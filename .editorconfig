@@ -1,0 +1,86 @@
+# ===============================================
+# EDITORCONFIG
+# Coding standards for consistent formatting
+# ===============================================
+
+root = true
+
+# ======================
+# ALL FILES
+# ======================
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# ======================
+# MARKDOWN FILES
+# ======================
+[markdown]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = false
+insert_final_newline = true
+max_line_length = 120
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ======================
+# SHELL SCRIPTS
+# ======================
+[*.sh]
+end_of_line = lf
+
+# ======================
+# YAML FILES
+# ======================
+[*.{yml,yaml}]
+indent_size = 2
+
+[docker-compose.yml]
+indent_size = 4
+
+# ======================
+# BUILD FILES
+# ======================
+[Makefile]
+indent_style = tab
+
+[Dockerfile*]
+indent_size = 4
+
+# ======================
+# CONFIGURATION FILES
+# ======================
+[*.{ini,conf}]
+indent_size = 4
+
+# ======================
+# FRONTEND FILES
+# ======================
+[*.json]
+indent_size = 2
+
+# ======================
+# PHP FILES
+# ======================
+[*.php]
+indent_size = 4
+max_line_length = 120
+
+# ======================
+# Test FILES
+# ======================
+[*.feature]
+charset = utf-8
+gherkin_indent_feature_children = true
+gherkin_indent_steps = true
+gherkin_indent_datatable = true
+gherkin_indent_docstring = true
+gherkin_indent_examples_table = true
+gherkin_table_cell_padding_size = 2
+gherkin_table_cell_right_align_numeric_content = true

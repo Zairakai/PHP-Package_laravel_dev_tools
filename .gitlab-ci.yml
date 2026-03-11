@@ -1,0 +1,22 @@
+# ================================
+# LARAVEL-DEV-TOOLS — Pipeline CI/CD
+# ================================
+# Self-hosted pipeline: uses local templates (local:)
+# because this project IS the source of the templates.
+#
+# Consumer projects use include:project instead.
+# See .gitlab/ci/pipeline-php-package.yml for full documentation.
+
+include:
+  - local: '.gitlab/ci/pipeline-php-package.yml'
+
+variables:
+  # Unique Composer cache key for this project
+  CACHE_KEY: "laravel-dev-tool"
+
+  # Nom du package sur Packagist
+  PACKAGIST_PACKAGE: "zairakai/laravel-dev-tools"
+
+  # Self-hosted mode: scripts live in this repo, not in vendor/
+  DEV_TOOLS_SCRIPTS: "scripts"
+  DEV_TOOLS_GITLAB_SCRIPTS: ".gitlab/scripts"

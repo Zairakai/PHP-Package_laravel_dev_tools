@@ -1,0 +1,353 @@
+# ================================
+# PIPELINE TEMPLATE — Package Laravel PHP
+# ================================
+# Shared pipeline template for Composer/Laravel packages in the Zairakai namespace.
+# Self-contained: anchors and jobs are all in this single file.
+# YAML anchors do not survive cross-file include: — this is a YAML parser
+# limitation, not a GitLab one. Everything is therefore kept here.
+#
+# All job names are prefixed php: to avoid any collision with JS or custom
+# jobs when this template is combined with other templates.
+#
+# USAGE in a consumer project:
+# ─────────────────────────────────────────
+#   include:
+#     - project: 'zairakai/php-packages/laravel-dev-tools'
+#       ref: main
+#       file: '.gitlab/ci/pipeline-php-package.yml'
+#
+#   variables:
+#     CACHE_KEY: "my-package"
+#     PACKAGIST_PACKAGE: "zairakai/my-package"
+#
+# FOR laravel-dev-tools ITSELF (self-hosted mode):
+# ─────────────────────────────────────────────────────
+#   include:
+#     - local: '.gitlab/ci/pipeline-php-package.yml'
+#
+#   variables:
+#     CACHE_KEY: "laravel-dev-tool"
+#     PACKAGIST_PACKAGE: "zairakai/laravel-dev-tools"
+#     DEV_TOOLS_SCRIPTS: "scripts"
+#     DEV_TOOLS_GITLAB_SCRIPTS: ".gitlab/scripts"
+# ================================
+
+include:
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+# ================================
+# WORKFLOW
+# ================================
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_REF_NAME =~ /^feature\// || $CI_COMMIT_REF_NAME =~ /^fix\// || $CI_COMMIT_REF_NAME =~ /^hotfix\//
+    - when: never
+
+# ================================
+# STAGES
+# ================================
+stages:
+  - security
+  - install
+  - validate
+  - quality
+  - test
+  - publish
+  - release
+  - metrics
+
+# ================================
+# DEFAULT VARIABLES
+# ================================
+variables:
+  # ── OVERRIDE PER PROJECT ──────────────────────────────────────────────────
+  CACHE_KEY: "zairakai-package"
+  PACKAGIST_PACKAGE: "zairakai/package"
+
+  # Paths to dev-tools scripts.
+  # Consumer projects do NOT need to override these.
+  # laravel-dev-tools itself overrides them in its own .gitlab-ci.yml.
+  DEV_TOOLS_SCRIPTS: "vendor/zairakai/laravel-dev-tools/scripts"
+  DEV_TOOLS_GITLAB_SCRIPTS: "vendor/zairakai/laravel-dev-tools/.gitlab/scripts"
+
+  # ── DOCKER IMAGES ─────────────────────────────────────────────────────────
+  ALPINE_IMAGE: "alpine:3.18"
+  DOCKERHUB_IMAGE: "zairakai/php:latest-test"
+  NODE_IMAGE: "node:20.11.0-alpine"
+  RELEASE_CLI_IMAGE: "registry.gitlab.com/gitlab-org/release-cli:v0.18.0"
+  SHELLCHECK_IMAGE: "koalaman/shellcheck-alpine:v0.10.0"
+
+  # ── COMPOSER CACHE ────────────────────────────────────────────────────────
+  COMPOSER_CACHE_DIR: ".composer-cache"
+
+  # ── GIT ───────────────────────────────────────────────────────────────────
+  GIT_CLEAN_FLAGS: "-ffdx -e vendor/ -e .composer-cache/"
+  GIT_DEPTH: 1
+  GIT_STRATEGY: fetch
+
+  # ── SECURITY ──────────────────────────────────────────────────────────────
+  DS_EXCLUDED_PATHS: "docs/,tests/"
+  SAST_EXCLUDED_PATHS: "docs/,tests/"
+  SECRET_DETECTION_EXCLUDED_PATHS: "docs/,tests/"
+
+# ================================
+# ANCHORS
+# ================================
+.base_job: &base_job
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+.cache_composer: &cache_composer
+  cache:
+    key:
+      files:
+        - composer.lock
+      prefix: $CACHE_KEY
+    paths:
+      - vendor/
+      - $COMPOSER_CACHE_DIR
+    policy: pull
+
+.cache_composer_push: &cache_composer_push
+  cache:
+    key:
+      files:
+        - composer.lock
+      prefix: $CACHE_KEY
+    paths:
+      - vendor/
+      - $COMPOSER_CACHE_DIR
+    policy: pull-push
+
+.job_php: &job_php
+  <<: [*base_job, *cache_composer]
+  image: ${DOCKERHUB_IMAGE}
+  before_script:
+    - composer --version
+
+# ================================
+# SECURITY
+# ================================
+secret_detection:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+
+# ================================
+# INSTALL
+# ================================
+php:install:
+  <<: [*base_job, *cache_composer_push]
+  stage: install
+  image: ${DOCKERHUB_IMAGE}
+  script:
+    - composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+# ================================
+# VALIDATE
+# ================================
+php:validate:markdownlint:
+  <<: [*base_job, *cache_composer]
+  stage: validate
+  image: ${NODE_IMAGE}
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - script_failure
+  needs:
+    - php:install
+  before_script:
+    - apk add --no-cache bash
+    - bash $DEV_TOOLS_SCRIPTS/install-markdownlint.sh
+  script:
+    - bash $DEV_TOOLS_SCRIPTS/markdownlint.sh
+
+php:validate:shellcheck:
+  <<: [*base_job, *cache_composer]
+  stage: validate
+  image: ${SHELLCHECK_IMAGE}
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - script_failure
+  needs:
+    - php:install
+  before_script:
+    - apk add --no-cache bash
+  script:
+    - bash $DEV_TOOLS_SCRIPTS/validate-shellcheck.sh
+
+# ================================
+# QUALITY
+# ================================
+php:quality:code-style:
+  <<: *job_php
+  stage: quality
+  needs:
+    - php:validate:shellcheck
+    - php:validate:markdownlint
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/cs-check.sh"
+
+php:quality:static-analysis:
+  <<: *job_php
+  stage: quality
+  needs:
+    - php:validate:shellcheck
+    - php:validate:markdownlint
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/phpstan.sh"
+  artifacts:
+    paths:
+      - build/phpstan/
+    expire_in: 1 week
+    when: on_failure
+
+php:quality:rector:
+  <<: *job_php
+  stage: quality
+  needs:
+    - php:validate:shellcheck
+    - php:validate:markdownlint
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/rector-check.sh"
+
+php:quality:insights:
+  <<: *job_php
+  stage: quality
+  needs:
+    - php:validate:shellcheck
+    - php:validate:markdownlint
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/insights.sh"
+
+php:quality:outdated:
+  <<: *job_php
+  stage: quality
+  needs:
+    - php:validate:shellcheck
+    - php:validate:markdownlint
+  script:
+    - composer outdated --direct --strict --format=json | tee outdated-report.json
+  artifacts:
+    paths:
+      - outdated-report.json
+    expire_in: 1 week
+
+php:quality:security:
+  <<: *job_php
+  stage: quality
+  needs:
+    - php:validate:shellcheck
+    - php:validate:markdownlint
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/security-audit.sh"
+  artifacts:
+    paths:
+      - build/logs/audit-report.json
+    expire_in: 1 month
+    when: always
+
+# ================================
+# TEST
+# ================================
+php:test:
+  <<: *job_php
+  stage: test
+  before_script:
+    - mkdir -p build/logs build/coverage
+    - git config --global user.email "ci@gitlab.com"
+    - git config --global user.name "GitLab CI"
+    - git config --global init.defaultBranch main
+    - git config --global --add safe.directory '*'
+  script:
+    - CI=true bash "$DEV_TOOLS_SCRIPTS/test.sh"
+  coverage: '/Lines:\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      junit: build/logs/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: build/logs/cobertura.xml
+    paths:
+      - build/logs/
+      - build/coverage/
+    expire_in: 1 week
+    when: always
+
+# ================================
+# PUBLISH
+# ================================
+php:publish:
+  <<: [*base_job, *cache_composer]
+  stage: publish
+  image: ${ALPINE_IMAGE}
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - php:test
+  before_script:
+    - apk add --no-cache bash curl jq
+  script:
+    - bash "$DEV_TOOLS_GITLAB_SCRIPTS/packagist-release.sh"
+
+# ================================
+# RELEASE
+# ================================
+php:release:
+  <<: [*base_job, *cache_composer]
+  stage: release
+  image: ${RELEASE_CLI_IMAGE}
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - php:publish
+  before_script:
+    - apk add --no-cache bash git jq
+    - git config --global --add safe.directory '*'
+    - git config --global user.name "GitLab CI"
+    - git config --global user.email "ci@gitlab.com"
+  script:
+    - |
+      bash "$DEV_TOOLS_GITLAB_SCRIPTS/generate-release-notes.sh"
+      if [ ! -f release_notes.md ]; then
+        echo "❌ ERROR: release_notes.md not created"
+        exit 1
+      fi
+      release-cli create \
+        --tag-name "${CI_COMMIT_TAG}" \
+        --name "Release ${CI_COMMIT_TAG}" \
+        --description "$(cat release_notes.md)" \
+        --assets-link "{\"name\":\"Packagist\",\"url\":\"https://packagist.org/packages/${PACKAGIST_PACKAGE}#${CI_COMMIT_TAG}\"}"
+  artifacts:
+    paths:
+      - release_notes.md
+    expire_in: 1 year
+
+# ================================
+# METRICS
+# ================================
+php:metrics:
+  <<: *job_php
+  stage: metrics
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - php:release
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/phpmetrics.sh"
+  artifacts:
+    paths:
+      - build/phpmetrics/
+    expire_in: 1 month

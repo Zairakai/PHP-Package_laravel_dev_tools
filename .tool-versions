@@ -1,0 +1,7 @@
+# Tool versions for Zairakai tooling
+# Format: tool=version
+# Use "latest" for most recent stable version
+
+shellcheck=0.9.0
+markdownlint-cli2=latest
+bats=1.11.0

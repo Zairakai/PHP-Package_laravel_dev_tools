@@ -1,0 +1,21 @@
+{
+  "analyse": "bash vendor/zairakai/laravel-dev-tools/scripts/phpstan.sh",
+  "analyse:baseline": "GENERATE_BASELINE=true bash vendor/zairakai/laravel-dev-tools/scripts/phpstan.sh",
+  "cs": "bash vendor/zairakai/laravel-dev-tools/scripts/cs-check.sh",
+  "cs-fix": "bash vendor/zairakai/laravel-dev-tools/scripts/cs-fix.sh",
+  "insights": "bash vendor/zairakai/laravel-dev-tools/scripts/insights.sh",
+  "insights:fix": "bash vendor/zairakai/laravel-dev-tools/scripts/insights.sh --fix",
+  "markdown": "bash vendor/zairakai/laravel-dev-tools/scripts/markdownlint.sh",
+  "markdown:fix": "bash vendor/zairakai/laravel-dev-tools/scripts/markdownlint.sh --fix",
+  "phpmetrics": "bash vendor/zairakai/laravel-dev-tools/scripts/phpmetrics.sh",
+  "post-update-cmd": [
+    "@setup-dev-tools"
+  ],
+  "quality-fast": "bash vendor/zairakai/laravel-dev-tools/scripts/ci-quality.sh",
+  "rector": "bash vendor/zairakai/laravel-dev-tools/scripts/rector-check.sh",
+  "rector:fix": "bash vendor/zairakai/laravel-dev-tools/scripts/rector-fix.sh",
+  "setup-dev-tools": "bash vendor/zairakai/laravel-dev-tools/scripts/setup-package.sh",
+  "test": "bash vendor/zairakai/laravel-dev-tools/scripts/test.sh",
+  "test:coverage": "COVERAGE=true bash vendor/zairakai/laravel-dev-tools/scripts/test.sh",
+  "test:unit": "TESTSUITE=Unit bash vendor/zairakai/laravel-dev-tools/scripts/test.sh"
+}

@@ -1,0 +1,37 @@
+# Default: treat everything as text and normalize EOL to LF
+* text=auto eol=lf
+
+# Markdown files: nice diffs
+*.md diff=markdown
+
+# PHP files: syntax-aware diffs
+*.php diff=php
+
+# JSON files: mark as text and normalize EOL
+*.json text eol=lf
+
+# YAML/YML files: mark as text and normalize EOL
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Shell scripts: mark as text, normalize EOL, and make executable
+*.sh text eol=lf
+
+# Composer & package files
+composer.json text eol=lf
+composer.lock text eol=lf
+
+# Git hooks
+.githooks/* text eol=lf
+
+# Ignore binary diffs
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

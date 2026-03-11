@@ -1,0 +1,55 @@
+# ================================
+# PIPELINE TEMPLATE — Laravel Full-Stack (PHP + JS)
+# ================================
+# Single include point for fullstack Laravel apps.
+# Mirrors the fullstack.mk approach: one file, both toolchains.
+#
+# Stage alignment (PHP || JS run in parallel at each level):
+#   install  : php:install (PHP) || js:install (JS)
+#   validate : php:validate:markdownlint + php:validate:shellcheck (PHP)
+#              || js:validate:markdownlint + js:validate:shellcheck (JS)
+#   quality  : php:quality:* (PHP) || js:quality:* (JS)
+#   test     : php:test (PHP) || js:test (JS)
+#   deploy   : deploy:staging / deploy:production (custom per app)
+#   metrics  : php:metrics (PHP)
+#
+# USAGE:
+# ─────────────────────────────────────────
+#   include:
+#     - project: 'zairakai/php-packages/laravel-dev-tools'
+#       ref: main
+#       file: '.gitlab/ci/pipeline-laravel-fullstack.yml'
+#
+#   variables:
+#     CACHE_KEY: "my-app-v1"
+# ================================
+
+include:
+  # PHP side — all Laravel CI jobs (install, validate, quality, test, deploy, metrics)
+  - project: "zairakai/php-packages/laravel-dev-tools"
+    ref: main
+    file: ".gitlab/ci/pipeline-laravel-app.yml"
+  # JS side — pipeline-js-app.yml includes pipeline-js-package.yml + disables build/publish/release
+  - project: "zairakai/npm-packages/dev-tools"
+    ref: main
+    file: ".gitlab/ci/pipeline-js-app.yml"
+
+# ================================
+# STAGES — unified ordered list
+# GitLab deduplicates stage names from included files.
+# ================================
+stages:
+  - security
+  - install
+  - validate
+  - quality
+  - test
+  - deploy
+  - metrics
+
+# ================================
+# FULLSTACK VARIABLES
+# ================================
+variables:
+  # Combined git clean: preserve both PHP vendor/ and JS node_modules/
+  GIT_CLEAN_FLAGS: "-ffdx -e vendor/ -e .composer-cache/ -e node_modules/ -e .npm/"

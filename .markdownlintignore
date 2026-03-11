@@ -1,0 +1,6 @@
+.cache/
+.git/
+.opencode/
+node_modules/
+vendor/
+*.min.md

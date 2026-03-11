@@ -1,0 +1,19 @@
+# Zairakai Laravel Dev Tools - Full-Stack Makefile (PHP + JS)
+# Includes unified targets from laravel-dev-tools and npm dev-tools.
+
+LARAVEL_DIRECTORY_TOOLS_PROJECT_ROOT := $(shell pwd)
+NPM_DIRECTORY_TOOLS_PROJECT_ROOT := $(shell pwd)
+
+LARAVEL_DIRECTORY_TOOLS_PROJECT_NAME := "Laravel-App"
+NPM_DIRECTORY_TOOLS_PROJECT_NAME := "Laravel-App"
+
+.DEFAULT_GOAL := help
+
+# Unified full-stack includes
+include vendor/zairakai/laravel-dev-tools/tools/make/fullstack.mk
+
+# Add your custom project-specific targets below
+# Example:
+# .PHONY: deploy
+# deploy: ## Deploy the application
+# 	@echo "Deploying application…"

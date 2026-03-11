@@ -1,0 +1,23 @@
+# Base PHPStan configuration - SHARED RULES ONLY
+# Common rules for both package dev and Laravel projects
+
+parameters:
+  level: max
+
+  parallel:
+    maximumNumberOfProcesses: 4
+
+  checkMissingCallableSignature: true
+  checkTooWideReturnTypesInProtectedAndPublicMethods: true
+  checkUninitializedProperties: true
+  checkDynamicProperties: false
+
+  reportUnmatchedIgnoredErrors: false
+  treatPhpDocTypesAsCertain: false
+
+  ignoreErrors:
+    - identifier: missingType.iterableValue
+
+    # Laravel patterns
+    - '#Access to an undefined property [a-zA-Z0-9_\\]+::\$[a-zA-Z0-9_]+\.#'
+    - '#Call to an undefined method [a-zA-Z0-9_\\]+::[a-zA-Z0-9_]+\(\)\.#'

@@ -1,0 +1,12 @@
+# PHPStan configuration for PACKAGE DEVELOPMENT
+# This file is used locally and in CI/CD for analyzing the package itself
+# Add to .gitignore if you want devs to customize locally
+
+includes:
+  - config/package.neon
+
+parameters:
+  paths:
+    - src
+
+  tmpDir: build/phpstan

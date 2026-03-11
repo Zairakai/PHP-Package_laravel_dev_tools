@@ -1,0 +1,37 @@
+# ======================
+# DEPENDENCIES
+# ======================
+/vendor
+/node_modules
+
+# ======================
+# BUILD & ARTIFACTS
+# ======================
+/build
+/storage
+
+# ======================
+# TEST / CACHE
+# ======================
+.phpunit.cache
+.phpunit.result.cache
+/coverage
+
+# ======================
+# IDE / EDITORS
+# ======================
+.idea/
+.vscode/
+.phpstorm.meta.php
+.phpactor.json
+
+# ======================
+# OS FILES
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# TEMP / LOGS
+# ======================
+*.log

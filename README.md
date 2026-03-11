@@ -1,93 +1,273 @@
-# Laravel Dev Tools
+# zairakai/laravel-dev-tools
 
+[![Main][pipeline-main-badge]][pipeline-main-link]
+[![Coverage][coverage-badge]][coverage-link]
 
+[![GitLab Release][gitlab-release-badge]][gitlab-release]
+[![Packagist][packagist-badge]][packagist]
+[![Downloads][downloads-badge]][packagist]
+[![License][license-badge]][license]
 
-## Getting started
+[![PHP][php-badge]][php]
+[![Laravel][laravel-badge]][laravel]
+[![Static Analysis][phpstan-badge]][phpstan]
+[![Code Style][pint-badge]][pint]
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+One unified toolkit to set up Laravel quality tooling. Context-aware by default — it adapts to both standalone packages and full-stack applications.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+---
 
-## Add your files
+## Why zairakai/laravel-dev-tools?
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+| Concept | Benefit |
+| :--- | :--- |
+| **Unified Logic** | The same quality gate for all your projects. Only the target (package or app) changes, not the rigor. |
+| **Concentrated Configs** | Centralized, opinionated configurations for PHPStan, Rector, Pint, and PHP Insights. Avoid configuration drift across projects. |
+| **Unified Workflow** | One set of `make` commands to rule them all. Whether it's a small package or a full-stack app, the quality gate remains the same. |
+| **Auto-Syncing CI** | Automatically updates GitLab CI ref tags in your `.gitlab-ci.yml` when you update the package. Keep your pipelines current without manual effort. |
+| **Zero Friction** | Automated setup via composer plugin and shell scripts handles the heavy lifting on install. |
 
+---
+
+## Features
+
+| Tool | Responsibility |
+| :--- | :--- |
+| **Pint** | Opinionated Laravel code style enforcer. |
+| **PHPStan** | Static analysis at max level with Laravel-aware rules. |
+| **Rector** | Automated refactoring and modernization. |
+| **PHP Insights** | Architecture and code quality metrics. |
+| **PHPMetrics** | Code metrics report. |
+| **Markdownlint** | Consistent documentation. |
+| **ShellCheck** | Validated shell scripts. |
+| **GitLab CI** | Reusable pipeline templates for Laravel apps and packages. |
+| **Makefile** | Unified `make quality`, `make test`, `make ci` targets (delegated to core). |
+| **Full-stack** | Integrates with `@zairakai/js-dev-tools` for JS/TS tooling in one unified workflow. |
+
+On install, the composer plugin:
+
+- creates `Makefile` (PHP-only or full-stack if `package.json` is detected, delegating to `vendor/zairakai/laravel-dev-tools/tools/make/core.mk`)
+- creates `.editorconfig`
+- creates `config/dev-tools/baseline.neon` for PHPStan
+- adds necessary scripts to `composer.json`
+- registers the automatic GitLab CI ref synchronization
+
+---
+
+## Install
+
+```bash
+composer require --dev zairakai/laravel-dev-tools
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/zairakai/php-packages/laravel-dev-tools.git
-git branch -M main
-git push -uf origin main
+
+For full-stack Laravel + Vue projects:
+
+```bash
+composer require --dev zairakai/laravel-dev-tools
+npm install --save-dev @zairakai/js-dev-tools
+php artisan dev-tools:publish --fullstack
 ```
 
-## Integrate with your tools
-
-* [Set up project integrations](https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+---
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+make quality        # pint + phpstan + rector + insights + markdownlint + shellcheck
+make quality-fast   # pint + phpstan + markdownlint (fast CI check)
+make quality-fix    # auto-fix (rector + pint + markdownlint)
+make test           # phpunit
+make test-coverage  # phpunit with coverage report (requires PCOV or Xdebug)
+make test-all       # phpunit + bats
+make ci             # full pipeline simulation
+make doctor         # environment diagnostics
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+---
+
+## Configuration
+
+The package provides a set of opinionated configurations that you can use as-is or extend in your project.
+
+### PHPStan
+
+Create `phpstan.neon` in your project root:
+
+```neon
+includes:
+    - vendor/zairakai/laravel-dev-tools/config/base.neon
+
+parameters:
+    paths:
+        - src
+        - tests
+```
+
+### Rector
+
+Create `rector.php` in your project root:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Rector\Config\RectorConfig;
+
+return static function (RectorConfig $rectorConfig): void
+{
+    $rectorConfig->import(__DIR__ . '/vendor/zairakai/laravel-dev-tools/config/rector.base.php');
+
+    $rectorConfig->paths([
+        __DIR__ . '/src',
+        __DIR__ . '/tests',
+    ]);
+};
+```
+
+### PHP Insights
+
+Create `insights.php` in your project root:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+return require 'vendor/zairakai/laravel-dev-tools/config/insights.base.php';
+```
+
+---
+
+## Publishing configs
+
+Publish config files to `config/dev-tools/` (never overwritten unless `--force`):
+
+```bash
+# All at once
+php artisan dev-tools:publish --publish
+
+# By group
+php artisan dev-tools:publish --publish=quality
+php artisan dev-tools:publish --publish=style
+php artisan dev-tools:publish --publish=testing
+php artisan dev-tools:publish --publish=hooks
+
+# Single files
+php artisan dev-tools:publish --publish=phpstan
+php artisan dev-tools:publish --publish=baseline
+php artisan dev-tools:publish --publish=rector
+php artisan dev-tools:publish --publish=insights
+php artisan dev-tools:publish --publish=pint
+php artisan dev-tools:publish --publish=markdownlint
+php artisan dev-tools:publish --publish=phpunit
+php artisan dev-tools:publish --publish=gitlab-ci
+
+# Full-stack Makefile (PHP + JS)
+php artisan dev-tools:publish --fullstack
+```
+
+For standalone packages (without artisan):
+
+```bash
+bash vendor/zairakai/laravel-dev-tools/scripts/setup-package.sh --publish=gitlab-ci
+bash vendor/zairakai/laravel-dev-tools/scripts/setup-package.sh --fullstack
+```
+
+---
+
+## GitLab CI pipeline templates
+
+```yaml
+# Laravel package pipeline
+include:
+  - project: 'zairakai/php-packages/laravel-dev-tools'
+    ref: v1.0.0          # pin to a release tag for reproducible builds
+    file: '.gitlab/ci/pipeline-php-package.yml'
+
+variables:
+  CACHE_KEY: "my-package-v1"
+  PACKAGIST_PACKAGE: "vendor/my-package"
+```
+
+```yaml
+# Laravel application pipeline
+include:
+  - project: 'zairakai/php-packages/laravel-dev-tools'
+    ref: v1.0.0          # pin to a release tag for reproducible builds
+    file: '.gitlab/ci/pipeline-laravel-app.yml'
+
+variables:
+  CACHE_KEY: "my-app-v1"
+```
+
+```yaml
+# Laravel + Vue full-stack pipeline (PHP + JS in one include)
+include:
+  - project: 'zairakai/php-packages/laravel-dev-tools'
+    ref: v1.0.0          # pin to a release tag for reproducible builds
+    file: '.gitlab/ci/pipeline-laravel-fullstack.yml'
+
+variables:
+  CACHE_KEY: "my-app-v1"
+```
+
+Available templates:
+
+- `pipeline-php-package.yml` — security → install → validate → quality → test → publish → release
+- `pipeline-laravel-app.yml` — security → install → validate → quality → test → deploy → metrics
+- `pipeline-laravel-fullstack.yml` — aggregates PHP + JS pipelines via a single include
+
+---
+
+## Development
+
+```bash
+make quality        # full quality check
+make quality-fast   # fast check (pint + phpstan + markdownlint)
+make test           # run tests
+make doctor         # environment diagnostics
+```
+
+---
 
 ## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Contributions are welcome. Please read [CONTRIBUTING.md][contributing] for the project-specific workflow and quality standards.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+---
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Getting Help
 
-## License
-For open source projects, say how it is licensed.
+[![License][license-badge]][license]
+[![Security Policy][security-badge]][security]
+[![Issues][issues-badge]][issues]
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+**Made with ❤️ by [Zairakai][ecosystem]**
+
+<!-- Reference Links -->
+[pipeline-main-badge]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/badges/main/pipeline.svg?ignore_skipped=true&key_text=Main
+[pipeline-main-link]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/commits/main
+[coverage-badge]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/badges/main/coverage.svg
+[coverage-link]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/jobs/artifacts/main/browse
+[gitlab-release-badge]: https://img.shields.io/gitlab/v/release/zairakai/php-packages/laravel-dev-tools?logo=gitlab
+[gitlab-release]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/releases
+[packagist-badge]: https://img.shields.io/packagist/v/zairakai/laravel-dev-tools
+[packagist]: https://packagist.org/packages/zairakai/laravel-dev-tools
+[downloads-badge]: https://img.shields.io/packagist/dt/zairakai/laravel-dev-tools
+[license-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[license]: ./LICENSE
+[security-badge]: https://img.shields.io/badge/security-scanned-green.svg
+[security]: ./SECURITY.md
+[issues-badge]: https://img.shields.io/gitlab/issues/open-raw/zairakai%2Fphp-packages%2Flaravel-dev-tools?logo=gitlab&label=Issues
+[issues]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/issues
+[php-badge]: https://img.shields.io/badge/php-8.3%20%7C%208.4-blue?logo=php
+[php]: https://www.php.net
+[laravel-badge]: https://img.shields.io/badge/Laravel-11%20%7C%2012-red?logo=laravel
+[laravel]: https://laravel.com
+[phpstan-badge]: https://img.shields.io/badge/static%20analysis-phpstan-5B2C6F.svg?logo=php
+[phpstan]: https://phpstan.org
+[pint-badge]: https://img.shields.io/badge/code%20style-pint-22C55E.svg
+[pint]: https://laravel.com/docs/pint
+[ecosystem]: https://gitlab.com/zairakai
+[contributing]: ./CONTRIBUTING.md

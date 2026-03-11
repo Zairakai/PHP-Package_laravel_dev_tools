@@ -1,0 +1,137 @@
+{
+  "name": "zairakai/laravel-dev-tools",
+  "description": "The unified and centralized development toolkit for Laravel projects - Pint, PHPStan, Rector, PHP Insights, git hooks, and GitLab CI pipeline templates",
+  "license": "MIT",
+  "type": "composer-plugin",
+  "keywords": [
+    "dev-tools",
+    "toolkit",
+    "unified",
+    "centralized",
+    "makefile",
+    "git-hooks",
+    "gitlab-ci",
+    "laravel",
+    "pint",
+    "phpstan",
+    "rector",
+    "phpinsights"
+  ],
+  "authors": [
+    {
+      "name": "Stanislas Poisson",
+      "email": "stanislas.p@the-white-rabbits.fr",
+      "homepage": "https://gitlab.com/zairakai",
+      "role": "Maintainer"
+    }
+  ],
+  "homepage": "https://gitlab.com/zairakai/php-packages/laravel-dev-tools",
+  "support": {
+    "issues": "https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/issues",
+    "source": "https://gitlab.com/zairakai/php-packages/laravel-dev-tools",
+    "docs": "https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/blob/main/README.md"
+  },
+  "funding": [
+    {
+      "type": "patreon",
+      "url": "https://www.patreon.com/c/zairakai"
+    },
+    {
+      "type": "other",
+      "url": "https://www.twitch.tv/zairakai"
+    }
+  ],
+  "require": {
+    "php": "^8.3",
+    "composer-plugin-api": "^2.0",
+    "driftingly/rector-laravel": "^1.2 || ^2.0",
+    "larastan/larastan": "^2.0 || ^3.0",
+    "laravel/pint": "^1.13",
+    "nunomaduro/phpinsights": "^2.11",
+    "phpmetrics/phpmetrics": "^2.8",
+    "phpstan/phpstan": "^1.10 || ^2.0",
+    "rector/rector": "^1.0 || ^2.0"
+  },
+  "require-dev": {
+    "composer/composer": "^2.0",
+    "ergebnis/composer-normalize": "^2.48",
+    "illuminate/console": "^11.0 || ^12.0",
+    "illuminate/database": "^11.0 || ^12.0",
+    "illuminate/filesystem": "^11.0 || ^12.0",
+    "illuminate/support": "^11.0 || ^12.0",
+    "orchestra/testbench": "^9.0 || ^10.0",
+    "phpunit/phpunit": "^12.0"
+  },
+  "suggest": {
+    "enlightn/enlightn": "Security and performance analysis (Laravel apps only)",
+    "ergebnis/composer-normalize": "Automated composer.json normalization"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "Zairakai\\LaravelDevTools\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Zairakai\\LaravelDevTools\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "ergebnis/composer-normalize": true,
+      "zairakai/laravel-dev-tools": true
+    },
+    "optimize-autoloader": true,
+    "platform": {
+      "php": "8.3"
+    },
+    "preferred-install": "dist",
+    "sort-packages": true
+  },
+  "extra": {
+    "authors": [
+      {
+        "email": [
+          "stanislas.p@the-white-rabbits.fr"
+        ],
+        "name": "Stanislas Poisson",
+        "notes": "Primary maintainer",
+        "social": {
+          "github": "https://github.com/Stanislas-Poisson",
+          "gitlab": "https://gitlab.com/zairakai",
+          "linkedin": "https://www.linkedin.com/in/stanislasp/",
+          "stanislas-poisson": "https://the-white-rabbits.fr",
+          "the-white-rabbits": "https://the-white-rabbits.fr",
+          "twitch": "https://twitch.tv/zairakai"
+        }
+      }
+    ],
+    "class": "Zairakai\\LaravelDevTools\\Composer\\DevToolsPlugin",
+    "laravel": {
+      "providers": [
+        "Zairakai\\LaravelDevTools\\LaravelDevToolsServiceProvider"
+      ]
+    }
+  },
+  "scripts": {
+    "analyse": "bash scripts/phpstan.sh",
+    "analyse:baseline": "GENERATE_BASELINE=true bash scripts/phpstan.sh",
+    "cs": "bash scripts/cs-check.sh",
+    "cs:fix": "bash scripts/cs-fix.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "insights": "bash scripts/insights.sh",
+    "insights:fix": "bash scripts/insights.sh --fix",
+    "markdown": "bash scripts/markdownlint.sh",
+    "markdown:fix": "bash scripts/markdownlint.sh --fix",
+    "phpmetrics": "bash scripts/phpmetrics.sh",
+    "quality": "bash scripts/ci-quality.sh",
+    "rector": "bash scripts/rector-check.sh",
+    "rector:fix": "bash scripts/rector-fix.sh",
+    "test": "bash scripts/test.sh",
+    "test:coverage": "COVERAGE=true bash scripts/test.sh",
+    "test:unit": "TESTSUITE=Unit bash scripts/test.sh"
+  }
+}

@@ -1,0 +1,11 @@
+# PHPStan configuration for LARAVEL LIBRARY packages
+# For packages that consume laravel-dev-tools
+
+includes:
+    - base.neon
+
+parameters:
+    paths:
+        - ../../../../src
+
+    tmpDir: ../../../../build/phpstan
