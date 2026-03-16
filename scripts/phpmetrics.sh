@@ -18,11 +18,20 @@ fi
 METRICS_DIR="$PROJECT_ROOT/build/phpmetrics"
 mkdir -p "$METRICS_DIR"
 
+# Detect source directory based on project type
+if [[ -f "$PROJECT_ROOT/artisan" ]] && grep -q '"laravel/framework"' "$PROJECT_ROOT/composer.json" 2>/dev/null; then
+    METRICS_SOURCE="app/"
+    log_step "Detected Laravel application context (analysing app/)"
+else
+    METRICS_SOURCE="src/"
+    log_step "Detected package context (analysing src/)"
+fi
+
 # Build PHPMetrics command
 PHPMETRICS_ARGS=(
     "--report-html=$METRICS_DIR"
     "--report-json=$METRICS_DIR/metrics.json"
-    "src/"
+    "$METRICS_SOURCE"
 )
 
 # Run PHPMetrics
