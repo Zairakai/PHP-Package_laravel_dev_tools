@@ -37,6 +37,7 @@ use SlevomatCodingStandard\Sniffs\Classes\SuperfluousInterfaceNamingSniff;
 use SlevomatCodingStandard\Sniffs\ControlStructures\DisallowYodaComparisonSniff;
 use SlevomatCodingStandard\Sniffs\Functions\FunctionLengthSniff;
 use SlevomatCodingStandard\Sniffs\Functions\UnusedParameterSniff;
+use SlevomatCodingStandard\Sniffs\Namespaces\UseSpacingSniff;
 use SlevomatCodingStandard\Sniffs\TypeHints\DisallowMixedTypeHintSniff;
 use SlevomatCodingStandard\Sniffs\TypeHints\PropertyTypeHintSniff;
 use SlevomatCodingStandard\Sniffs\TypeHints\UselessConstantTypeHintSniff;
@@ -59,6 +60,10 @@ return [
         SuperfluousAbstractClassNamingSniff::class,
         SuperfluousExceptionNamingSniff::class,
         SuperfluousInterfaceNamingSniff::class,
+
+        // ── Namespaces ────────────────────────────────────────────────────────
+        // Conflicts with Pint blank_line_between_import_groups rule (class/function/const separation)
+        UseSpacingSniff::class,
 
         // ── Type hints ────────────────────────────────────────────────────────
         // PSR-12 does not mandate mixed/property type hints at this level
