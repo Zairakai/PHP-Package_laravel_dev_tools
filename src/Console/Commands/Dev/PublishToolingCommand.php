@@ -169,6 +169,8 @@ final class PublishToolingCommand extends Command
                 . ' tool configurations');
             $this->line('       or <fg=cyan>--publish=quality</>, <fg=cyan>--publish=style</>'
                 . ', <fg=cyan>--publish=pint</>…');
+            $this->line('<fg=yellow>Tip:</> Run with <fg=cyan>--publish=governance</>'
+                . ' to publish CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md');
         }
     }
 

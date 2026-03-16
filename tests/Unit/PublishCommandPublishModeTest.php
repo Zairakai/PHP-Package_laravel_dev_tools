@@ -259,6 +259,29 @@ final class PublishCommandPublishModeTest extends TestCase
     }
 
     // =========================================================================
+    // --publish=governance
+    // =========================================================================
+
+    #[Test]
+    public function publish_mode_governance_creates_all_three_files(): void
+    {
+        $exitCode = Artisan::call('dev-tools:publish', [
+            '--publish'        => 'governance',
+            '--force'          => true,
+            '--no-interaction' => true,
+        ]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
+        $this->assertFileExists($this->basePath . '/CODE_OF_CONDUCT.md');
+        $this->assertFileExists($this->basePath . '/SECURITY.md');
+
+        File::delete($this->basePath . '/CONTRIBUTING.md');
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 
@@ -282,5 +305,12 @@ final class PublishCommandPublishModeTest extends TestCase
             File::delete($makefilePath);
         }
 
+        foreach (['CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'SECURITY.md'] as $governanceFile) {
+            $path = $this->basePath . '/' . $governanceFile;
+
+            if (File::exists($path)) {
+                File::delete($path);
+            }
+        }
     }
 }
