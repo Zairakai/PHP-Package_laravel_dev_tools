@@ -11,6 +11,6 @@ include:
     file: '.gitlab/ci/pipeline-laravel-fullstack.yml'
 
 variables:
-  CACHE_KEY: "{{APP_SLUG}}"
+  CACHE_KEY: "my-app"
   APP_ENV: "testing"
   JS_PACKAGE_MANAGER: "npm"
