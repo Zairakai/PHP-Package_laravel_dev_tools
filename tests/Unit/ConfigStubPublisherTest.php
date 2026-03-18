@@ -55,6 +55,17 @@ final class ConfigStubPublisherTest extends TestCase
     }
 
     // =========================================================================
+    // publishGovernanceFiles
+    // =========================================================================
+
+    #[Test]
+    public function available_groups_includes_governance(): void
+    {
+        $groups = $this->configStubPublisher->availableGroups();
+        $this->assertContains('governance', $groups);
+    }
+
+    // =========================================================================
     // availableGroups / availableKeys
     // =========================================================================
 
@@ -87,11 +98,18 @@ final class ConfigStubPublisherTest extends TestCase
     }
 
     #[Test]
+    public function available_keys_includes_governance(): void
+    {
+        $keys = $this->configStubPublisher->availableKeys();
+        $this->assertContains('governance', $keys);
+    }
+
+    #[Test]
     public function available_keys_returns_individual_publishable_keys(): void
     {
         $keys = $this->configStubPublisher->availableKeys();
 
-        $expectedKeys = ['phpstan', 'rector', 'insights', 'baseline', 'pint', 'markdownlint', 'phpunit', 'hooks', 'gitlab-ci'];
+        $expectedKeys = ['phpstan', 'rector', 'insights', 'baseline', 'pint', 'markdownlint', 'phpunit', 'hooks', 'gitlab-ci', 'governance'];
 
         foreach ($expectedKeys as $expectedKey) {
             $this->assertContains($expectedKey, $keys);
@@ -146,6 +164,21 @@ final class ConfigStubPublisherTest extends TestCase
         $this->assertTrue($result);
         $this->assertFileExists($targetPath);
         File::delete($targetPath);
+    }
+
+    #[Test]
+    public function publish_by_key_governance_creates_files(): void
+    {
+        $result = $this->configStubPublisher->publishByKey('governance', $this->vendorPath, $this->basePath, false);
+
+        $this->assertTrue($result);
+        $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
+        $this->assertFileExists($this->basePath . '/CODE_OF_CONDUCT.md');
+        $this->assertFileExists($this->basePath . '/SECURITY.md');
+
+        File::delete($this->basePath . '/CONTRIBUTING.md');
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
     }
 
     #[Test]
@@ -330,6 +363,77 @@ variables:
         $this->assertStringContainsString('CACHE_KEY', $content);
         $this->assertStringContainsString('PACKAGIST_PACKAGE', $content);
         File::delete($targetPath);
+    }
+
+    #[Test]
+    public function publish_governance_files_creates_all_three_files(): void
+    {
+        $result = $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, false);
+
+        $this->assertTrue($result);
+        $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
+        $this->assertFileExists($this->basePath . '/CODE_OF_CONDUCT.md');
+        $this->assertFileExists($this->basePath . '/SECURITY.md');
+
+        File::delete($this->basePath . '/CONTRIBUTING.md');
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
+    }
+
+    #[Test]
+    public function publish_governance_files_overwrites_with_force(): void
+    {
+        $contributingPath = $this->basePath . '/CONTRIBUTING.md';
+        File::put($contributingPath, '# My custom contributing guide');
+
+        $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, true);
+
+        $this->assertStringNotContainsString('My custom contributing guide', File::get($contributingPath));
+
+        File::delete($contributingPath);
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
+    }
+
+    #[Test]
+    public function publish_governance_files_replaces_placeholder(): void
+    {
+        // Provide a composer.json so the URL can be derived
+        $composerPath = $this->basePath . '/composer.json';
+        File::put($composerPath, '{"name": "zairakai/test-package"}');
+
+        $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, false);
+
+        $security = File::get($this->basePath . '/SECURITY.md');
+        $this->assertStringNotContainsString('PACKAGE_GITLAB_ISSUES', $security);
+        $this->assertStringContainsString('gitlab.com/zairakai', $security);
+
+        File::delete($composerPath);
+        File::delete($this->basePath . '/CONTRIBUTING.md');
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
+    }
+
+    #[Test]
+    public function publish_governance_files_returns_false_when_stubs_dir_missing(): void
+    {
+        $result = $this->configStubPublisher->publishGovernanceFiles('/nonexistent/vendor/path', $this->basePath, false);
+        $this->assertFalse($result);
+    }
+
+    #[Test]
+    public function publish_governance_files_skips_user_modified_file_without_force(): void
+    {
+        $contributingPath = $this->basePath . '/CONTRIBUTING.md';
+        File::put($contributingPath, '# My custom contributing guide');
+
+        $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, false);
+
+        $this->assertStringContainsString('My custom contributing guide', File::get($contributingPath));
+
+        File::delete($contributingPath);
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
     }
 
     #[Test]
