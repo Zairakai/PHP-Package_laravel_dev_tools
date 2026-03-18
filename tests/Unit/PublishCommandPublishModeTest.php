@@ -34,6 +34,29 @@ final class PublishCommandPublishModeTest extends TestCase
         parent::tearDown();
     }
 
+    // =========================================================================
+    // --publish=governance
+    // =========================================================================
+
+    #[Test]
+    public function publish_mode_governance_creates_all_three_files(): void
+    {
+        $exitCode = Artisan::call('dev-tools:publish', [
+            '--publish'        => 'governance',
+            '--force'          => true,
+            '--no-interaction' => true,
+        ]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
+        $this->assertFileExists($this->basePath . '/CODE_OF_CONDUCT.md');
+        $this->assertFileExists($this->basePath . '/SECURITY.md');
+
+        File::delete($this->basePath . '/CONTRIBUTING.md');
+        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
+        File::delete($this->basePath . '/SECURITY.md');
+    }
+
     #[Test]
     public function publish_mode_individual_key_baseline_creates_file(): void
     {
@@ -256,29 +279,6 @@ final class PublishCommandPublishModeTest extends TestCase
 
         $output = Artisan::output();
         $this->assertStringContainsString('Done', $output);
-    }
-
-    // =========================================================================
-    // --publish=governance
-    // =========================================================================
-
-    #[Test]
-    public function publish_mode_governance_creates_all_three_files(): void
-    {
-        $exitCode = Artisan::call('dev-tools:publish', [
-            '--publish'        => 'governance',
-            '--force'          => true,
-            '--no-interaction' => true,
-        ]);
-
-        $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
-        $this->assertFileExists($this->basePath . '/CODE_OF_CONDUCT.md');
-        $this->assertFileExists($this->basePath . '/SECURITY.md');
-
-        File::delete($this->basePath . '/CONTRIBUTING.md');
-        File::delete($this->basePath . '/CODE_OF_CONDUCT.md');
-        File::delete($this->basePath . '/SECURITY.md');
     }
 
     // =========================================================================

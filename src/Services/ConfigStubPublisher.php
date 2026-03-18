@@ -168,6 +168,46 @@ final readonly class ConfigStubPublisher
     }
 
     /**
+     * Publish governance files (CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md) to project root.
+     *
+     * Replaces PACKAGE_GITLAB_ISSUES placeholder with a URL derived from composer.json name.
+     * Hash-protected: skips files modified by the user (use --force to overwrite).
+     * Not included in 'all' — requires explicit opt-in (--publish=governance).
+     */
+    public function publishGovernanceFiles(string $vendorPath, string $basePath, bool $force): bool
+    {
+        $stubsDir = $vendorPath . '/stubs/governance';
+
+        if (! File::isDirectory($stubsDir)) {
+            $this->componentsFactory->error('Governance stubs directory not found: ' . $stubsDir);
+
+            return false;
+        }
+
+        $issuesUrl = $this->resolveIssuesUrl($basePath);
+
+        $files = [
+            'CONTRIBUTING.md'    => $basePath . '/CONTRIBUTING.md',
+            'CODE_OF_CONDUCT.md' => $basePath . '/CODE_OF_CONDUCT.md',
+            'SECURITY.md'        => $basePath . '/SECURITY.md',
+        ];
+
+        $results = [];
+
+        foreach ($files as $filename => $targetFile) {
+            $results[] = $this->publishGovernanceFile(
+                stubFile: $stubsDir . '/' . $filename . '.stub',
+                targetFile: $targetFile,
+                label: $filename,
+                issuesUrl: $issuesUrl,
+                force: $force,
+            );
+        }
+
+        return ! in_array(false, $results, true);
+    }
+
+    /**
      * Publish all files belonging to the given group.
      *
      * @param string $group      One of: quality, style, testing, hooks, all
@@ -248,46 +288,6 @@ final readonly class ConfigStubPublisher
             label: 'config/dev-tools/markdownlint.json',
             protectUserChanges: true,
         );
-    }
-
-    /**
-     * Publish governance files (CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md) to project root.
-     *
-     * Replaces PACKAGE_GITLAB_ISSUES placeholder with a URL derived from composer.json name.
-     * Hash-protected: skips files modified by the user (use --force to overwrite).
-     * Not included in 'all' — requires explicit opt-in (--publish=governance).
-     */
-    public function publishGovernanceFiles(string $vendorPath, string $basePath, bool $force): bool
-    {
-        $stubsDir = $vendorPath . '/stubs/governance';
-
-        if (! File::isDirectory($stubsDir)) {
-            $this->componentsFactory->error('Governance stubs directory not found: ' . $stubsDir);
-
-            return false;
-        }
-
-        $issuesUrl = $this->resolveIssuesUrl($basePath);
-
-        $files = [
-            'CONTRIBUTING.md'    => $basePath . '/CONTRIBUTING.md',
-            'CODE_OF_CONDUCT.md' => $basePath . '/CODE_OF_CONDUCT.md',
-            'SECURITY.md'        => $basePath . '/SECURITY.md',
-        ];
-
-        $results = [];
-
-        foreach ($files as $filename => $targetFile) {
-            $results[] = $this->publishGovernanceFile(
-                stubFile: $stubsDir . '/' . $filename . '.stub',
-                targetFile: $targetFile,
-                label: $filename,
-                issuesUrl: $issuesUrl,
-                force: $force,
-            );
-        }
-
-        return ! in_array(false, $results, true);
     }
 
     // =========================================================================
@@ -409,67 +409,6 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Copy a single hook stub to the .githooks/ directory.
-     */
-    private function publishSingleHook(
-        string $stubHooksDir,
-        string $projectHooksDir,
-        string $hook,
-        bool $force,
-    ): bool {
-        $source      = $stubHooksDir . '/' . $hook;
-        $destination = $projectHooksDir . '/' . $hook;
-
-        if (! File::exists($source)) {
-            // @codeCoverageIgnoreStart
-            // Individual hook stub missing — impossible in practice (all hooks are packaged together).
-            $this->componentsFactory->warn('Hook stub not found: ' . $hook);
-
-            return false;
-            // @codeCoverageIgnoreEnd
-        }
-
-        if (File::exists($destination) && ! $force) {
-            $this->skip('.githooks/' . $hook, 'already exists (use --force to overwrite)');
-
-            return false;
-        }
-
-        File::copy($source, $destination);
-        chmod($destination, 0755);
-        $this->componentsFactory->task('Copied: .githooks/' . $hook);
-
-        return true;
-    }
-
-    /**
-     * Derive the GitLab issues URL from the project's composer.json name.
-     *
-     * Convention: zairakai/laravel-dev-tools → https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/issues
-     */
-    private function resolveIssuesUrl(string $basePath): string
-    {
-        $composerPath = $basePath . '/composer.json';
-
-        if (! File::exists($composerPath)) {
-            return 'TODO: add GitLab issues URL';
-        }
-
-        $composer = json_decode((string) File::get($composerPath), true);
-        $raw      = is_array($composer) ? ($composer['name'] ?? '') : '';
-        $name     = is_string($raw) ? $raw : '';
-
-        if ('' === $name) {
-            return 'TODO: add GitLab issues URL';
-        }
-
-        // Strip vendor prefix: zairakai/laravel-dev-tools → laravel-dev-tools
-        $shortName = str_contains($name, '/') ? substr($name, strpos($name, '/') + 1) : $name;
-
-        return 'https://gitlab.com/zairakai/php-packages/' . $shortName . '/-/issues';
-    }
-
-    /**
      * Publish a single governance file with placeholder replacement.
      *
      * Logic (mirrors js-dev-tools publish_governance_file):
@@ -533,9 +472,44 @@ final readonly class ConfigStubPublisher
             $this->componentsFactory->task('Copied: ' . $label);
 
             return true;
-        } finally {
+        }
+        finally {
             File::delete($tempFile);
         }
+    }
+
+    /**
+     * Copy a single hook stub to the .githooks/ directory.
+     */
+    private function publishSingleHook(
+        string $stubHooksDir,
+        string $projectHooksDir,
+        string $hook,
+        bool $force,
+    ): bool {
+        $source      = $stubHooksDir . '/' . $hook;
+        $destination = $projectHooksDir . '/' . $hook;
+
+        if (! File::exists($source)) {
+            // @codeCoverageIgnoreStart
+            // Individual hook stub missing — impossible in practice (all hooks are packaged together).
+            $this->componentsFactory->warn('Hook stub not found: ' . $hook);
+
+            return false;
+            // @codeCoverageIgnoreEnd
+        }
+
+        if (File::exists($destination) && ! $force) {
+            $this->skip('.githooks/' . $hook, 'already exists (use --force to overwrite)');
+
+            return false;
+        }
+
+        File::copy($source, $destination);
+        chmod($destination, 0755);
+        $this->componentsFactory->task('Copied: .githooks/' . $hook);
+
+        return true;
     }
 
     // =========================================================================
@@ -571,6 +545,33 @@ final readonly class ConfigStubPublisher
         }
 
         return $this->copyStub($stubFile, $targetFile, $label);
+    }
+
+    /**
+     * Derive the GitLab issues URL from the project's composer.json name.
+     *
+     * Convention: zairakai/laravel-dev-tools → https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/issues
+     */
+    private function resolveIssuesUrl(string $basePath): string
+    {
+        $composerPath = $basePath . '/composer.json';
+
+        if (! File::exists($composerPath)) {
+            return 'TODO: add GitLab issues URL';
+        }
+
+        $composer = json_decode((string) File::get($composerPath), true);
+        $raw      = is_array($composer) ? ($composer['name'] ?? '') : '';
+        $name     = is_string($raw) ? $raw : '';
+
+        if ('' === $name) {
+            return 'TODO: add GitLab issues URL';
+        }
+
+        // Strip vendor prefix: zairakai/laravel-dev-tools → laravel-dev-tools
+        $shortName = str_contains($name, '/') ? substr($name, strpos($name, '/') + 1) : $name;
+
+        return 'https://gitlab.com/zairakai/php-packages/' . $shortName . '/-/issues';
     }
 
     /**
