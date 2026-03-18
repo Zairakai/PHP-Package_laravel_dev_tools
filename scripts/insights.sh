@@ -49,6 +49,13 @@ done
 # Build PHPInsights command (analysis only — no --fix)
 INSIGHTS_ARGS=()
 
+# Pass resolved config path when available.
+# Overrides the artisan default (config/insights.php) so that config/dev-tools/insights.php
+# is used when published there — consistent with the package path behaviour.
+if [[ -n "$INSIGHTS_CONFIG" ]]; then
+    INSIGHTS_ARGS+=(--config-path="$INSIGHTS_CONFIG")
+fi
+
 # Run PHPInsights
 cd "$PROJECT_ROOT"
 
