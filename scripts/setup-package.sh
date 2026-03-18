@@ -452,6 +452,19 @@ do_publish() {
                 "$key"
             FORCE_OVERWRITE="$saved_force"
         fi
+
+        # After publishing markdownlint config to config/dev-tools/, also create a root
+        # .markdownlint.json that extends it — IDEs and editor extensions look at root.
+        if [[ "$key" == "markdownlint" ]]; then
+            local root_markdownlint="${PROJECT_ROOT}/.markdownlint.json"
+            local root_content='{"extends":"./config/dev-tools/.markdownlint.json"}'
+
+            if [[ ! -f "$root_markdownlint" ]]; then
+                echo "$root_content" > "$root_markdownlint"
+                track_created ".markdownlint.json (root — extends config/dev-tools/)"
+                log_success "Created: .markdownlint.json → extends config/dev-tools/.markdownlint.json"
+            fi
+        fi
     done
 }
 
