@@ -13,4 +13,4 @@ include:
 variables:
   CACHE_KEY: "my-app"
   APP_ENV: "testing"
-  JS_PACKAGE_MANAGER: "yarn"
+  JS_PACKAGE_MANAGER: "npm"
