@@ -116,6 +116,9 @@
       ]
     }
   },
+  "outdatedIgnore": [
+    "orchestra/testbench"
+  ],
   "scripts": {
     "analyse": "bash scripts/phpstan.sh",
     "analyse:baseline": "GENERATE_BASELINE=true bash scripts/phpstan.sh",

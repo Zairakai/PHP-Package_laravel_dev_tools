@@ -239,10 +239,10 @@ php:quality:outdated:
     - php:validate:shellcheck
     - php:validate:markdownlint
   script:
-    - composer outdated --direct --strict --format=json | tee outdated-report.json
+    - bash "$DEV_TOOLS_SCRIPTS/outdated.sh"
   artifacts:
     paths:
-      - outdated-report.json
+      - build/reports/outdated.json
     expire_in: 1 week
 
 php:quality:security:
