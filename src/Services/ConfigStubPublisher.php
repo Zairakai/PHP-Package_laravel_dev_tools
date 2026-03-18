@@ -316,6 +316,7 @@ final readonly class ConfigStubPublisher
     {
         // Use app config for Laravel applications, library config for packages
         $isLaravelApp = file_exists($basePath . '/artisan')
+            && file_exists($basePath . '/composer.json')
             && str_contains((string) file_get_contents($basePath . '/composer.json'), '"laravel/framework"');
 
         $stubFile = $isLaravelApp
