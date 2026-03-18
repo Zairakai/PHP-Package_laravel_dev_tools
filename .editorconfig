@@ -18,6 +18,15 @@ indent_size = 2
 [*.json]
 indent_size = 2
 
+[*.{ts,tsx,js,jsx,vue}]
+indent_size = 2
+
+[*.{scss,css}]
+indent_size = 2
+
+# ======================
+# PHP FILES
+# ======================
 [*.php]
 max_line_length = 120
 
