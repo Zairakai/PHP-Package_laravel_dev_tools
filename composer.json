@@ -42,7 +42,7 @@
     }
   ],
   "require": {
-    "php": "^8.3",
+    "php": "^8.4",
     "composer-plugin-api": "^2.0",
     "driftingly/rector-laravel": "^1.2 || ^2.0",
     "larastan/larastan": "^2.0 || ^3.0",
@@ -55,11 +55,11 @@
   "require-dev": {
     "composer/composer": "^2.0",
     "ergebnis/composer-normalize": "^2.48",
-    "illuminate/console": "^11.0 || ^12.0",
-    "illuminate/database": "^11.0 || ^12.0",
-    "illuminate/filesystem": "^11.0 || ^12.0",
-    "illuminate/support": "^11.0 || ^12.0",
-    "orchestra/testbench": "^9.0 || ^10.0",
+    "illuminate/console": "^12.0 || ^13.0",
+    "illuminate/database": "^12.0 || ^13.0",
+    "illuminate/filesystem": "^12.0 || ^13.0",
+    "illuminate/support": "^12.0 || ^13.0",
+    "orchestra/testbench": "^10.0 || ^11.0",
     "phpunit/phpunit": "^12.0"
   },
   "suggest": {
@@ -86,7 +86,7 @@
     },
     "optimize-autoloader": true,
     "platform": {
-      "php": "8.3"
+      "php": "8.4"
     },
     "preferred-install": "dist",
     "sort-packages": true
@@ -116,9 +116,6 @@
       ]
     }
   },
-  "outdatedIgnore": [
-    "orchestra/testbench"
-  ],
   "scripts": {
     "analyse": "bash scripts/phpstan.sh",
     "analyse:baseline": "GENERATE_BASELINE=true bash scripts/phpstan.sh",
