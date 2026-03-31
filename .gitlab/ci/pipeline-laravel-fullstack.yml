@@ -36,8 +36,8 @@ include:
 
 # ================================
 # STAGES — unified ordered list
-# publish and release are kept for php:publish/php:release (disabled via
-# rules: when: never in pipeline-laravel-app.yml) — GitLab requires all
+# build/publish/release are kept for jobs disabled via rules: when: never
+# in pipeline-laravel-app.yml and pipeline-js-app.yml — GitLab requires all
 # referenced stages to exist even for never-running jobs.
 # ================================
 stages:
@@ -46,6 +46,7 @@ stages:
   - validate
   - quality
   - test
+  - build
   - publish
   - release
   - deploy
