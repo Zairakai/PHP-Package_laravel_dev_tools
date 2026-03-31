@@ -30,7 +30,7 @@ include:
     ref: main
     file: ".gitlab/ci/pipeline-laravel-app.yml"
   # JS side — pipeline-js-app.yml includes pipeline-js-package.yml + disables build/publish/release
-  - project: "zairakai/npm-packages/dev-tools"
+  - project: "zairakai/npm-packages/js-dev-tools"
     ref: main
     file: ".gitlab/ci/pipeline-js-app.yml"
 
