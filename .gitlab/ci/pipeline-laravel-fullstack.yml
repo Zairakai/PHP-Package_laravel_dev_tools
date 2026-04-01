@@ -31,7 +31,7 @@ include:
     file: ".gitlab/ci/pipeline-laravel-app.yml"
   # JS side — pipeline-js-app.yml includes pipeline-js-package.yml + disables build/publish/release
   - project: "zairakai/npm-packages/js-dev-tools"
-    ref: v1.2.3
+    ref: v1.2.4
     file: ".gitlab/ci/pipeline-js-app.yml"
 
 # ================================
