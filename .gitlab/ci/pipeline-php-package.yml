@@ -157,7 +157,9 @@ php:install:
 php:validate:markdownlint:
   <<: [*base_job, *cache_composer]
   stage: validate
-  image: ${NODE_IMAGE}
+  # Use debian-based image — bash is pre-installed, no apk required.
+  # Alpine runners may lack write permission to /var/log causing apk to fail.
+  image: node:20.11.0
   retry:
     max: 2
     when:
@@ -167,7 +169,6 @@ php:validate:markdownlint:
   needs:
     - php:install
   before_script:
-    - apk add --no-cache bash
     - bash $DEV_TOOLS_SCRIPTS/install-markdownlint.sh
   script:
     - bash $DEV_TOOLS_SCRIPTS/markdownlint.sh
