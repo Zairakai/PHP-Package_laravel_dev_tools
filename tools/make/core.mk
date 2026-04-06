@@ -55,5 +55,8 @@ include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)bats.mk
 # 12. Code metrics (phpmetrics - reporting and visualization)
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)phpmetrics.mk
 
-# 13. Utilities (utils - git, composer, doctor helpers)
+# 13. Utilities (composer, setup, security)
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)utils.mk
+
+# 14. Shared utilities (git, hooks, doctor)
+include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)utils-shared.mk
