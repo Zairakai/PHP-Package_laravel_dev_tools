@@ -21,17 +21,9 @@ composer-validate: ## Validate composer.json
 	@composer validate --strict
 
 ## —— 🧰 Utils ——
-.PHONY: doctor
-doctor: ## Run environment diagnostics
-	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/doctor.sh
-
 .PHONY: security-audit
 security-audit: ## Run Composer security audit
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/security-audit.sh
-
-.PHONY: install-hooks
-install-hooks: ## Install git hooks into .git/hooks
-	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/install-hooks.sh
 
 .PHONY: install-packages
 install-packages: ## Install optional PHP tools interactively
@@ -45,10 +37,3 @@ setup: ## Run the dev-tools setup wizard (Makefile, configs, CI stub)
 uninstall: ## Remove dev-tools configuration files
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/uninstall-package.sh
 
-.PHONY: git-update
-git-update: ## Fast-forward all local branches that track a remote
-	@$(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/git-update.sh
-
-.PHONY: git-cleanup
-git-cleanup: ## Remove local branches whose remote tracking branch no longer exists
-	@$(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/git-cleanup.sh
