@@ -82,19 +82,24 @@ check_markdownlint_installed() {
 
     log_info "Current version: ${current_version}"
 
-    # If desired is 'latest', we can't compare
+    # If desired is 'latest', we can't compare versions
     if [[ "${desired_version}" == "latest" ]]; then
         log_warning "Desired version is 'latest', cannot verify if update needed"
 
-        if [[ "${CI_MODE}" != "true" ]]; then
-            echo ""
-            read -rp "Reinstall to ensure latest? (y/N) " -n 1
-            echo ""
+        # In CI, trust the pre-installed version — attempting a reinstall would
+        # fail with EACCES if the tool was installed as root in the Docker image.
+        if [[ "${CI_MODE}" == "true" ]]; then
+            log_info "CI mode: skipping reinstall, using pre-installed version"
+            return 0
+        fi
 
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                log_success "Keeping existing installation"
-                return 0
-            fi
+        echo ""
+        read -rp "Reinstall to ensure latest? (y/N) " -n 1
+        echo ""
+
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_success "Keeping existing installation"
+            return 0
         fi
 
         return 1
