@@ -75,13 +75,18 @@ include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)test.mk
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)bats.mk
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)utils.mk
 
+# ---- Shared Utilities (fullstack) ----
+# Included right after laravel utils so doctor/install-hooks/git-update/git-cleanup
+# appear under the Utils section in make help (section deduplication in help.mk).
+include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)fullstack-utils.mk
+
 # ---- JS Utilities (package-install, package-update) ----
 ifneq ($(NPM_DIRECTORY_TOOLS_AVAILABLE),false)
 include $(NPM_DIRECTORY_TOOLS_MAKE_DIR)utils.mk
 endif
 
 # ---- JS extensions: quality/test aggregator append + JS-specific targets ----
-# Included LAST so "JS Testing" appears at the end of `make help`.
+# Included last so "JS Testing" appears at the end of make help.
 # fullstack-js.mk only enters MAKEFILE_LIST when npm is present — the grep
 # in help.mk only sees its ## headers when it is actually included.
 ifneq ($(NPM_DIRECTORY_TOOLS_AVAILABLE),false)

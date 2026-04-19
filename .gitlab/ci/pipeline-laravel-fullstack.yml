@@ -31,12 +31,14 @@ include:
     file: ".gitlab/ci/pipeline-laravel-app.yml"
   # JS side — pipeline-js-app.yml includes pipeline-js-package.yml + disables build/publish/release
   - project: "zairakai/npm-packages/js-dev-tools"
-    ref: main
+    ref: v1.2.4
     file: ".gitlab/ci/pipeline-js-app.yml"
 
 # ================================
 # STAGES — unified ordered list
-# GitLab deduplicates stage names from included files.
+# build/publish/release are kept for jobs disabled via rules: when: never
+# in pipeline-laravel-app.yml and pipeline-js-app.yml — GitLab requires all
+# referenced stages to exist even for never-running jobs.
 # ================================
 stages:
   - security
@@ -44,6 +46,9 @@ stages:
   - validate
   - quality
   - test
+  - build
+  - publish
+  - release
   - deploy
   - metrics
 

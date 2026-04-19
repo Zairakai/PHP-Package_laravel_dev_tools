@@ -9,3 +9,5 @@ pint: ## Check code style (Pint)
 .PHONY: pint-fix
 pint-fix: ## Fix code style automatically
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/cs-fix.sh
+
+##

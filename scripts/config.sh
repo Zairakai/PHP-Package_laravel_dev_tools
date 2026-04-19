@@ -52,7 +52,12 @@ export NC='\033[0m'
 
 # TOOL BINARIES
 # ================
-export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/phpunit}"
+# Auto-detect Pest when installed — Pest refuses to run via phpunit directly
+if [[ -x "${PROJECT_ROOT}/vendor/bin/pest" ]]; then
+    export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/pest}"
+else
+    export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/phpunit}"
+fi
 export PHPSTAN_BIN="${PHPSTAN_BIN:-vendor/bin/phpstan}"
 export PINT_BIN="${PINT_BIN:-vendor/bin/pint}"
 export RECTOR_BIN="${RECTOR_BIN:-vendor/bin/rector}"

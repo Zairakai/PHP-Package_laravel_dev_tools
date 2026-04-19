@@ -261,9 +261,9 @@ Contributions are welcome. Please read [CONTRIBUTING.md][contributing] for the p
 [security]: ./SECURITY.md
 [issues-badge]: https://img.shields.io/gitlab/issues/open-raw/zairakai%2Fphp-packages%2Flaravel-dev-tools?logo=gitlab&label=Issues
 [issues]: https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/issues
-[php-badge]: https://img.shields.io/badge/php-8.3%20%7C%208.4-blue?logo=php
+[php-badge]: https://img.shields.io/badge/php-8.4-blue?logo=php
 [php]: https://www.php.net
-[laravel-badge]: https://img.shields.io/badge/Laravel-11%20%7C%2012-red?logo=laravel
+[laravel-badge]: https://img.shields.io/badge/Laravel-12%20%7C%2013-red?logo=laravel
 [laravel]: https://laravel.com
 [phpstan-badge]: https://img.shields.io/badge/static%20analysis-phpstan-5B2C6F.svg?logo=php
 [phpstan]: https://phpstan.org
