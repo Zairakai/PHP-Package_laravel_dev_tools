@@ -46,6 +46,16 @@ variables:
   SESSION_DRIVER: "array"
 
 # ================================
+# INSTALL — Override: bootstrap .env before composer install
+# ================================
+# Without .env, artisan package:discover (triggered by --optimize-autoloader)
+# cannot resolve the Blade cache path and fails with "Please provide a valid cache path".
+php:install:
+  before_script:
+    - git config --global --add safe.directory '*'
+    - cp .env.testing .env 2>/dev/null || cp .env.example .env
+
+# ================================
 # TEST — Overrides with migrate + seed
 # ================================
 php:test:
