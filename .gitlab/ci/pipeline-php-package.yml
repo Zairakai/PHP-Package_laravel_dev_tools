@@ -77,7 +77,7 @@ variables:
   # ── DOCKER IMAGES ─────────────────────────────────────────────────────────
   ALPINE_IMAGE: "alpine:3.18"
   DOCKERHUB_IMAGE: "zairakai/php:latest-test"
-  NODE_IMAGE: "node:20.11.0-alpine"
+  MARKDOWNLINT_IMAGE: "zairakai/node:latest-dev"
   RELEASE_CLI_IMAGE: "registry.gitlab.com/gitlab-org/release-cli:v0.18.0"
   SHELLCHECK_IMAGE: "koalaman/shellcheck-alpine:v0.10.0"
 
@@ -157,7 +157,7 @@ php:install:
 php:validate:markdownlint:
   <<: [*base_job, *cache_composer]
   stage: validate
-  image: ${NODE_IMAGE}
+  image: ${MARKDOWNLINT_IMAGE}
   retry:
     max: 2
     when:
@@ -167,7 +167,6 @@ php:validate:markdownlint:
   needs:
     - php:install
   before_script:
-    - apk add --no-cache bash
     - bash $DEV_TOOLS_SCRIPTS/install-markdownlint.sh
   script:
     - bash $DEV_TOOLS_SCRIPTS/markdownlint.sh
