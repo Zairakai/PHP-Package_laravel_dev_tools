@@ -8,6 +8,21 @@ source "$SCRIPT_DIR/config.sh"
 
 log_header "PHPUnit Tests"
 
+if [[ "${CI:-false}" == "true" ]]; then
+    echo "=== DIAG: composer show ==="
+    composer show phpunit/phpunit phpunit/php-code-coverage 2>&1 | grep -E "^(name|versions|source|path)"
+    echo "=== DIAG: file checksums ==="
+    md5sum vendor/phpunit/phpunit/src/Util/PHP/JobRunner.php vendor/phpunit/phpunit/src/Util/PHP/DefaultJobRunner.php 2>&1
+    echo "=== DIAG: duplicate JobRunner class declarations in classmap ==="
+    grep -rn "'PHPUnit\\\\\\\\Util\\\\\\\\PHP\\\\\\\\JobRunner'" vendor/composer/autoload_classmap.php vendor/composer/autoload_static.php 2>&1
+    echo "=== DIAG: find all JobRunner.php on disk ==="
+    find . -name "JobRunner.php" -not -path "*/node_modules/*" 2>&1
+    echo "=== DIAG: php -l on both files ==="
+    php -l vendor/phpunit/phpunit/src/Util/PHP/JobRunner.php
+    php -l vendor/phpunit/phpunit/src/Util/PHP/DefaultJobRunner.php
+    echo "=== END DIAG ==="
+fi
+
 # Validate configuration exists
 if [[ ! -f "$PHPUNIT_CONFIG" ]]; then
     log_error "PHPUnit configuration not found: $PHPUNIT_CONFIG"
