@@ -12,7 +12,12 @@ include:
 
 variables:
   # Unique Composer cache key for this project
-  CACHE_KEY: "laravel-dev-tool"
+  # Bumped to -v2: the runner's local cache volume held a corrupted
+  # phpunit/phpunit install (orphaned DefaultJobRunner.php from an old
+  # version, incompatible with 12.5.30's final JobRunner), surviving
+  # every GitLab "clear runner cache" action since it is local-disk
+  # cache, not shared object storage. New key = new local path.
+  CACHE_KEY: "laravel-dev-tool-v2"
 
   # Nom du package sur Packagist
   PACKAGIST_PACKAGE: "zairakai/laravel-dev-tools"
