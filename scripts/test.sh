@@ -9,18 +9,29 @@ source "$SCRIPT_DIR/config.sh"
 log_header "PHPUnit Tests"
 
 if [[ "${CI:-false}" == "true" ]]; then
-    echo "=== DIAG: composer show ==="
-    composer show phpunit/phpunit phpunit/php-code-coverage 2>&1 | grep -E "^(name|versions|source|path)"
+    set +e
+    echo "=== DIAG: composer show phpunit/phpunit ==="
+    composer show phpunit/phpunit 2>&1
+    echo "=== DIAG: composer show phpunit/php-code-coverage ==="
+    composer show phpunit/php-code-coverage 2>&1
     echo "=== DIAG: file checksums ==="
     md5sum vendor/phpunit/phpunit/src/Util/PHP/JobRunner.php vendor/phpunit/phpunit/src/Util/PHP/DefaultJobRunner.php 2>&1
-    echo "=== DIAG: duplicate JobRunner class declarations in classmap ==="
-    grep -rn "'PHPUnit\\\\\\\\Util\\\\\\\\PHP\\\\\\\\JobRunner'" vendor/composer/autoload_classmap.php vendor/composer/autoload_static.php 2>&1
-    echo "=== DIAG: find all JobRunner.php on disk ==="
-    find . -name "JobRunner.php" -not -path "*/node_modules/*" 2>&1
+    echo "=== DIAG: all JobRunner*.php on disk ==="
+    find . -name "JobRunner.php" -o -name "DefaultJobRunner.php" 2>&1
     echo "=== DIAG: php -l on both files ==="
-    php -l vendor/phpunit/phpunit/src/Util/PHP/JobRunner.php
-    php -l vendor/phpunit/phpunit/src/Util/PHP/DefaultJobRunner.php
+    php -l vendor/phpunit/phpunit/src/Util/PHP/JobRunner.php 2>&1
+    php -l vendor/phpunit/phpunit/src/Util/PHP/DefaultJobRunner.php 2>&1
+    echo "=== DIAG: php version + extensions ==="
+    php -v 2>&1
+    php -m 2>&1
+    echo "=== DIAG: php ini opcache/pcov settings ==="
+    php -i 2>&1 | grep -iE "^(opcache|pcov)\." 2>&1
+    echo "=== DIAG: JobRunner.php content around final keyword ==="
+    grep -n "class JobRunner\|final class" vendor/phpunit/phpunit/src/Util/PHP/JobRunner.php 2>&1
+    echo "=== DIAG: composer.lock hash ==="
+    md5sum composer.lock 2>&1
     echo "=== END DIAG ==="
+    set -e
 fi
 
 # Validate configuration exists
