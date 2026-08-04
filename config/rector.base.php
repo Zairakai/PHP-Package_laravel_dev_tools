@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Rector;
 
-use Rector\CodingStyle\Rector\Encapsed\EncapsedStringsToSprintfRector;
 use Rector\Config\RectorConfig;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Set\ValueObject\LevelSetList;
@@ -79,7 +78,6 @@ final class RectorBaseConfig
         return array_merge([
             $root . '/tests/Fixtures',
             AddOverrideAttributeToOverriddenMethodsRector::class,
-            EncapsedStringsToSprintfRector::class,
         ], $extra);
     }
 }
