@@ -40,6 +40,61 @@ is_package()     { [[ "package" == "$(detect_project_type)" ]]; }
 
 export -f detect_project_type is_laravel_app is_package
 
+# DOCKER AUTO-DISPATCH
+# ================
+# Tool scripts that need a real PHP runtime (pint, phpstan, rector, phpunit/pest,
+# insights, enlightn, phpmetrics, composer audit/outdated) call maybe_dockerize
+# right after sourcing this file. When a docker-compose stack is already running
+# for this project, the script transparently re-execs itself inside the "php"
+# service instead of depending on whatever PHP happens to be on the host.
+#
+# Utility scripts (doctor.sh, install-hooks.sh, git-*.sh, setup/uninstall
+# scripts) never call this — they inspect or act on the host on purpose and
+# must keep doing so.
+#
+# Opt out with DEV_TOOLS_NO_DOCKER=true. Override target service/mount with
+# DEV_TOOLS_PHP_SERVICE / DEV_TOOLS_PHP_SERVICE_MOUNT if a project's compose
+# file diverges from the "php" / "/var/www/html" convention.
+DEV_TOOLS_DOCKER_ENV_VARS=(CI COVERAGE GENERATE_BASELINE TESTSUITE)
+
+maybe_dockerize() {
+    local script_path="$1"
+    shift
+
+    # Already running inside a container — nothing to dispatch.
+    [[ -f /.dockerenv ]] && return 0
+
+    # Explicit opt-out.
+    [[ "${DEV_TOOLS_NO_DOCKER:-false}" == "true" ]] && return 0
+
+    # CI runners execute inside a single job image, not this dev compose stack.
+    [[ "${CI:-false}" == "true" || "${GITLAB_CI:-false}" == "true" ]] && return 0
+
+    command -v docker >/dev/null 2>&1 || return 0
+    [[ -f "${PROJECT_ROOT}/docker-compose.yml" ]] || return 0
+
+    local service="${DEV_TOOLS_PHP_SERVICE:-php}"
+    local mount="${DEV_TOOLS_PHP_SERVICE_MOUNT:-/var/www/html}"
+
+    # Only dispatch when the target service is already running — never start
+    # it as a side effect of running a quality check.
+    if ! (cd "$PROJECT_ROOT" && docker compose ps --status running --services 2>/dev/null | grep -qx "$service"); then
+        return 0
+    fi
+
+    local rel_script="${script_path#"${PROJECT_ROOT}"/}"
+    local env_flags=()
+    local var
+    for var in "${DEV_TOOLS_DOCKER_ENV_VARS[@]}"; do
+        [[ -n "${!var:-}" ]] && env_flags+=(-e "$var")
+    done
+
+    log_step "Dispatching to '${service}' container..."
+    cd "$PROJECT_ROOT"
+    exec docker compose exec -T "${env_flags[@]}" "$service" bash "${mount}/${rel_script}" "$@"
+}
+export -f maybe_dockerize
+
 # COLORS
 # ================
 export RED='\033[0;31m'
