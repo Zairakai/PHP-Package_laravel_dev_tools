@@ -50,7 +50,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             'dev-tools first, GitLab template second (in sync)' => [
                 "include:\n"
                 . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-                . "    ref: v1.3.0\n"
+                . "    ref: 1.3.0\n"
                 . "    file: '.gitlab/ci/pipeline-php-package.yml'\n"
                 . "  - template: Jobs/Secret-Detection.gitlab-ci.yml\n",
                 false, // already in sync → no output
@@ -59,7 +59,7 @@ final class GitlabCiSynchronizerTest extends TestCase
                 "include:\n"
                 . "  - template: Jobs/Secret-Detection.gitlab-ci.yml\n"
                 . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-                . "    ref: v1.0.0\n"
+                . "    ref: 1.0.0\n"
                 . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
                 true, // out of sync → warn
             ],
@@ -81,7 +81,7 @@ final class GitlabCiSynchronizerTest extends TestCase
     {
         $this->writeGitlabCi($content);
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         if ($expectOutput) {
             $this->assertNotSame('', $this->bufferIO->getOutput());
@@ -109,7 +109,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             . '  PACKAGIST_PACKAGE: "zairakai/laravel-dev-tools"' . "\n",
         );
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         // File matched via CI_TEMPLATE_FILE — ref is unparseable without project: block
         // so we expect the "Could not parse ref" warning
@@ -143,10 +143,10 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_does_not_modify_file_when_auto_fix_is_disabled(): void
     {
-        $original = $this->makeGitlabCiWithRef('v1.2.0');
+        $original = $this->makeGitlabCiWithRef('1.2.0');
         $this->writeGitlabCi($original);
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         $this->assertSame($original, $this->readGitlabCi());
     }
@@ -154,10 +154,10 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_does_nothing_on_auto_fix_when_already_in_sync(): void
     {
-        $content = $this->makeGitlabCiWithRef('v1.3.0');
+        $content = $this->makeGitlabCiWithRef('1.3.0');
         $this->writeGitlabCi($content);
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
         $this->assertSame($content, $this->readGitlabCi());
         $this->assertSame('', $this->bufferIO->getOutput());
@@ -170,11 +170,29 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_does_nothing_when_ref_matches_installed_version(): void
     {
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.3.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.3.0'));
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         $this->assertSame('', $this->bufferIO->getOutput());
+    }
+
+    #[Test]
+    public function it_drops_the_v_prefix_of_the_resolved_version(): void
+    {
+        $gitlabCiSynchronizer = new GitlabCiSynchronizer(
+            io: $this->bufferIO,
+            projectRoot: $this->tmpDir,
+            versionResolver: static fn (): string => 'v1.3.0',
+        );
+
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
+
+        $gitlabCiSynchronizer->synchronize(autoFix: true);
+
+        // A resolver that returns a v-prefixed version still gives a plain tag
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
+        $this->assertStringNotContainsString('v1.3.0', $this->readGitlabCi());
     }
 
     #[Test]
@@ -193,7 +211,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             . '  CACHE_KEY: "my-package"' . "\n",
         );
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         // ref: absent → parser resets at "variables:" → currentRef null
         $this->assertStringContainsString('Could not parse ref:', $this->bufferIO->getOutput());
@@ -205,13 +223,13 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->writeGitlabCi(
             "include:\n"
             . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-            . '    ref: "v1.2.0"' . "\n"
+            . '    ref: "1.2.0"' . "\n"
             . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
         );
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
-        $this->assertStringContainsString('v1.3.0', $this->readGitlabCi());
+        $this->assertStringContainsString('1.3.0', $this->readGitlabCi());
     }
 
     // =========================================================================
@@ -224,31 +242,13 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->writeGitlabCi(
             "include:\n"
             . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-            . "    ref: 'v1.2.0'\n"
+            . "    ref: '1.2.0'\n"
             . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
         );
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
-        $this->assertStringContainsString('v1.3.0', $this->readGitlabCi());
-    }
-
-    #[Test]
-    public function it_handles_version_already_v_prefixed_without_double_prefix(): void
-    {
-        $gitlabCiSynchronizer = new GitlabCiSynchronizer(
-            io: $this->bufferIO,
-            projectRoot: $this->tmpDir,
-            versionResolver: static fn (): string => 'v1.3.0',
-        );
-
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
-
-        $gitlabCiSynchronizer->synchronize(autoFix: true);
-
-        // Should be "v1.3.0", never "vv1.3.0"
-        $this->assertStringContainsString('ref: v1.3.0', $this->readGitlabCi());
-        $this->assertStringNotContainsString('vv1.3.0', $this->readGitlabCi());
+        $this->assertStringContainsString('1.3.0', $this->readGitlabCi());
     }
 
     // =========================================================================
@@ -274,7 +274,7 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_ignores_file_when_version_resolver_returns_null(): void
     {
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
 
         $gitlabCiSynchronizer = new GitlabCiSynchronizer(
             io: $this->bufferIO,
@@ -285,7 +285,7 @@ final class GitlabCiSynchronizerTest extends TestCase
         $gitlabCiSynchronizer->synchronize(autoFix: true);
 
         // File must not be modified
-        $this->assertStringContainsString('ref: v1.2.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.2.0', $this->readGitlabCi());
         $this->assertSame('', $this->bufferIO->getOutput());
     }
 
@@ -310,14 +310,14 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_logs_success_message_after_auto_fix(): void
     {
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
         $output = $this->bufferIO->getOutput();
 
-        $this->assertStringContainsString('v1.2.0', $output);
-        $this->assertStringContainsString('v1.3.0', $output);
+        $this->assertStringContainsString('1.2.0', $output);
+        $this->assertStringContainsString('1.3.0', $output);
         $this->assertStringContainsString('.gitlab-ci.yml', $output);
     }
 
@@ -328,26 +328,26 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_normalizes_version_without_v_prefix_from_resolver(): void
     {
-        // Resolver returns "1.3.0" (no v prefix) — should still write "v1.3.0"
+        // Resolver returns "1.3.0" (no v prefix) and the tag is written as it is
         $gitlabCiSynchronizer = new GitlabCiSynchronizer(
             io: $this->bufferIO,
             projectRoot: $this->tmpDir,
             versionResolver: static fn (): string => '1.3.0',
         );
 
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
 
         $gitlabCiSynchronizer->synchronize(autoFix: true);
 
-        $this->assertStringContainsString('ref: v1.3.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
     }
 
     #[Test]
     public function it_preserves_file_content_except_ref_on_auto_fix(): void
     {
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
         $updated = $this->readGitlabCi();
 
@@ -372,7 +372,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             . "  - template: Jobs/Secret-Detection.gitlab-ci.yml\n",
         );
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         // ref: never found → currentRef null → "Could not parse ref" warning
         $this->assertStringContainsString('Could not parse ref:', $this->bufferIO->getOutput());
@@ -437,12 +437,12 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_updates_ref_when_auto_fix_is_enabled(): void
     {
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
-        $this->assertStringContainsString('ref: v1.3.0', $this->readGitlabCi());
-        $this->assertStringNotContainsString('ref: v1.2.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
+        $this->assertStringNotContainsString('ref: 1.2.0', $this->readGitlabCi());
     }
 
     // =========================================================================
@@ -452,14 +452,14 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_warns_when_ref_is_outdated_and_auto_fix_is_disabled(): void
     {
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('v1.2.0'));
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         $output = $this->bufferIO->getOutput();
 
-        $this->assertStringContainsString('v1.2.0', $output);
-        $this->assertStringContainsString('v1.3.0', $output);
+        $this->assertStringContainsString('1.2.0', $output);
+        $this->assertStringContainsString('1.3.0', $output);
         $this->assertStringContainsString('composer update', $output);
     }
 
@@ -474,7 +474,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
         );
 
-        $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: false);
+        $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
         $this->assertStringContainsString('Could not parse ref:', $this->bufferIO->getOutput());
     }
@@ -504,7 +504,7 @@ final class GitlabCiSynchronizerTest extends TestCase
     /**
      * Build a GitlabCiSynchronizer with a fixed installed version.
      */
-    private function makeSynchronizer(string $installedVersion = 'v1.3.0'): GitlabCiSynchronizer
+    private function makeSynchronizer(string $installedVersion = '1.3.0'): GitlabCiSynchronizer
     {
         return new GitlabCiSynchronizer(
             io: $this->bufferIO,

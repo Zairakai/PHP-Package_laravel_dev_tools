@@ -5,8 +5,13 @@
 #
 set -euo pipefail
 
+# Tags are listed newest first, whether they have the old "v" prefix or not (v2.2.0 then 2.3.0)
+sorted_tags() {
+    git tag | sed -E 's/^v?(.*)$/\1 &/' | sort -k1,1 -Vr | cut -d' ' -f2
+}
+
 TO_TAG="${2:-$(git describe --tags --abbrev=0 HEAD)}"
-FROM_TAG="${1:-$(git tag --sort=-v:refname | grep -A1 "^${TO_TAG}$" | tail -n1)}"
+FROM_TAG="${1:-$(sorted_tags | grep -A1 -Fx "${TO_TAG}" | tail -n1)}"
 
 # Output files
 RELEASE_NOTES="release_notes.md"

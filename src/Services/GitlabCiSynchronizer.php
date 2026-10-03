@@ -310,12 +310,12 @@ final class GitlabCiSynchronizer
     }
 
     /**
-     * Parse the ref value from a "ref: vX.Y.Z" line.
+     * Parse the ref value from a "ref: X.Y.Z" line.
      *
      * Handles both quoted and unquoted forms:
-     *   ref: v1.3.0
-     *   ref: 'v1.3.0'
-     *   ref: "v1.3.0"
+     *   ref: 1.3.0
+     *   ref: '1.3.0'
+     *   ref: "1.3.0"
      */
     private function parseRefValue(string $refLine): ?string
     {
@@ -333,7 +333,7 @@ final class GitlabCiSynchronizer
     // =========================================================================
 
     /**
-     * Resolve the installed package version as a v-prefixed tag string.
+     * Resolve the installed package version as a plain tag string (no v prefix).
      *
      * Returns null when the version cannot be determined — e.g. when running
      * the plugin on the package itself during development.
@@ -346,7 +346,7 @@ final class GitlabCiSynchronizer
             return null;
         }
 
-        return 'v' . ltrim($pretty, 'v');
+        return ltrim($pretty, 'v');
     }
 
     /**

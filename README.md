@@ -182,7 +182,7 @@ bash vendor/zairakai/laravel-dev-tools/scripts/setup-package.sh --fullstack
 # Laravel package pipeline
 include:
   - project: 'zairakai/php-packages/laravel-dev-tools'
-    ref: v1.0.0          # pin to a release tag for reproducible builds
+    ref: 1.0.0          # pin to a release tag for reproducible builds
     file: '.gitlab/ci/pipeline-php-package.yml'
 
 variables:
@@ -194,7 +194,7 @@ variables:
 # Laravel application pipeline
 include:
   - project: 'zairakai/php-packages/laravel-dev-tools'
-    ref: v1.0.0          # pin to a release tag for reproducible builds
+    ref: 1.0.0          # pin to a release tag for reproducible builds
     file: '.gitlab/ci/pipeline-laravel-app.yml'
 
 variables:
@@ -205,7 +205,7 @@ variables:
 # Laravel + Vue full-stack pipeline (PHP + JS in one include)
 include:
   - project: 'zairakai/php-packages/laravel-dev-tools'
-    ref: v1.0.0          # pin to a release tag for reproducible builds
+    ref: 1.0.0          # pin to a release tag for reproducible builds
     file: '.gitlab/ci/pipeline-laravel-fullstack.yml'
 
 variables:
