@@ -134,7 +134,7 @@ final readonly class ConfigStubPublisher
      *
      * The stub contains a minimal .gitlab-ci.yml that includes the centralized
      * pipeline template from zairakai/laravel-dev-tools. The ref: placeholder
-     * (v0.0.0) is replaced with the currently installed package version by
+     * (0.0.0) is replaced with the currently installed package version by
      * GitlabCiSynchronizer on the next composer install/update.
      *
      * Not included in the 'all' group — the CI file sits at the project root,

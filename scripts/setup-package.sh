@@ -354,7 +354,7 @@ publish_gitlab_ci_file() {
 
     track_published ".gitlab-ci.yml"
     log_success "Published: .gitlab-ci.yml"
-    log_info "ref: v0.0.0 will be updated automatically on: composer update zairakai/laravel-dev-tools"
+    log_info "ref: 0.0.0 will be updated automatically on: composer update zairakai/laravel-dev-tools"
 }
 
 # ============================================================================

@@ -322,7 +322,7 @@ final class ConfigStubPublisherTest extends TestCase
         // User has modified the file (different from stub)
         File::put($targetPath, "include:
   - project: 'zairakai/php-packages/laravel-dev-tools'
-    ref: v1.5.0
+    ref: 1.5.0
     file: '.gitlab/ci/pipeline-php-package.yml'
 variables:
   CACHE_KEY: 'my-custom-project'

@@ -50,7 +50,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             'dev-tools first, GitLab template second (in sync)' => [
                 "include:\n"
                 . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-                . "    ref: v1.3.0\n"
+                . "    ref: 1.3.0\n"
                 . "    file: '.gitlab/ci/pipeline-php-package.yml'\n"
                 . "  - template: Jobs/Secret-Detection.gitlab-ci.yml\n",
                 false, // already in sync → no output
@@ -59,7 +59,7 @@ final class GitlabCiSynchronizerTest extends TestCase
                 "include:\n"
                 . "  - template: Jobs/Secret-Detection.gitlab-ci.yml\n"
                 . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-                . "    ref: v1.0.0\n"
+                . "    ref: 1.0.0\n"
                 . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
                 true, // out of sync → warn
             ],
@@ -205,7 +205,7 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->writeGitlabCi(
             "include:\n"
             . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-            . '    ref: "v1.2.0"' . "\n"
+            . '    ref: "1.2.0"' . "\n"
             . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
         );
 
@@ -224,7 +224,7 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->writeGitlabCi(
             "include:\n"
             . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
-            . "    ref: 'v1.2.0'\n"
+            . "    ref: '1.2.0'\n"
             . "    file: '.gitlab/ci/pipeline-php-package.yml'\n",
         );
 
@@ -247,7 +247,7 @@ final class GitlabCiSynchronizerTest extends TestCase
         $gitlabCiSynchronizer->synchronize(autoFix: true);
 
         // Should be "v1.3.0", never "vv1.3.0"
-        $this->assertStringContainsString('ref: v1.3.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
         $this->assertStringNotContainsString('vv1.3.0', $this->readGitlabCi());
     }
 
@@ -285,7 +285,7 @@ final class GitlabCiSynchronizerTest extends TestCase
         $gitlabCiSynchronizer->synchronize(autoFix: true);
 
         // File must not be modified
-        $this->assertStringContainsString('ref: v1.2.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.2.0', $this->readGitlabCi());
         $this->assertSame('', $this->bufferIO->getOutput());
     }
 
@@ -339,7 +339,7 @@ final class GitlabCiSynchronizerTest extends TestCase
 
         $gitlabCiSynchronizer->synchronize(autoFix: true);
 
-        $this->assertStringContainsString('ref: v1.3.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
     }
 
     #[Test]
@@ -441,8 +441,8 @@ final class GitlabCiSynchronizerTest extends TestCase
 
         $this->makeSynchronizer('v1.3.0')->synchronize(autoFix: true);
 
-        $this->assertStringContainsString('ref: v1.3.0', $this->readGitlabCi());
-        $this->assertStringNotContainsString('ref: v1.2.0', $this->readGitlabCi());
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
+        $this->assertStringNotContainsString('ref: 1.2.0', $this->readGitlabCi());
     }
 
     // =========================================================================
