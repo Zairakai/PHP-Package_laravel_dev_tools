@@ -178,6 +178,24 @@ final class GitlabCiSynchronizerTest extends TestCase
     }
 
     #[Test]
+    public function it_drops_the_v_prefix_of_the_resolved_version(): void
+    {
+        $gitlabCiSynchronizer = new GitlabCiSynchronizer(
+            io: $this->bufferIO,
+            projectRoot: $this->tmpDir,
+            versionResolver: static fn (): string => 'v1.3.0',
+        );
+
+        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
+
+        $gitlabCiSynchronizer->synchronize(autoFix: true);
+
+        // A resolver that returns a v-prefixed version still gives a plain tag
+        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
+        $this->assertStringNotContainsString('v1.3.0', $this->readGitlabCi());
+    }
+
+    #[Test]
     public function it_exits_include_block_on_top_level_key_and_ignores_further_content(): void
     {
         // project: found but ref: is absent — parsing continues past the include block
@@ -231,24 +249,6 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->makeSynchronizer('1.3.0')->synchronize(autoFix: true);
 
         $this->assertStringContainsString('1.3.0', $this->readGitlabCi());
-    }
-
-    #[Test]
-    public function it_drops_the_v_prefix_of_the_resolved_version(): void
-    {
-        $gitlabCiSynchronizer = new GitlabCiSynchronizer(
-            io: $this->bufferIO,
-            projectRoot: $this->tmpDir,
-            versionResolver: static fn (): string => 'v1.3.0',
-        );
-
-        $this->writeGitlabCi($this->makeGitlabCiWithRef('1.2.0'));
-
-        $gitlabCiSynchronizer->synchronize(autoFix: true);
-
-        // A resolver that returns a v-prefixed version still gives a plain tag
-        $this->assertStringContainsString('ref: 1.3.0', $this->readGitlabCi());
-        $this->assertStringNotContainsString('v1.3.0', $this->readGitlabCi());
     }
 
     // =========================================================================
