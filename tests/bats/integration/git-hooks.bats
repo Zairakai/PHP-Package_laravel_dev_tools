@@ -32,100 +32,107 @@ teardown() {
 # commit-msg Hook Tests
 # ============================================================================
 
-@test "commit-msg accepts valid conventional commit" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
+# Writes a message in a file and runs the commit-msg hook on it
+run_commit_msg() {
     local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
 
-    echo "feat(auth): add user authentication" > "$msg_file"
+    printf '%b' "$1" > "$msg_file"
 
-    run bash "$hook" "$msg_file"
+    run bash "${PROJECT_ROOT}/stubs/githooks/commit-msg" "$msg_file"
+}
+
+@test "commit-msg accepts the handbook format" {
+    run_commit_msg "feat(auth): #123 add user authentication\n"
 
     [ "$status" -eq 0 ]
     [[ "$output" =~ "Commit message OK" ]]
 }
 
-@test "commit-msg accepts commit with ticket number" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
-
-    echo "fix(validation): #456 correct email validation" > "$msg_file"
-
-    run bash "$hook" "$msg_file"
+@test "commit-msg accepts a message without scope" {
+    run_commit_msg "fix: #456 correct email validation\n"
 
     [ "$status" -eq 0 ]
 }
 
+@test "commit-msg accepts a body after a blank second line" {
+    run_commit_msg "fix(api): #7 handle null response\n\nThe gateway can answer null.\n"
+
+    [ "$status" -eq 0 ]
+}
+
+@test "commit-msg accepts all valid types" {
+    local type
+
+    for type in feat fix docs style refactor perf test chore ci build; do
+        run_commit_msg "${type}(x): #1 valid commit message here\n"
+
+        [ "$status" -eq 0 ]
+    done
+}
+
+@test "commit-msg rejects a message without ticket" {
+    run_commit_msg "feat(auth): add user authentication\n"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Invalid commit message format" ]]
+}
+
+@test "commit-msg rejects the ticket after the subject" {
+    run_commit_msg "feat(auth): add user authentication #123\n"
+
+    [ "$status" -eq 1 ]
+}
+
 @test "commit-msg rejects invalid format" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
-
-    echo "just a random commit message" > "$msg_file"
-
-    run bash "$hook" "$msg_file"
+    run_commit_msg "just a random commit message\n"
 
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Invalid commit message format" ]]
 }
 
 @test "commit-msg rejects unknown type" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
-
-    echo "unknown(scope): some message" > "$msg_file"
-
-    run bash "$hook" "$msg_file"
+    run_commit_msg "unknown(scope): #1 some message\n"
 
     [ "$status" -eq 1 ]
 }
 
-@test "commit-msg enforces lowercase subject" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
-
-    # Uppercase first letter should fail
-    echo "feat(auth): Add user authentication" > "$msg_file"
-
-    run bash "$hook" "$msg_file"
+@test "commit-msg rejects a scope in uppercase" {
+    run_commit_msg "feat(Auth): #1 add user authentication\n"
 
     [ "$status" -eq 1 ]
 }
 
-@test "commit-msg enforces minimum subject length" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
-
-    # Too short (less than 10 chars)
-    echo "feat: short" > "$msg_file"
-
-    run bash "$hook" "$msg_file"
+@test "commit-msg rejects WIP without the format" {
+    run_commit_msg "WIP\n"
 
     [ "$status" -eq 1 ]
 }
 
-@test "commit-msg enforces line length limit" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+@test "commit-msg accepts a work in progress in the format" {
+    run_commit_msg "chore(x): #9 wip on the hooks\n"
 
-    # Create a very long subject line (> 72 chars)
-    echo "feat(auth): this is a very long commit message that exceeds the maximum allowed length of 72 characters" > "$msg_file"
-
-    run bash "$hook" "$msg_file"
-
-    [ "$status" -eq 1 ]
-    [[ "$output" =~ "too long" ]]
+    [ "$status" -eq 0 ]
 }
 
-@test "commit-msg accepts all valid types" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+@test "commit-msg rejects a first line over 72 characters" {
+    run_commit_msg "feat(auth): #1 this is a very long commit message that exceeds the maximum length\n"
 
-    # Test each valid type
-    local types=("feat" "fix" "docs" "style" "refactor" "test" "chore" "perf" "ci" "build")
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "the limit is 72" ]]
+}
 
-    for type in "${types[@]}"; do
-        echo "${type}: valid commit message here" > "$msg_file"
+@test "commit-msg rejects a second line that is not blank" {
+    run_commit_msg "feat(auth): #1 add user authentication\nnot blank\n"
 
-        run bash "$hook" "$msg_file"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "second line must be blank" ]]
+}
+
+@test "commit-msg accepts the messages that Git writes itself" {
+    local message
+
+    for message in "Merge branch 'x' into 'develop'" 'Revert "feat(x): #1 add y"' "fixup! feat(x): #1 add y" "squash! feat(x): #1 add y"; do
+        run_commit_msg "${message}\n"
 
         [ "$status" -eq 0 ]
     done
@@ -135,105 +142,68 @@ teardown() {
 # prepare-commit-msg Hook Tests
 # ============================================================================
 
-@test "prepare-commit-msg extracts ticket from feature branch" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg"
+# Runs the prepare-commit-msg hook on a message, on a given branch, and prints the result
+prepare_message() {
+    local branch="$1"
+    local message="$2"
+    local source="${3:-}"
     local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
 
-    # Create branch with ticket number
-    git checkout -b feature/#123-add-login >/dev/null 2>&1
+    git checkout -b "$branch" >/dev/null 2>&1
 
-    echo "add login functionality" > "$msg_file"
+    printf '%s\n' "$message" > "$msg_file"
 
-    bash "$hook" "$msg_file" "" >/dev/null 2>&1
+    bash "${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg" "$msg_file" "$source" >/dev/null 2>&1
 
-    # Message should now have #123 prefix
-    local content
-    content=$(cat "$msg_file")
-    [[ "$content" =~ "#123" ]]
+    head -n1 "$msg_file"
 }
 
-@test "prepare-commit-msg extracts ticket from fix branch" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+@test "prepare-commit-msg puts the ticket of a feature branch after the type" {
+    run prepare_message "feature/#123-add-login" "feat(auth): add login"
 
-    git checkout -b fix/#456-bug-fix >/dev/null 2>&1
-
-    echo "fix critical bug" > "$msg_file"
-
-    bash "$hook" "$msg_file" "" >/dev/null 2>&1
-
-    local content
-    content=$(cat "$msg_file")
-    [[ "$content" =~ "#456" ]]
+    [ "$output" = "feat(auth): #123 add login" ]
 }
 
-@test "prepare-commit-msg extracts ticket from hotfix branch" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+@test "prepare-commit-msg puts the ticket of a fix branch after the type" {
+    run prepare_message "fix/#456-bug-fix" "fix: correct the bug"
 
-    git checkout -b hotfix/#789-critical >/dev/null 2>&1
-
-    echo "critical hotfix" > "$msg_file"
-
-    bash "$hook" "$msg_file" "" >/dev/null 2>&1
-
-    local content
-    content=$(cat "$msg_file")
-    [[ "$content" =~ "#789" ]]
+    [ "$output" = "fix: #456 correct the bug" ]
 }
 
-@test "prepare-commit-msg skips if ticket already present" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+@test "prepare-commit-msg puts the ticket of a hotfix branch after the type" {
+    run prepare_message "hotfix/#789-critical" "fix(api): critical hotfix"
 
-    git checkout -b feature/#123-test >/dev/null 2>&1
+    [ "$output" = "fix(api): #789 critical hotfix" ]
+}
 
-    echo "#123 already has ticket" > "$msg_file"
+@test "prepare-commit-msg keeps a ticket that is already there" {
+    run prepare_message "feature/#123-test" "feat(x): #123 already has ticket"
 
-    bash "$hook" "$msg_file" "" >/dev/null 2>&1
+    [ "$output" = "feat(x): #123 already has ticket" ]
+}
 
-    # Should not duplicate ticket
-    local content
-    content=$(cat "$msg_file")
-    local count
-    count=$(echo "$content" | grep -o "#123" | wc -l)
-    [ "$count" -eq 1 ]
+@test "prepare-commit-msg does not take #12 for #123" {
+    run prepare_message "feature/#12-test" "feat(x): #123 other ticket"
+
+    [ "$output" = "feat(x): #12 #123 other ticket" ]
 }
 
 @test "prepare-commit-msg skips merge commits" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+    run prepare_message "feature/#123-test" "Merge branch 'x'" "merge"
 
-    git checkout -b feature/#123-test >/dev/null 2>&1
+    [ "$output" = "Merge branch 'x'" ]
+}
 
-    echo "merge commit" > "$msg_file"
+@test "prepare-commit-msg leaves a message that is not type and subject" {
+    run prepare_message "feature/#123-test" "add login"
 
-    # Simulate merge commit (commit_source is set)
-    bash "$hook" "$msg_file" "merge" >/dev/null 2>&1
-
-    # Should not add ticket to merge commits
-    local content
-    content=$(cat "$msg_file")
-    [[ ! "$content" =~ "#123" ]]
+    [ "$output" = "add login" ]
 }
 
 @test "prepare-commit-msg ignores branches without ticket pattern" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg"
-    local msg_file="${TEST_TEMP_DIR}/commit-msg.txt"
+    run prepare_message "my-branch" "feat(x): add login"
 
-    # Branch without ticket number
-    git checkout -b my-branch >/dev/null 2>&1
-
-    echo "commit without ticket" > "$msg_file"
-    local original_content
-    original_content=$(cat "$msg_file")
-
-    bash "$hook" "$msg_file" "" >/dev/null 2>&1
-
-    # Message should remain unchanged
-    local new_content
-    new_content=$(cat "$msg_file")
-    [ "$original_content" = "$new_content" ]
+    [ "$output" = "feat(x): add login" ]
 }
 
 # ============================================================================
