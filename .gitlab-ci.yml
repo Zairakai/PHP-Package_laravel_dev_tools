@@ -25,7 +25,7 @@ variables:
 # each built from its own tag, with a version selector. See docs/scripts/publish.sh.
 pages:
   stage: publish
-  image: ${NODE_IMAGE}
+  image: zairakai/node:latest-dev
   needs: []
   variables:
     GIT_DEPTH: 0
