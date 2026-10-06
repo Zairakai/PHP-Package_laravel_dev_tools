@@ -24,7 +24,7 @@ variables:
 # The documentation site, published with GitLab Pages from main: main ("next") and every released version,
 # each built from its own tag, with a version selector. See docs/scripts/publish.sh.
 pages:
-  stage: build
+  stage: publish
   image: ${NODE_IMAGE}
   needs: []
   variables:
