@@ -1,0 +1,55 @@
+/* The colors of the site are the blue-grey of the theme tokens of @zairakai/mithril-scss. */
+:root {
+  --vp-c-brand-1: #455a64;
+  --vp-c-brand-2: #546e7a;
+  --vp-c-brand-3: #607d8b;
+  --vp-c-brand-soft: rgb(96 125 139 / 14%);
+}
+
+.dark {
+  --vp-c-brand-1: #90a4ae;
+  --vp-c-brand-2: #78909c;
+  --vp-c-brand-3: #607d8b;
+  --vp-c-brand-soft: rgb(144 164 174 / 16%);
+}
+
+.docs-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 0 1.5rem;
+  margin: 1rem 0;
+}
+
+.docs-badges img {
+  display: block;
+  block-size: 20px;
+}
+
+.docs-build {
+  padding-top: 1rem;
+  margin-top: 2rem;
+  font-size: 0.8125rem;
+  color: var(--vp-c-text-2);
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.docs-version select {
+  padding: 0.25rem 0.5rem;
+  margin-inline-start: 1rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
