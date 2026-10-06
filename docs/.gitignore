@@ -1,0 +1,5 @@
+reference/
+guide/readme.md
+.vitepress/cache/
+.vitepress/dist/
+node_modules/

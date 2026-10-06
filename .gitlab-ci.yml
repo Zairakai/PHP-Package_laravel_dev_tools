@@ -20,3 +20,25 @@ variables:
   # Self-hosted mode: scripts live in this repo, not in vendor/
   DEV_TOOLS_SCRIPTS: "scripts"
   DEV_TOOLS_GITLAB_SCRIPTS: ".gitlab/scripts"
+
+# The documentation site, published with GitLab Pages from main: main ("next") and every released version,
+# each built from its own tag, with a version selector. See docs/scripts/publish.sh.
+pages:
+  stage: build
+  image: ${NODE_IMAGE}
+  needs: []
+  variables:
+    GIT_DEPTH: 0
+  before_script:
+    - node --version
+  script:
+    - bash docs/scripts/publish.sh
+  # The next jobs of the runner must not find (and lint) the docs dependencies.
+  after_script:
+    - rm -rf docs/node_modules docs/reference docs/guide docs/.vitepress/dist docs/.vitepress/cache
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

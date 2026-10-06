@@ -1,0 +1,15 @@
+{
+  "name": "laravel-dev-tools-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "dev": "npm run generate && vitepress dev",
+    "build": "npm run generate && vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "php-parser": "3.7.0",
+    "vitepress": "1.6.4"
+  }
+}
