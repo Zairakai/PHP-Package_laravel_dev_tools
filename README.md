@@ -5,6 +5,7 @@
 
 [![GitLab Release][gitlab-release-badge]][gitlab-release]
 [![Packagist][packagist-badge]][packagist]
+[![Docs][docs-badge]][docs]
 [![Downloads][downloads-badge]][packagist]
 [![License][license-badge]][license]
 
@@ -14,6 +15,8 @@
 [![Code Style][pint-badge]][pint]
 
 One unified toolkit to set up Laravel quality tooling. Context-aware by default — it adapts to both standalone packages and full-stack applications.
+
+**Documentation: [laravel-dev-tools-8745c7.gitlab.io][docs]**
 
 ---
 
@@ -271,3 +274,5 @@ Contributions are welcome. Please read [CONTRIBUTING.md][contributing] for the p
 [pint]: https://laravel.com/docs/pint
 [ecosystem]: https://gitlab.com/zairakai
 [contributing]: ./CONTRIBUTING.md
+[docs]: https://laravel-dev-tools-8745c7.gitlab.io
+[docs-badge]: https://img.shields.io/badge/docs-online-blue
