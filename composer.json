@@ -44,13 +44,10 @@
   "require": {
     "php": "^8.4",
     "composer-plugin-api": "^2.0",
-    "driftingly/rector-laravel": "^1.2 || ^2.0",
-    "larastan/larastan": "^2.0 || ^3.0",
-    "laravel/pint": "^1.13",
-    "nunomaduro/phpinsights": "^2.11",
+    "driftingly/rector-laravel": "^2.0",
+    "larastan/larastan": "^3.0",
     "phpmetrics/phpmetrics": "^2.8",
-    "phpstan/phpstan": "^1.10 || ^2.0",
-    "rector/rector": "^1.0 || ^2.0"
+    "stanislas-poisson/php-dev-tools": "^1.0.1"
   },
   "require-dev": {
     "composer/composer": "^2.0",
