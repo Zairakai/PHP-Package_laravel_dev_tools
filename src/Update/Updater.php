@@ -26,6 +26,11 @@ final class Updater
     private const string CONFIG_FILE = '.dependency-update.json';
 
     /**
+     * The files an update may change.
+     */
+    private const array FILES = ['composer.json', 'composer.lock'];
+
+    /**
      * @var array{reject: list<string>, cooldown: string, tag: array{when: string, level: string}, cascade: ?array{groups?: list<string>}}
      */
     private array $config;
@@ -408,15 +413,15 @@ final class Updater
 
         $rows = Planner::diffDependencies($before, $this->manifest());
 
-        if ('' === $this->exec(['git', 'status', '--porcelain'])) {
+        if ('' === $this->exec(['git', 'status', '--porcelain', '--', ...self::FILES])) {
             $this->log('Everything is up to date.');
 
             return;
         }
 
         $table = Planner::formatChanges($rows);
-        // Only the tracked files: the cache of Composer on the runner is not ignored by git.
-        $this->exec(['git', 'add', '--update']);
+        // Only the manifest and the lock file: the plugin of laravel-dev-tools republishes other files during composer update, and the cache of Composer on the runner is not ignored by git.
+        $this->exec(['git', 'add', ...self::FILES]);
         $this->exec(['git', 'commit', '-m', self::COMMIT_SUBJECT, '-m', "Minor and patch updates.\n\n{$table}"]);
         $this->exec(['git', 'push', $this->remoteUrl(), "HEAD:refs/heads/{$branch}"]);
 
