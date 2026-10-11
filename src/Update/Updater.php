@@ -361,7 +361,8 @@ final class Updater
         $commits = [];
 
         if (null !== $last) {
-            $subject = str_replace(['(', ')'], ['\\(', '\\)'], self::COMMIT_SUBJECT);
+            // git reads a basic regular expression: the parentheses of the subject are literal.
+            $subject = self::COMMIT_SUBJECT;
             $commits = array_values(array_filter(explode("\n", $this->exec(['git', 'log', "{$last}..HEAD", '--format=%s', "--grep=^{$subject}"]))));
         }
 
