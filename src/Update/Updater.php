@@ -61,20 +61,23 @@ final class Updater
     }
 
     /**
+     * @param non-empty-string          $method
      * @param array<string, mixed>|null $body
      *
      * @return array{status: int, ok: bool, data: mixed}
      */
     private function api(string $method, string $path, ?array $body = null): array
     {
-        $handle = curl_init((getenv('CI_API_V4_URL') ?: 'https://gitlab.com/api/v4') . $path);
-        curl_setopt_array($handle, [
-            CURLOPT_CUSTOMREQUEST  => $method,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['PRIVATE-TOKEN: ' . getenv('GITLAB_TOKEN'), 'Content-Type: application/json'],
-            CURLOPT_TIMEOUT        => 60,
-            ...(null === $body ? [] : [CURLOPT_POSTFIELDS => json_encode($body)]),
-        ]);
+        $handle  = curl_init((getenv('CI_API_V4_URL') ?: 'https://gitlab.com/api/v4') . $path);
+        curl_setopt($handle, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($handle, CURLOPT_HTTPHEADER, ['PRIVATE-TOKEN: ' . getenv('GITLAB_TOKEN'), 'Content-Type: application/json']);
+        curl_setopt($handle, CURLOPT_TIMEOUT, 60);
+
+        if (null !== $body) {
+            curl_setopt($handle, CURLOPT_POSTFIELDS, json_encode($body, JSON_THROW_ON_ERROR));
+        }
+
         $text   = (string) curl_exec($handle);
         $status = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         curl_close($handle);
@@ -411,7 +414,8 @@ final class Updater
         }
 
         $table = Planner::formatChanges($rows);
-        $this->exec(['git', 'add', '-A']);
+        // Only the tracked files: the cache of Composer on the runner is not ignored by git.
+        $this->exec(['git', 'add', '--update']);
         $this->exec(['git', 'commit', '-m', self::COMMIT_SUBJECT, '-m', "Minor and patch updates.\n\n{$table}"]);
         $this->exec(['git', 'push', $this->remoteUrl(), "HEAD:refs/heads/{$branch}"]);
 
