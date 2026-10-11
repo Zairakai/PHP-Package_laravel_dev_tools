@@ -1,0 +1,9 @@
+{
+  "tag": {
+    "when": "runtime",
+    "level": "minor"
+  },
+  "cascade": {
+    "groups": ["zairakai/php-packages"]
+  }
+}

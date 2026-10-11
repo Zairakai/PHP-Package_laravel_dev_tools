@@ -75,6 +75,9 @@
       "Zairakai\\LaravelDevTools\\Tests\\": "tests/"
     }
   },
+  "bin": [
+    "bin/update-dependencies"
+  ],
   "config": {
     "allow-plugins": {
       "dealerdirect/phpcodesniffer-composer-installer": true,
