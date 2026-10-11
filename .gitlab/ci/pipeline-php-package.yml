@@ -442,6 +442,8 @@ deps:update:
   needs: []
   script:
     - composer install --prefer-dist --no-interaction --no-progress
+    # The tool of the lock file may be old: take the newest one first (this project runs its own copy).
+    - '[ "${UPDATE_DEPENDENCIES_BIN}" = "bin/update-dependencies" ] || composer update zairakai/laravel-dev-tools --no-interaction --no-progress'
     - php "${UPDATE_DEPENDENCIES_BIN}" update
   rules:
     - if: $UPDATE_DEPENDENCIES == "true" && $CI_COMMIT_BRANCH == "develop"
@@ -453,6 +455,8 @@ deps:release:
   image: ${DOCKERHUB_IMAGE}
   script:
     - composer install --prefer-dist --no-interaction --no-progress
+    # The tool of the lock file may be old: take the newest one first (this project runs its own copy).
+    - '[ "${UPDATE_DEPENDENCIES_BIN}" = "bin/update-dependencies" ] || composer update zairakai/laravel-dev-tools --no-interaction --no-progress'
     - php "${UPDATE_DEPENDENCIES_BIN}" release
   rules:
     - if: $CI_COMMIT_BRANCH == "develop" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE =~ /chore\/update-dependencies/
@@ -466,6 +470,8 @@ deps:tag:
     GIT_DEPTH: 0
   script:
     - composer install --prefer-dist --no-interaction --no-progress
+    # The tool of the lock file may be old: take the newest one first (this project runs its own copy).
+    - '[ "${UPDATE_DEPENDENCIES_BIN}" = "bin/update-dependencies" ] || composer update zairakai/laravel-dev-tools --no-interaction --no-progress'
     - php "${UPDATE_DEPENDENCIES_BIN}" tag
   rules:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
@@ -479,6 +485,8 @@ deps:cascade:
     - job: php:publish
   script:
     - composer install --prefer-dist --no-interaction --no-progress
+    # The tool of the lock file may be old: take the newest one first (this project runs its own copy).
+    - '[ "${UPDATE_DEPENDENCIES_BIN}" = "bin/update-dependencies" ] || composer update zairakai/laravel-dev-tools --no-interaction --no-progress'
     - php "${UPDATE_DEPENDENCIES_BIN}" cascade
   rules:
     - if: $CI_COMMIT_TAG =~ $VERSION_TAG_REGEX
