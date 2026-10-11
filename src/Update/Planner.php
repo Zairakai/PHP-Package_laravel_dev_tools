@@ -14,12 +14,12 @@ final class Planner
     /**
      * All the sections of composer.json that hold requirements.
      */
-    public const ALL_SECTIONS = ['require', 'require-dev'];
+    public const array ALL_SECTIONS = ['require', 'require-dev'];
 
     /**
      * The sections of composer.json that are published with the package.
      */
-    public const RUNTIME_SECTIONS = ['require'];
+    public const array RUNTIME_SECTIONS = ['require'];
 
     /**
      * The configuration of a project, completed with the defaults.
@@ -101,7 +101,7 @@ final class Planner
             return null;
         }
 
-        usort($versions, static fn (string $a, string $b): int => version_compare($a, $b));
+        usort($versions, strnatcmp(...));
 
         return $versions[array_key_last($versions)];
     }

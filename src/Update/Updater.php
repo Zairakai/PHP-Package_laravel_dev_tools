@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Update;
 
+use Illuminate\Support\Sleep;
 use RuntimeException;
 
 /**
@@ -18,11 +19,11 @@ use RuntimeException;
  */
 final class Updater
 {
-    private const BRANCH_PREFIX = 'chore/update-dependencies';
+    private const string BRANCH_PREFIX = 'chore/update-dependencies';
 
-    private const COMMIT_SUBJECT = 'chore(deps): update the dependencies';
+    private const string COMMIT_SUBJECT = 'chore(deps): update the dependencies';
 
-    private const CONFIG_FILE = '.dependency-update.json';
+    private const string CONFIG_FILE = '.dependency-update.json';
 
     /**
      * @var array{reject: list<string>, cooldown: string, tag: array{when: string, level: string}, cascade: ?array{groups?: list<string>}}
@@ -75,7 +76,7 @@ final class Updater
             ...(null === $body ? [] : [CURLOPT_POSTFIELDS => json_encode($body)]),
         ]);
         $text   = (string) curl_exec($handle);
-        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $status = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         curl_close($handle);
 
         return ['status' => $status, 'ok' => 200 <= $status && 300 > $status, 'data' => json_decode($text, true) ?? $text];
@@ -115,7 +116,7 @@ final class Updater
             $available = $this->onPackagist($name, $version);
 
             if (! $available) {
-                sleep(30);
+                Sleep::sleep(30);
             }
         }
 
@@ -275,7 +276,7 @@ final class Updater
                 return;
             }
 
-            sleep(10);
+            Sleep::sleep(10);
         }
 
         $this->log("Merge request !{$iid}: it could not be set to merge by itself, it stays open.");
