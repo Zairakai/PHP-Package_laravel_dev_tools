@@ -223,6 +223,21 @@ Available templates:
 
 ---
 
+## Automatic updates
+
+The tool `vendor/bin/update-dependencies` (PHP, so nothing to add to the PHP image) keeps the requirements of a package
+up to date. The CI template runs it from the jobs `deps:update`, `deps:release`, `deps:tag` and `deps:cascade`:
+
+- `update`: `composer update -W`, `composer bump`, `composer normalize`, then a signed commit on a branch and a merge
+  request into `develop`, merged when its pipeline succeeds.
+- `release`: brings `develop` into `main` after an update.
+- `tag`: tags `main` (signed) only when a published range (`require`) changed.
+- `cascade`: after the publication on Packagist, starts the update of the projects that use the package.
+
+It is started by a weekly schedule or by a pipeline with `UPDATE_DEPENDENCIES=true`, and reads `.dependency-update.json`
+at the root of the project (`tag.when`: `runtime`, `always` or `never`; `tag.level`; `cascade.groups`). The group
+variables `GITLAB_TOKEN`, `GPG_PRIVATE_KEY_B64`, `RELEASE_SIGNER_NAME` and `RELEASE_SIGNER_EMAIL` are required.
+
 ## Development
 
 ```bash
