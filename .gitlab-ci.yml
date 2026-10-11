@@ -19,6 +19,7 @@ variables:
 
   # Self-hosted mode: scripts live in this repo, not in vendor/
   DEV_TOOLS_SCRIPTS: "scripts"
+  UPDATE_DEPENDENCIES_BIN: "bin/update-dependencies"
   DEV_TOOLS_GITLAB_SCRIPTS: ".gitlab/scripts"
 
 # The documentation site, published with GitLab Pages from main: main ("next") and every released version,
