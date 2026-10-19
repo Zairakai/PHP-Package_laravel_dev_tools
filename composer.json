@@ -57,7 +57,7 @@
     "illuminate/filesystem": "^12.0 || ^13.0",
     "illuminate/support": "^12.0 || ^13.0",
     "orchestra/testbench": "^10.0 || ^11.3",
-    "phpunit/phpunit": "^12.5.38"
+    "phpunit/phpunit": "^12.5.40"
   },
   "suggest": {
     "enlightn/enlightn": "Security and performance analysis (Laravel apps only)",
