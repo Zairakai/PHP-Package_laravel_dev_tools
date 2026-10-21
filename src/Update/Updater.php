@@ -30,6 +30,8 @@ final class Updater
      */
     private const array FILES = ['composer.json', 'composer.lock'];
 
+    private const string PIPELINE_FILE = '.gitlab-ci.yml';
+
     /**
      * @var array{reject: list<string>, cooldown: string, tag: array{when: string, level: string}, cascade: ?array{groups?: list<string>}}
      */
@@ -411,9 +413,15 @@ final class Updater
             $this->log('composer normalize is not available: skipped.');
         }
 
-        $rows = Planner::diffDependencies($before, $this->manifest());
+        $rows  = Planner::diffDependencies($before, $this->manifest());
+        $files = self::FILES;
 
-        if ('' === $this->exec(['git', 'status', '--porcelain', '--', ...self::FILES])) {
+        // The one exception: the ref of the shared pipeline follows the installed version of the tools.
+        if (is_file($this->directory . '/' . self::PIPELINE_FILE) && Planner::isRefOnlyChange($this->exec(['git', 'diff', '-U0', '--', self::PIPELINE_FILE]))) {
+            $files[] = self::PIPELINE_FILE;
+        }
+
+        if ('' === $this->exec(['git', 'status', '--porcelain', '--', ...$files])) {
             $this->log('Everything is up to date.');
 
             return;
@@ -421,7 +429,7 @@ final class Updater
 
         $table = Planner::formatChanges($rows);
         // Only the manifest and the lock file: the plugin of laravel-dev-tools republishes other files during composer update, and the cache of Composer on the runner is not ignored by git.
-        $this->exec(['git', 'add', ...self::FILES]);
+        $this->exec(['git', 'add', ...$files]);
         $this->exec(['git', 'commit', '-m', self::COMMIT_SUBJECT, '-m', "Minor and patch updates.\n\n{$table}"]);
         $this->exec(['git', 'push', $this->remoteUrl(), "HEAD:refs/heads/{$branch}"]);
 
