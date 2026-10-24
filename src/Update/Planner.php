@@ -89,6 +89,30 @@ final class Planner
     }
 
     /**
+     * True when a diff changes one `ref:` line and nothing else. The install of the tools moves the `ref:` of the shared
+     * pipeline to the installed version: that is the only change of the pipeline file an update may commit.
+     */
+    public static function isRefOnlyChange(string $diff): bool
+    {
+        $changed = array_values(array_filter(
+            explode("\n", $diff),
+            static fn (string $line): bool => 1 === preg_match('/^[+-]/', $line) && 1 !== preg_match('/^(\+\+\+|---)/', $line),
+        ));
+
+        if (2 !== count($changed)) {
+            return false;
+        }
+
+        foreach ($changed as $line) {
+            if (1 !== preg_match('/^[+-]\s*ref:\s*\S+\s*$/', $line)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * The highest tag of the form X.Y.Z (a tag with a prefix or a suffix is ignored), or null.
      *
      * @param list<string> $tags

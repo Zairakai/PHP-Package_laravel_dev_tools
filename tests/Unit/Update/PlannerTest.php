@@ -12,6 +12,17 @@ use Zairakai\LaravelDevTools\Update\Planner;
 final class PlannerTest extends TestCase
 {
     #[Test]
+    public function accepts_only_the_move_of_the_ref_of_the_shared_pipeline(): void
+    {
+        $header = "--- a/.gitlab-ci.yml\n+++ b/.gitlab-ci.yml\n@@ -6 +6 @@\n";
+
+        $this->assertTrue(Planner::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1"));
+        $this->assertFalse(Planner::isRefOnlyChange($header . "-    file: \"a.yml\"\n+    file: \"b.yml\""));
+        $this->assertFalse(Planner::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1\n+  extra: true"));
+        $this->assertFalse(Planner::isRefOnlyChange(''));
+    }
+
+    #[Test]
     public function computes_the_next_version(): void
     {
         $this->assertSame('1.2.4', Planner::nextVersion('1.2.3', 'patch'));
