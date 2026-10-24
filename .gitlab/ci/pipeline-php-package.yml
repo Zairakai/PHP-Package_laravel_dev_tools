@@ -446,7 +446,23 @@ deps:update:
     - '[ "${UPDATE_DEPENDENCIES_BIN}" = "bin/update-dependencies" ] || composer update zairakai/laravel-dev-tools --no-interaction --no-progress'
     - php "${UPDATE_DEPENDENCIES_BIN}" update
   rules:
-    - if: $UPDATE_DEPENDENCIES == "true" && $CI_COMMIT_BRANCH == "develop"
+    - if: $UPDATE_DEPENDENCIES == "true" && $AUDIT_DEPENDENCIES != "true" && $CI_COMMIT_BRANCH == "develop"
+
+# A daily schedule with UPDATE_DEPENDENCIES=true and AUDIT_DEPENDENCIES=true looks for security advisories: one issue per
+# advisory (ntfy alert, closed when it is gone) and, with the group variable AUTO_FIX=true, an update started to fix it.
+# The token FRESHNESS_TOKEN of the group (else GITLAB_TOKEN) opens the issues and starts the update; NTFY_URL is the alert.
+deps:audit:
+  <<: *base_job
+  stage: install
+  image: ${PHP_UPDATE_IMAGE}
+  needs: []
+  script:
+    - composer install --prefer-dist --no-interaction --no-progress
+    # The tool of the lock file may be old: take the newest one first (this project runs its own copy).
+    - '[ "${UPDATE_DEPENDENCIES_BIN}" = "bin/update-dependencies" ] || composer update zairakai/laravel-dev-tools --no-interaction --no-progress'
+    - php "${UPDATE_DEPENDENCIES_BIN}" audit
+  rules:
+    - if: $UPDATE_DEPENDENCIES == "true" && $AUDIT_DEPENDENCIES == "true" && $CI_COMMIT_BRANCH == "develop"
 
 # After the merge of an update into develop, bring develop into main.
 deps:release:

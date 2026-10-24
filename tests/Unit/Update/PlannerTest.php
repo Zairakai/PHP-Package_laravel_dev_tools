@@ -42,6 +42,20 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function describes_the_advisory_and_the_automatic_fix_in_the_issue(): void
+    {
+        $advisory = ['id' => 'PKSA-1', 'package' => 'vendor/a', 'title' => 'Remote code execution', 'link' => 'https://example.test/1', 'cve' => 'CVE-2026-1', 'severity' => 'high', 'range' => '<1.5'];
+
+        $on  = Planner::advisoryIssueBody($advisory, 'https://ci.test/1', true);
+        $off = Planner::advisoryIssueBody([...$advisory, 'severity' => 'low'], 'https://ci.test/1', true);
+
+        $this->assertStringContainsString('`vendor/a`', $on);
+        $this->assertStringContainsString('CVE-2026-1', $on);
+        $this->assertStringContainsString('Automatic fix: started', $on);
+        $this->assertStringContainsString('Automatic fix: off', $off);
+    }
+
+    #[Test]
     public function does_not_tag_when_only_development_requirements_changed(): void
     {
         $config = Planner::config();
@@ -59,6 +73,16 @@ final class PlannerTest extends TestCase
     {
         $this->assertSame('1.10.0', Planner::latestTag(['1.2.0', '1.10.0', 'v9.0.0', '2.0.0-rc1', 'latest']));
         $this->assertNull(Planner::latestTag(['v1.0.0', 'main']));
+    }
+
+    #[Test]
+    public function fixes_without_waiting_only_the_serious_or_unknown_severities(): void
+    {
+        $this->assertTrue(Planner::isUrgent('critical'));
+        $this->assertTrue(Planner::isUrgent('high'));
+        $this->assertTrue(Planner::isUrgent(''));
+        $this->assertFalse(Planner::isUrgent('medium'));
+        $this->assertFalse(Planner::isUrgent('low'));
     }
 
     #[Test]
@@ -84,6 +108,24 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function reads_the_advisories_of_a_composer_audit_report(): void
+    {
+        $report = ['advisories' => [
+            'vendor/b' => [['advisoryId' => 'PKSA-2', 'packageName' => 'vendor/b', 'title' => 'Second', 'link' => 'https://example.test/2', 'cve' => 'CVE-2026-2', 'severity' => 'HIGH', 'affectedVersions' => '<2.0']],
+            'vendor/a' => [['advisoryId' => 'PKSA-1', 'title' => 'First', 'affectedVersions' => '>=1.0,<1.5']],
+        ]];
+
+        $rows = Planner::advisories($report);
+
+        $this->assertSame(['vendor/a', 'vendor/b'], array_column($rows, 'package'));
+        $this->assertSame('', $rows[0]['severity']);
+        $this->assertSame('high', $rows[1]['severity']);
+        $this->assertSame('CVE-2026-2', $rows[1]['cve']);
+        $this->assertSame([], Planner::advisories(['advisories' => []]));
+        $this->assertSame([], Planner::advisories([]));
+    }
+
+    #[Test]
     public function refuses_to_sign_without_the_group_variables(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -96,5 +138,12 @@ final class PlannerTest extends TestCase
         $plan = Planner::planTag(Planner::config(['tag' => ['level' => 'minor']]), '1.2.3', ['x'], ['require' => ['a' => '^1']], ['require' => ['a' => '^2']]);
 
         $this->assertSame('1.3.0', $plan['version']);
+    }
+
+    #[Test]
+    public function titles_the_issue_of_an_advisory_with_a_stable_key(): void
+    {
+        $this->assertSame('Security advisory: vendor/a (PKSA-1)', Planner::advisoryTitle(['id' => 'PKSA-1', 'package' => 'vendor/a']));
+        $this->assertStringStartsWith(Planner::ADVISORY_TITLE_PREFIX, Planner::advisoryTitle(['id' => 'x', 'package' => 'y']));
     }
 }
