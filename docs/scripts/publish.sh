@@ -6,7 +6,7 @@
 #   /next/       main
 #   /versions.json   what the version selector lists
 #
-# GitLab Pages has one site per project and deploys only from the default branch, so this runs there and
+# GitLab Pages has one site per project, so this runs in the pipeline of a release tag (after the publication) and
 # rebuilds the versions from their tags: nothing has to be kept between two runs.
 set -euo pipefail
 
