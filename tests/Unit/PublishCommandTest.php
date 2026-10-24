@@ -889,7 +889,7 @@ final class PublishCommandTest extends TestCase
 
         // Remove pint.json (symlink or file)
         if (is_link($this->pintPath)) {
-            unlink($this->pintPath);
+            File::delete($this->pintPath);
         }
         elseif (File::exists($this->pintPath)) {
             File::delete($this->pintPath);
@@ -897,7 +897,7 @@ final class PublishCommandTest extends TestCase
 
         // Remove phpstan.neon (symlink or file)
         if (is_link($this->phpstanPath)) {
-            unlink($this->phpstanPath);
+            File::delete($this->phpstanPath);
         }
         elseif (File::exists($this->phpstanPath)) {
             File::delete($this->phpstanPath);
@@ -907,7 +907,7 @@ final class PublishCommandTest extends TestCase
         $rectorPath = $this->basePath . '/rector.php';
 
         if (is_link($rectorPath)) {
-            unlink($rectorPath);
+            File::delete($rectorPath);
         }
         elseif (File::exists($rectorPath)) {
             File::delete($rectorPath);
@@ -917,7 +917,7 @@ final class PublishCommandTest extends TestCase
         $insightsPath = $this->basePath . '/config/insights.php';
 
         if (is_link($insightsPath)) {
-            unlink($insightsPath);
+            File::delete($insightsPath);
         }
         elseif (File::exists($insightsPath)) {
             File::delete($insightsPath);
