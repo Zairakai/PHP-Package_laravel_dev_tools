@@ -233,8 +233,8 @@ final class Updater
 
             $path = '/projects/' . getenv('CI_PROJECT_ID') . '/issues/' . Json::int($issue, 'iid');
             $this->api('POST', "{$path}/notes", ['body' => 'The audit of ' . getenv('CI_PIPELINE_URL') . ' no longer finds this advisory.'], $token);
-            $this->api('PUT', $path, ['state_event' => 'close'], $token);
-            $this->log("Issue closed: {$title}");
+            $closed = $this->api('PUT', $path, ['state_event' => 'close'], $token);
+            $this->log($closed['ok'] ? "Issue closed: {$title}" : "Issue not closed ({$closed['status']}): {$title}");
         }
     }
 
@@ -265,12 +265,18 @@ final class Updater
 
     private function createIssue(string $title, string $description, string $token): string
     {
-        $user  = $this->api('GET', '/user', null, $token);
+        // The assignee is given by the variable ISSUE_ASSIGNEE_ID; without it, the user of the token.
+        $assignee = (int) getenv('ISSUE_ASSIGNEE_ID');
+
+        if (0 === $assignee) {
+            $assignee = Json::int(Json::map($this->api('GET', '/user', null, $token)['data']), 'id');
+        }
+
         $issue = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/issues', [
             'title'        => $title,
             'description'  => $description,
             'labels'       => self::ISSUE_LABELS,
-            'assignee_ids' => [Json::int(Json::map($user['data']), 'id')],
+            'assignee_ids' => 0 < $assignee ? [$assignee] : [],
         ], $token);
 
         if (! $issue['ok']) {
