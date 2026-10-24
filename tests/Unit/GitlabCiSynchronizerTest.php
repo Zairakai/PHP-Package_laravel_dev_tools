@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Zairakai\LaravelDevTools\Tests\Unit;
 
 use Composer\IO\BufferIO;
+use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -537,7 +538,7 @@ final class GitlabCiSynchronizerTest extends TestCase
             }
 
             $full = $path . '/' . $item;
-            is_dir($full) ? $this->removeDirectory($full) : unlink($full);
+            is_dir($full) ? $this->removeDirectory($full) : File::delete($full);
         }
 
         rmdir($path);

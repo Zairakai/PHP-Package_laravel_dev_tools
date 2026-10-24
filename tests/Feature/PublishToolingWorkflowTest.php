@@ -114,7 +114,7 @@ final class PublishToolingWorkflowTest extends TestCase
 
         foreach ($files as $file) {
             if (is_link($file)) {
-                unlink($file);
+                File::delete($file);
             }
             elseif (File::exists($file)) {
                 File::delete($file);

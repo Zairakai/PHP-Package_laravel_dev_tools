@@ -14,6 +14,7 @@ use RuntimeException;
  * - release: open the merge request of develop into main after an update.
  * - tag: tag main when a published range changed since the last tag.
  * - cascade: after the publication of this package, start the update of the projects that use it.
+ * - audit: look for security advisories, open one issue per advisory and, with AUTO_FIX=true, start an update to fix them.
  *
  * It reads `.dependency-update.json` at the root of the project, like the JavaScript tool of the group.
  */
@@ -29,6 +30,8 @@ final class Updater
      * The files an update may change.
      */
     private const array FILES = ['composer.json', 'composer.lock'];
+
+    private const string ISSUE_LABELS = 'Kind::Security,Area::Security,Automated';
 
     private const string PIPELINE_FILE = '.gitlab-ci.yml';
 
@@ -63,22 +66,24 @@ final class Updater
             'release' => $this->release(),
             'tag'     => $this->tag(),
             'cascade' => $this->cascade(),
-            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade'),
+            'audit'   => $this->audit(),
+            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade | audit'),
         };
     }
 
     /**
      * @param non-empty-string          $method
      * @param array<string, mixed>|null $body
+     * @param string|null               $token  The token of the call, GITLAB_TOKEN when not given.
      *
      * @return array{status: int, ok: bool, data: mixed}
      */
-    private function api(string $method, string $path, ?array $body = null): array
+    private function api(string $method, string $path, ?array $body = null, ?string $token = null): array
     {
         $handle  = curl_init((getenv('CI_API_V4_URL') ?: 'https://gitlab.com/api/v4') . $path);
         curl_setopt($handle, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($handle, CURLOPT_HTTPHEADER, ['PRIVATE-TOKEN: ' . getenv('GITLAB_TOKEN'), 'Content-Type: application/json']);
+        curl_setopt($handle, CURLOPT_HTTPHEADER, ['PRIVATE-TOKEN: ' . ($token ?? getenv('GITLAB_TOKEN')), 'Content-Type: application/json']);
         curl_setopt($handle, CURLOPT_TIMEOUT, 60);
 
         if (null !== $body) {
@@ -102,6 +107,55 @@ final class Updater
 
         // The runner clones the project with another user than the one of the job: Git refuses it otherwise.
         $this->exec(['git', 'config', '--global', '--add', 'safe.directory', $this->directory]);
+    }
+
+    /**
+     * Look for security advisories in the lock file. One issue per advisory, never twice, closed when the advisory is gone.
+     * With AUTO_FIX=true, an advisory that is high, critical or of unknown severity starts an update of the dependencies.
+     */
+    private function audit(): void
+    {
+        $report = json_decode($this->exec(['composer', 'audit', '--locked', '--format=json', '--no-interaction'], null, [0, 1, 2, 3]), true, 512, JSON_THROW_ON_ERROR);
+        $found  = Planner::advisories(Json::map($report));
+        $auto   = 'true' === getenv('AUTO_FIX');
+        $token  = (string) (getenv('FRESHNESS_TOKEN') ?: getenv('GITLAB_TOKEN'));
+        $titles = [];
+        $urgent = false;
+
+        $this->log(count($found) . ' security advisory(ies) found.');
+
+        foreach ($found as $advisory) {
+            $title    = Planner::advisoryTitle($advisory);
+            $titles[] = $title;
+            $urgent   = $urgent || Planner::isUrgent($advisory['severity']);
+
+            if ($this->issueExists($title, $token)) {
+                $this->log("Issue already open: {$title}");
+
+                continue;
+            }
+
+            $url = $this->createIssue($title, Planner::advisoryIssueBody($advisory, (string) getenv('CI_PIPELINE_URL'), $auto), $token);
+            $this->log("Issue created: {$url}");
+            $this->notify($title, getenv('CI_PROJECT_PATH') . ': ' . $url);
+        }
+
+        $this->closeResolved($titles, $token);
+
+        if (! $auto || ! $urgent) {
+            $this->log($auto ? 'Nothing urgent: the weekly update takes the rest.' : 'AUTO_FIX is off: update by hand.');
+
+            return;
+        }
+
+        if ($this->hasOpenUpdate()) {
+            $this->log('An update is already open: nothing to start.');
+
+            return;
+        }
+
+        $started = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/pipeline', ['ref' => 'develop', 'variables' => [['key' => 'UPDATE_DEPENDENCIES', 'value' => 'true']]], $token);
+        $this->log($started['ok'] ? 'Update started.' : "The update could not be started ({$started['status']}).");
     }
 
     private function cascade(): void
@@ -161,6 +215,30 @@ final class Updater
     }
 
     /**
+     * Close the open issues of the audit whose advisory is not found any more.
+     *
+     * @param list<string> $titles The titles of the advisories found today.
+     */
+    private function closeResolved(array $titles, string $token): void
+    {
+        $query  = http_build_query(['state' => 'opened', 'labels' => 'Automated', 'search' => Planner::ADVISORY_TITLE_PREFIX, 'in' => 'title', 'per_page' => 100]);
+        $issues = $this->api('GET', '/projects/' . getenv('CI_PROJECT_ID') . "/issues?{$query}", null, $token);
+
+        foreach (Json::rows($issues['data']) as $issue) {
+            $title = Json::text($issue, 'title');
+
+            if (! str_starts_with($title, Planner::ADVISORY_TITLE_PREFIX) || in_array($title, $titles, true)) {
+                continue;
+            }
+
+            $path = '/projects/' . getenv('CI_PROJECT_ID') . '/issues/' . Json::int($issue, 'iid');
+            $this->api('POST', "{$path}/notes", ['body' => 'The audit of ' . getenv('CI_PIPELINE_URL') . ' no longer finds this advisory.'], $token);
+            $closed = $this->api('PUT', $path, ['state_event' => 'close'], $token);
+            $this->log($closed['ok'] ? "Issue closed: {$title}" : "Issue not closed ({$closed['status']}): {$title}");
+        }
+    }
+
+    /**
      * Import the signing key and make Git sign the commits and the tags with it.
      */
     private function configureSigning(): void
@@ -185,10 +263,34 @@ final class Updater
         $this->exec(['git', 'config', 'tag.gpgsign', 'true']);
     }
 
+    private function createIssue(string $title, string $description, string $token): string
+    {
+        // The assignee is given by the variable ISSUE_ASSIGNEE_ID; without it, the user of the token.
+        $assignee = (int) getenv('ISSUE_ASSIGNEE_ID');
+
+        if (0 === $assignee) {
+            $assignee = Json::int(Json::map($this->api('GET', '/user', null, $token)['data']), 'id');
+        }
+
+        $issue = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/issues', [
+            'title'        => $title,
+            'description'  => $description,
+            'labels'       => self::ISSUE_LABELS,
+            'assignee_ids' => 0 < $assignee ? [$assignee] : [],
+        ], $token);
+
+        if (! $issue['ok']) {
+            throw new RuntimeException('The issue could not be created: ' . $this->mask((string) json_encode($issue['data'])));
+        }
+
+        return Json::text(Json::map($issue['data']), 'web_url');
+    }
+
     /**
      * @param list<string> $command
+     * @param list<int>    $allowed The exit statuses that are not a failure.
      */
-    private function exec(array $command, ?string $input = null): string
+    private function exec(array $command, ?string $input = null, array $allowed = [0]): string
     {
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->directory);
 
@@ -203,7 +305,7 @@ final class Updater
         fclose($pipes[1]);
         fclose($pipes[2]);
 
-        if (0 !== proc_close($process)) {
+        if (! in_array(proc_close($process), $allowed, true)) {
             throw new RuntimeException($this->mask(implode(' ', $command) . ' failed: ' . $error));
         }
 
@@ -214,6 +316,20 @@ final class Updater
     {
         foreach ($this->openMergeRequests() as $request) {
             if (str_starts_with(Json::text($request, 'source_branch'), self::BRANCH_PREFIX)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function issueExists(string $title, string $token): bool
+    {
+        $query  = http_build_query(['state' => 'opened', 'search' => $title, 'in' => 'title']);
+        $issues = $this->api('GET', '/projects/' . getenv('CI_PROJECT_ID') . "/issues?{$query}", null, $token);
+
+        foreach (Json::rows($issues['data']) as $issue) {
+            if (Json::text($issue, 'title') === $title) {
                 return true;
             }
         }
@@ -239,9 +355,12 @@ final class Updater
 
     private function mask(string $text): string
     {
-        $token = (string) getenv('GITLAB_TOKEN');
+        foreach (['GITLAB_TOKEN', 'FRESHNESS_TOKEN'] as $name) {
+            $token = (string) getenv($name);
+            $text  = '' === $token ? $text : str_replace($token, '***', $text);
+        }
 
-        return '' === $token ? $text : str_replace($token, '***', $text);
+        return $text;
     }
 
     /**
@@ -290,6 +409,21 @@ final class Updater
         }
 
         $this->log("Merge request !{$iid}: it could not be set to merge by itself, it stays open.");
+    }
+
+    /**
+     * A push notification through ntfy, when NTFY_URL is set. A failure never stops the audit.
+     */
+    private function notify(string $title, string $message): void
+    {
+        $url = (string) getenv('NTFY_URL');
+
+        if ('' === $url) {
+            return;
+        }
+
+        $context = stream_context_create(['http' => ['method' => 'POST', 'header' => "Title: {$title}\r\nContent-Type: text/plain", 'content' => $message, 'timeout' => 15, 'ignore_errors' => true]]);
+        @file_get_contents($url, false, $context);
     }
 
     private function onPackagist(string $name, string $version): bool

@@ -12,6 +12,11 @@ use InvalidArgumentException;
 final class Planner
 {
     /**
+     * The start of the title of the issues opened by the audit.
+     */
+    public const string ADVISORY_TITLE_PREFIX = 'Security advisory: ';
+
+    /**
      * All the sections of composer.json that hold requirements.
      */
     public const array ALL_SECTIONS = ['require', 'require-dev'];
@@ -20,6 +25,75 @@ final class Planner
      * The sections of composer.json that are published with the package.
      */
     public const array RUNTIME_SECTIONS = ['require'];
+
+    /**
+     * The advisories of the JSON report of `composer audit`, one row per advisory.
+     *
+     * @param array<string, mixed> $report
+     *
+     * @return list<array{id: string, package: string, title: string, link: string, cve: string, severity: string, range: string}>
+     */
+    public static function advisories(array $report): array
+    {
+        $rows = [];
+
+        foreach (Json::map($report['advisories'] ?? []) as $package => $advisories) {
+            foreach (Json::rows($advisories) as $advisory) {
+                $rows[] = [
+                    'id'       => Json::text($advisory, 'advisoryId'),
+                    'package'  => Json::text($advisory, 'packageName') ?: $package,
+                    'title'    => Json::text($advisory, 'title'),
+                    'link'     => Json::text($advisory, 'link'),
+                    'cve'      => Json::text($advisory, 'cve'),
+                    'severity' => strtolower(Json::text($advisory, 'severity')),
+                    'range'    => Json::text($advisory, 'affectedVersions'),
+                ];
+            }
+        }
+
+        usort($rows, static fn (array $a, array $b): int => [$a['package'], $a['id']] <=> [$b['package'], $b['id']]);
+
+        return $rows;
+    }
+
+    /**
+     * The body of the issue opened for an advisory.
+     *
+     * @param array{id: string, package: string, title: string, link: string, cve: string, severity: string, range: string} $advisory
+     */
+    public static function advisoryIssueBody(array $advisory, string $pipelineUrl, bool $autoFix): string
+    {
+        $lines = [
+            "{$advisory['title']}.",
+            '',
+            "- Package: `{$advisory['package']}`",
+            '- Affected versions: `' . ('' !== $advisory['range'] ? $advisory['range'] : 'unknown') . '`',
+            '- Severity: ' . ('' !== $advisory['severity'] ? $advisory['severity'] : 'not given'),
+            '- Advisory: ' . ('' !== $advisory['link'] ? $advisory['link'] : $advisory['id']),
+        ];
+
+        if ('' !== $advisory['cve']) {
+            $lines[] = "- CVE: {$advisory['cve']}";
+        }
+
+        $lines[] = '- Automatic fix: ' . ($autoFix && self::isUrgent($advisory['severity']) ? 'started (an update of the dependencies, taken without waiting)' : 'off for this advisory: update by hand');
+        $lines[] = '';
+        $lines[] = "Pipeline: {$pipelineUrl}";
+        $lines[] = '';
+        $lines[] = 'The issue is closed by the next audit that no longer finds this advisory.';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * The title of the issue of an advisory. It is also the key that keeps the issue from being opened twice.
+     *
+     * @param array{id: string, package: string} $advisory
+     */
+    public static function advisoryTitle(array $advisory): string
+    {
+        return self::ADVISORY_TITLE_PREFIX . "{$advisory['package']} ({$advisory['id']})";
+    }
 
     /**
      * The configuration of a project, completed with the defaults.
@@ -110,6 +184,14 @@ final class Planner
         }
 
         return true;
+    }
+
+    /**
+     * Whether an advisory is fixed without waiting for the next weekly update. Composer does not always give a severity: unknown counts as urgent.
+     */
+    public static function isUrgent(string $severity): bool
+    {
+        return in_array($severity, ['', 'high', 'critical'], true);
     }
 
     /**
