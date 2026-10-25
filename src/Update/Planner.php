@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Update;
 
+use Closure;
 use InvalidArgumentException;
 
 /**
@@ -86,6 +87,22 @@ final class Planner
     }
 
     /**
+     * The labels of the issue of an advisory: kind and area, the priority from the severity, and Status::Ready.
+     *
+     * @param array{severity: string} $advisory
+     */
+    public static function advisoryLabels(array $advisory, string $base): string
+    {
+        $priority = match ($advisory['severity']) {
+            'critical' => 'Priority::Critical',
+            'high'     => 'Priority::High',
+            default    => 'Priority::Low',
+        };
+
+        return "{$base},{$priority},Status::Ready";
+    }
+
+    /**
      * The title of the issue of an advisory. It is also the key that keeps the issue from being opened twice.
      *
      * @param array{id: string, package: string} $advisory
@@ -93,6 +110,31 @@ final class Planner
     public static function advisoryTitle(array $advisory): string
     {
         return self::ADVISORY_TITLE_PREFIX . "{$advisory['package']} ({$advisory['id']})";
+    }
+
+    /**
+     * The one notification of an audit, or null when nothing notable was opened. The advisories of a low severity only get their issue: they are counted, not listed.
+     *
+     * @param list<array{advisory: array{package: string, id: string, severity: string}, url: string}> $opened
+     *
+     * @return array{title: string, message: string}|null
+     */
+    public static function auditAlert(array $opened, string $project): ?array
+    {
+        $notable = array_values(array_filter($opened, static fn (array $item): bool => self::isNotable($item['advisory']['severity'])));
+
+        if ([] === $notable) {
+            return null;
+        }
+
+        $lines  = array_map(static fn (array $item): string => "{$item['advisory']['package']} ({$item['advisory']['id']}, " . ('' === $item['advisory']['severity'] ? 'unknown' : $item['advisory']['severity']) . "): {$item['url']}", $notable);
+        $silent = count($opened) - count($notable);
+
+        if (0 < $silent) {
+            $lines[] = "{$silent} more of a low severity, issue only.";
+        }
+
+        return ['title' => 'Security advisories: ' . count($notable) . " new in {$project}", 'message' => implode("\n", $lines)];
     }
 
     /**
@@ -163,6 +205,40 @@ final class Planner
     }
 
     /**
+     * Whether a package is only reached through the packages of the group (zairakai/*), by name.
+     *
+     * @param array<string, mixed> $lock
+     * @param array<string, mixed> $manifest
+     */
+    public static function isInherited(array $lock, array $manifest, string $name, string $scope = 'zairakai/'): bool
+    {
+        /** @var Closure(mixed): list<string> $names */
+        $names = static fn (mixed $requirements): array => array_map(strval(...), array_keys(Json::map($requirements)));
+
+        /** @var array<string, list<string>> $edges */
+        $edges = [];
+
+        foreach ([...Json::rows($lock['packages'] ?? []), ...Json::rows($lock['packages-dev'] ?? [])] as $package) {
+            $edges[Json::text($package, 'name')] = $names($package['require'] ?? []);
+        }
+
+        $direct = [...$names($manifest['require'] ?? []), ...$names($manifest['require-dev'] ?? [])];
+
+        $ours   = self::reachable($edges, array_values(array_filter($direct, static fn (string $dependency): bool => ! str_starts_with($dependency, $scope))));
+        $theirs = self::reachable($edges, array_values(array_filter($direct, static fn (string $dependency): bool => str_starts_with($dependency, $scope))));
+
+        return isset($theirs[$name]) && ! isset($ours[$name]);
+    }
+
+    /**
+     * Whether an advisory is worth a push notification: medium and above. Unknown counts as notable. Composer says medium, npm says moderate.
+     */
+    public static function isNotable(string $severity): bool
+    {
+        return in_array($severity, ['', 'medium', 'moderate', 'high', 'critical'], true);
+    }
+
+    /**
      * True when a diff changes one `ref:` line and nothing else. The install of the tools moves the `ref:` of the shared
      * pipeline to the installed version: that is the only change of the pipeline file an update may commit.
      */
@@ -213,6 +289,24 @@ final class Planner
     }
 
     /**
+     * The locked version of every package of a composer.lock, by name.
+     *
+     * @param array<string, mixed> $lock
+     *
+     * @return array<string, string>
+     */
+    public static function lockVersions(array $lock): array
+    {
+        $versions = [];
+
+        foreach ([...Json::rows($lock['packages'] ?? []), ...Json::rows($lock['packages-dev'] ?? [])] as $package) {
+            $versions[Json::text($package, 'name')] = Json::text($package, 'version');
+        }
+
+        return $versions;
+    }
+
+    /**
      * The version after `$last` for a level of change (major, minor or patch).
      */
     public static function nextVersion(string $last, string $level): string
@@ -256,6 +350,18 @@ final class Planner
         }
 
         return ['version' => self::nextVersion($last, $config['tag']['level']), 'reason' => 'a published range changed'];
+    }
+
+    /**
+     * The packages of a valid policy document.
+     *
+     * @param array<string, mixed> $doc
+     *
+     * @return list<string>
+     */
+    public static function policyPackages(array $doc): array
+    {
+        return array_values(array_filter(array_map(static fn (array $entry): string => Json::text($entry, 'package'), Json::rows($doc['entries'] ?? [])), static fn (string $name): bool => '' !== $name));
     }
 
     /**
@@ -304,5 +410,86 @@ final class Planner
             'email' => $env['RELEASE_SIGNER_EMAIL'],
             'key'   => (string) base64_decode($env['GPG_PRIVATE_KEY_B64'], true),
         ];
+    }
+
+    /**
+     * The problems of a policy document, as a list of sentences (empty when it is valid).
+     *
+     * @param array<string, mixed> $doc
+     *
+     * @return list<string>
+     */
+    public static function validatePolicy(array $doc): array
+    {
+        if (! isset($doc['entries']) || ! is_array($doc['entries'])) {
+            return ['"entries" must be a list.'];
+        }
+
+        $errors = [];
+        $seen   = [];
+
+        foreach (array_values($doc['entries']) as $index => $item) {
+            $entry = Json::map($item);
+            $where = "entries[{$index}]";
+            $name  = Json::text($entry, 'package');
+
+            if ('' === $name) {
+                $errors[] = "{$where}: \"package\" is missing.";
+            }
+            elseif (in_array($name, $seen, true)) {
+                $errors[] = "{$where}: \"{$name}\" is listed twice.";
+            }
+
+            $seen[] = $name;
+
+            if ('' === trim(Json::text($entry, 'reason'))) {
+                $errors[] = "{$where}: \"reason\" is missing.";
+            }
+
+            if (1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', Json::text($entry, 'since'))) {
+                $errors[] = "{$where}: \"since\" must be a date (YYYY-MM-DD).";
+            }
+
+            if (array_key_exists('unblock', $entry)) {
+                $unblock = Json::map($entry['unblock']);
+
+                if (1 !== preg_match('/^\d+\.\d+\.\d+$/', Json::text($unblock, 'version'))) {
+                    $errors[] = "{$where}: \"unblock.version\" must be a version (X.Y.Z).";
+                }
+
+                $peers = Json::strings($unblock['peers'] ?? null);
+
+                if ([] === $peers || count($peers) !== count(Json::map($unblock['peers'] ?? null))) {
+                    $errors[] = "{$where}: \"unblock.peers\" must be a list of packages.";
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Every package reached from the starting ones, by name.
+     *
+     * @param array<string, list<string>> $edges
+     * @param list<string>                $starts
+     *
+     * @return array<string, bool>
+     */
+    private static function reachable(array $edges, array $starts): array
+    {
+        $seen  = array_fill_keys($starts, true);
+        $queue = $starts;
+
+        while ([] !== $queue) {
+            foreach ($edges[array_shift($queue)] ?? [] as $next) {
+                if (! isset($seen[$next])) {
+                    $seen[$next] = true;
+                    $queue[]     = $next;
+                }
+            }
+        }
+
+        return $seen;
     }
 }

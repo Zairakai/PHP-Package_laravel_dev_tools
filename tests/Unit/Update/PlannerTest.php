@@ -12,6 +12,27 @@ use Zairakai\LaravelDevTools\Update\Planner;
 final class PlannerTest extends TestCase
 {
     #[Test]
+    public function accepts_a_valid_policy_and_reports_what_is_wrong(): void
+    {
+        $entry = ['package' => 'a/b', 'reason' => 'Not accepted by c/d.', 'since' => '2026-10-11', 'unblock' => ['version' => '2.0.0', 'peers' => ['c/d']]];
+
+        $this->assertSame([], Planner::validatePolicy(['entries' => [$entry]]));
+        $this->assertSame([], Planner::validatePolicy(['entries' => []]));
+        $this->assertSame(['"entries" must be a list.'], Planner::validatePolicy([]));
+        $this->assertSame([
+            'entries[0]: "package" is missing.',
+            'entries[0]: "reason" is missing.',
+            'entries[0]: "since" must be a date (YYYY-MM-DD).',
+        ], Planner::validatePolicy(['entries' => [[]]]));
+        $this->assertSame(['entries[1]: "a/b" is listed twice.'], Planner::validatePolicy(['entries' => [$entry, $entry]]));
+        $this->assertSame([
+            'entries[0]: "unblock.version" must be a version (X.Y.Z).',
+            'entries[0]: "unblock.peers" must be a list of packages.',
+        ], Planner::validatePolicy(['entries' => [[...$entry, 'unblock' => ['version' => 'two', 'peers' => []]]]]));
+        $this->assertSame(['a/b'], Planner::policyPackages(['entries' => [$entry]]));
+    }
+
+    #[Test]
     public function accepts_only_the_move_of_the_ref_of_the_shared_pipeline(): void
     {
         $header = "--- a/.gitlab-ci.yml\n+++ b/.gitlab-ci.yml\n@@ -6 +6 @@\n";
@@ -69,6 +90,26 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function finds_a_package_that_only_the_group_brings(): void
+    {
+        $lock = [
+            'packages'     => [
+                ['name' => 'zairakai/laravel-dev-tools', 'require' => ['x/inherited' => '^1.0', 'x/shared' => '^1.0']],
+                ['name' => 'x/inherited'],
+                ['name' => 'x/shared'],
+                ['name' => 'x/own', 'require' => ['x/shared' => '^1.0']],
+            ],
+            'packages-dev' => [],
+        ];
+        $manifest = ['require' => ['zairakai/laravel-dev-tools' => '^4.0'], 'require-dev' => ['x/own' => '^1.0']];
+
+        $this->assertTrue(Planner::isInherited($lock, $manifest, 'x/inherited'));
+        $this->assertFalse(Planner::isInherited($lock, $manifest, 'x/shared'));
+        $this->assertFalse(Planner::isInherited($lock, $manifest, 'x/own'));
+        $this->assertFalse(Planner::isInherited([], [], 'x/inherited'));
+    }
+
+    #[Test]
     public function finds_the_highest_plain_tag(): void
     {
         $this->assertSame('1.10.0', Planner::latestTag(['1.2.0', '1.10.0', 'v9.0.0', '2.0.0-rc1', 'latest']));
@@ -108,6 +149,16 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function notifies_from_medium_up_and_for_an_unknown_severity(): void
+    {
+        foreach (['critical', 'high', 'medium', 'moderate', ''] as $severity) {
+            $this->assertTrue(Planner::isNotable($severity));
+        }
+
+        $this->assertFalse(Planner::isNotable('low'));
+    }
+
+    #[Test]
     public function reads_the_advisories_of_a_composer_audit_report(): void
     {
         $report = ['advisories' => [
@@ -126,10 +177,48 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function reads_the_locked_versions(): void
+    {
+        $lock = ['packages' => [['name' => 'a/b', 'version' => '1.2.3']], 'packages-dev' => [['name' => 'c/d', 'version' => '4.5.6']]];
+
+        $this->assertSame(['a/b' => '1.2.3', 'c/d' => '4.5.6'], Planner::lockVersions($lock));
+        $this->assertSame([], Planner::lockVersions([]));
+    }
+
+    #[Test]
     public function refuses_to_sign_without_the_group_variables(): void
     {
         $this->expectException(InvalidArgumentException::class);
         Planner::signerIdentity(['RELEASE_SIGNER_NAME' => 'x']);
+    }
+
+    #[Test]
+    public function sends_nothing_when_only_low_advisories_were_opened(): void
+    {
+        $this->assertNull(Planner::auditAlert([['advisory' => ['package' => 'c/d', 'id' => 'GHSA-2', 'severity' => 'low'], 'url' => 'u']], 'p'));
+        $this->assertNull(Planner::auditAlert([], 'p'));
+    }
+
+    #[Test]
+    public function sends_one_message_for_the_notable_advisories_and_counts_the_low_ones(): void
+    {
+        $alert = Planner::auditAlert([
+            ['advisory' => ['package' => 'a/b', 'id' => 'GHSA-1', 'severity' => 'high'], 'url' => 'https://x.test/1'],
+            ['advisory' => ['package' => 'c/d', 'id' => 'GHSA-2', 'severity' => 'low'], 'url' => 'https://x.test/2'],
+        ], 'zairakai/php-packages/x');
+
+        $this->assertSame([
+            'title'   => 'Security advisories: 1 new in zairakai/php-packages/x',
+            'message' => "a/b (GHSA-1, high): https://x.test/1\n1 more of a low severity, issue only.",
+        ], $alert);
+    }
+
+    #[Test]
+    public function sets_the_priority_from_the_severity_and_the_status(): void
+    {
+        $this->assertSame('Kind::Security,Priority::Critical,Status::Ready', Planner::advisoryLabels(['severity' => 'critical'], 'Kind::Security'));
+        $this->assertSame('Kind::Security,Priority::High,Status::Ready', Planner::advisoryLabels(['severity' => 'high'], 'Kind::Security'));
+        $this->assertSame('Kind::Security,Priority::Low,Status::Ready', Planner::advisoryLabels(['severity' => 'medium'], 'Kind::Security'));
     }
 
     #[Test]
