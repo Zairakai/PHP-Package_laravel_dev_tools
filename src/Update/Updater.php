@@ -6,6 +6,7 @@ namespace Zairakai\LaravelDevTools\Update;
 
 use Illuminate\Support\Sleep;
 use RuntimeException;
+use Throwable;
 
 /**
  * Automatic updates of the requirements of a PHP package of the zairakai group, in GitLab CI.
@@ -34,6 +35,8 @@ final class Updater
     private const string ISSUE_LABELS = 'Kind::Security,Area::Security,Automated';
 
     private const string PIPELINE_FILE = '.gitlab-ci.yml';
+
+    private const string POLICY_URL = 'https://gitlab.com/zairakai/dependency-policy/-/raw/main';
 
     /**
      * @var array{reject: list<string>, cooldown: string, tag: array{when: string, level: string}, cascade: ?array{groups?: list<string>}}
@@ -122,6 +125,7 @@ final class Updater
         $titles = [];
         $opened = [];
         $urgent = false;
+        $lock   = is_file($this->directory . '/composer.lock') ? Json::map(json_decode((string) file_get_contents($this->directory . '/composer.lock'), true)) : [];
 
         $this->log(count($found) . ' security advisory(ies) found.');
 
@@ -136,7 +140,14 @@ final class Updater
                 continue;
             }
 
-            $url = $this->createIssue($title, Planner::advisoryIssueBody($advisory, (string) getenv('CI_PIPELINE_URL'), $auto), $token);
+            // Inherited from a package of the group: the issue is in the package that brings it, and the update of this project takes the fix when there is one.
+            if (Planner::isInherited($lock, $this->manifest(), $advisory['package'])) {
+                $this->log("Inherited from the group, followed in the package that brings it: {$title}");
+
+                continue;
+            }
+
+            $url = $this->createIssue($title, Planner::advisoryIssueBody($advisory, (string) getenv('CI_PIPELINE_URL'), $auto), Planner::advisoryLabels($advisory, self::ISSUE_LABELS), $token);
             $this->log("Issue created: {$url}");
             $opened[] = ['advisory' => $advisory, 'url' => $url];
         }
@@ -223,6 +234,22 @@ final class Updater
     }
 
     /**
+     * Close the issues whose advisory is gone from the merged tree. It never stops a release.
+     */
+    private function closeObsolete(): void
+    {
+        try {
+            $report = json_decode($this->exec(['composer', 'audit', '--locked', '--format=json', '--no-interaction'], null, [0, 1, 2, 3]), true, 512, JSON_THROW_ON_ERROR);
+            $titles = array_map(Planner::advisoryTitle(...), Planner::advisories(Json::map($report)));
+
+            $this->closeResolved($titles, (string) (getenv('FRESHNESS_TOKEN') ?: getenv('GITLAB_TOKEN')));
+        }
+        catch (Throwable $throwable) {
+            $this->log('The obsolete issues could not be checked: ' . strtok($this->mask($throwable->getMessage()), "\n"));
+        }
+    }
+
+    /**
      * Close the open issues of the audit whose advisory is not found any more.
      *
      * @param list<string> $titles The titles of the advisories found today.
@@ -271,7 +298,7 @@ final class Updater
         $this->exec(['git', 'config', 'tag.gpgsign', 'true']);
     }
 
-    private function createIssue(string $title, string $description, string $token): string
+    private function createIssue(string $title, string $description, string $labels, string $token): string
     {
         // The assignee is given by the variable ISSUE_ASSIGNEE_ID; without it, the user of the token.
         $assignee = (int) getenv('ISSUE_ASSIGNEE_ID');
@@ -283,7 +310,7 @@ final class Updater
         $issue = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/issues', [
             'title'        => $title,
             'description'  => $description,
-            'labels'       => self::ISSUE_LABELS,
+            'labels'       => $labels,
             'assignee_ids' => 0 < $assignee ? [$assignee] : [],
         ], $token);
 
@@ -343,6 +370,16 @@ final class Updater
         }
 
         return false;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function lockVersions(): array
+    {
+        $file = $this->directory . '/composer.lock';
+
+        return is_file($file) ? Planner::lockVersions(Json::map(json_decode((string) file_get_contents($file), true))) : [];
     }
 
     private function log(string $message): void
@@ -485,8 +522,47 @@ final class Updater
         return Json::rows($result['data']);
     }
 
+    /**
+     * The policy of the group (repository zairakai/dependency-policy, php.json). Anything wrong stops the update, with an alert.
+     *
+     * @return array<string, mixed>
+     */
+    private function policy(): array
+    {
+        $base = rtrim((string) (getenv('DEPENDENCY_POLICY_URL') ?: self::POLICY_URL), '/');
+        $url  = "{$base}/php.json";
+
+        try {
+            $text = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 20]]));
+
+            if (false === $text) {
+                throw new RuntimeException('no answer');
+            }
+
+            $doc    = Json::map(json_decode($text, true, 512, JSON_THROW_ON_ERROR));
+            $errors = Planner::validatePolicy($doc);
+
+            if ([] !== $errors) {
+                throw new RuntimeException('not valid: ' . implode(' ', $errors));
+            }
+        }
+        catch (Throwable $throwable) {
+            $message = "The dependency policy could not be read ({$url}): " . $throwable->getMessage();
+            $this->notify('Dependency policy unreachable', getenv('CI_PROJECT_PATH') . ': ' . $message);
+
+            throw new RuntimeException($message, 0, $throwable);
+        }
+
+        $this->log('Dependency policy: ' . (implode(', ', Planner::policyPackages($doc)) ?: 'nothing is held back') . '.');
+
+        return $doc;
+    }
+
     private function release(): void
     {
+        // The update that was just merged into develop may fix advisories: their issues have no reason to stay open.
+        $this->closeObsolete();
+
         $existing = $this->openMergeRequests('&source_branch=develop&target_branch=main');
 
         if ([] !== $existing) {
@@ -544,7 +620,20 @@ final class Updater
         $branch = self::BRANCH_PREFIX . '-' . date('Ymd');
         $this->exec(['git', 'switch', '-C', $branch]);
 
-        $this->exec(['composer', 'update', '-W', '--no-interaction', '--no-progress']);
+        $blocked = Planner::policyPackages($this->policy());
+        $locked  = $this->lockVersions();
+        $held    = array_values(array_intersect($blocked, array_keys($locked)));
+        $all     = array_values(array_diff(array_keys($locked), $held));
+
+        // A package of the policy keeps its locked version: the others are updated by name, with their dependencies.
+        $this->exec(['composer', 'update', '-W', '--no-interaction', '--no-progress', ...([] === $held ? [] : $all)]);
+
+        foreach ($held as $name) {
+            if (($this->lockVersions()[$name] ?? '') !== $locked[$name]) {
+                throw new RuntimeException("{$name} is held back by the dependency policy but the update changed it: nothing is merged.");
+            }
+        }
+
         $this->exec(['composer', 'bump', '--no-interaction']);
 
         // The normalization is optional: not every project has the plugin.
