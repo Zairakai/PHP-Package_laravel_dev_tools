@@ -244,8 +244,8 @@ final class Updater
 
             $this->closeResolved($titles, (string) (getenv('FRESHNESS_TOKEN') ?: getenv('GITLAB_TOKEN')));
         }
-        catch (Throwable $error) {
-            $this->log('The obsolete issues could not be checked: ' . strtok($this->mask($error->getMessage()), "\n"));
+        catch (Throwable $throwable) {
+            $this->log('The obsolete issues could not be checked: ' . strtok($this->mask($throwable->getMessage()), "\n"));
         }
     }
 
@@ -546,11 +546,11 @@ final class Updater
                 throw new RuntimeException('not valid: ' . implode(' ', $errors));
             }
         }
-        catch (Throwable $error) {
-            $message = "The dependency policy could not be read ({$url}): " . $error->getMessage();
+        catch (Throwable $throwable) {
+            $message = "The dependency policy could not be read ({$url}): " . $throwable->getMessage();
             $this->notify('Dependency policy unreachable', getenv('CI_PROJECT_PATH') . ': ' . $message);
 
-            throw new RuntimeException($message, 0, $error);
+            throw new RuntimeException($message, 0, $throwable);
         }
 
         $this->log('Dependency policy: ' . (implode(', ', Planner::policyPackages($doc)) ?: 'nothing is held back') . '.');
