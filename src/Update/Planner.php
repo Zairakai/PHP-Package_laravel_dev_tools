@@ -96,6 +96,31 @@ final class Planner
     }
 
     /**
+     * The one notification of an audit, or null when nothing notable was opened. The advisories of a low severity only get their issue: they are counted, not listed.
+     *
+     * @param list<array{advisory: array{package: string, id: string, severity: string}, url: string}> $opened
+     *
+     * @return array{title: string, message: string}|null
+     */
+    public static function auditAlert(array $opened, string $project): ?array
+    {
+        $notable = array_values(array_filter($opened, static fn (array $item): bool => self::isNotable($item['advisory']['severity'])));
+
+        if ([] === $notable) {
+            return null;
+        }
+
+        $lines  = array_map(static fn (array $item): string => "{$item['advisory']['package']} ({$item['advisory']['id']}, " . ('' === $item['advisory']['severity'] ? 'unknown' : $item['advisory']['severity']) . "): {$item['url']}", $notable);
+        $silent = count($opened) - count($notable);
+
+        if (0 < $silent) {
+            $lines[] = "{$silent} more of a low severity, issue only.";
+        }
+
+        return ['title' => 'Security advisories: ' . count($notable) . " new in {$project}", 'message' => implode("\n", $lines)];
+    }
+
+    /**
      * The configuration of a project, completed with the defaults.
      *
      * @param array<string, mixed> $user
@@ -160,6 +185,14 @@ final class Planner
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Whether an advisory is worth a push notification: medium and above. Unknown counts as notable. Composer says medium, npm says moderate.
+     */
+    public static function isNotable(string $severity): bool
+    {
+        return in_array($severity, ['', 'medium', 'moderate', 'high', 'critical'], true);
     }
 
     /**

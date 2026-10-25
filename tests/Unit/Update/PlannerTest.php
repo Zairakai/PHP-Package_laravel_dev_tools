@@ -108,6 +108,16 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function notifies_from_medium_up_and_for_an_unknown_severity(): void
+    {
+        foreach (['critical', 'high', 'medium', 'moderate', ''] as $severity) {
+            $this->assertTrue(Planner::isNotable($severity));
+        }
+
+        $this->assertFalse(Planner::isNotable('low'));
+    }
+
+    #[Test]
     public function reads_the_advisories_of_a_composer_audit_report(): void
     {
         $report = ['advisories' => [
@@ -130,6 +140,27 @@ final class PlannerTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         Planner::signerIdentity(['RELEASE_SIGNER_NAME' => 'x']);
+    }
+
+    #[Test]
+    public function sends_nothing_when_only_low_advisories_were_opened(): void
+    {
+        $this->assertNull(Planner::auditAlert([['advisory' => ['package' => 'c/d', 'id' => 'GHSA-2', 'severity' => 'low'], 'url' => 'u']], 'p'));
+        $this->assertNull(Planner::auditAlert([], 'p'));
+    }
+
+    #[Test]
+    public function sends_one_message_for_the_notable_advisories_and_counts_the_low_ones(): void
+    {
+        $alert = Planner::auditAlert([
+            ['advisory' => ['package' => 'a/b', 'id' => 'GHSA-1', 'severity' => 'high'], 'url' => 'https://x.test/1'],
+            ['advisory' => ['package' => 'c/d', 'id' => 'GHSA-2', 'severity' => 'low'], 'url' => 'https://x.test/2'],
+        ], 'zairakai/php-packages/x');
+
+        $this->assertSame([
+            'title'   => 'Security advisories: 1 new in zairakai/php-packages/x',
+            'message' => "a/b (GHSA-1, high): https://x.test/1\n1 more of a low severity, issue only.",
+        ], $alert);
     }
 
     #[Test]
