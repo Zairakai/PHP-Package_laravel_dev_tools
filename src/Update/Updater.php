@@ -120,6 +120,7 @@ final class Updater
         $auto   = 'true' === getenv('AUTO_FIX');
         $token  = (string) (getenv('FRESHNESS_TOKEN') ?: getenv('GITLAB_TOKEN'));
         $titles = [];
+        $opened = [];
         $urgent = false;
 
         $this->log(count($found) . ' security advisory(ies) found.');
@@ -137,7 +138,14 @@ final class Updater
 
             $url = $this->createIssue($title, Planner::advisoryIssueBody($advisory, (string) getenv('CI_PIPELINE_URL'), $auto), $token);
             $this->log("Issue created: {$url}");
-            $this->notify($title, getenv('CI_PROJECT_PATH') . ': ' . $url);
+            $opened[] = ['advisory' => $advisory, 'url' => $url];
+        }
+
+        // One message per audit, whatever the number of new advisories.
+        $alert = Planner::auditAlert($opened, (string) getenv('CI_PROJECT_PATH'));
+
+        if (null !== $alert) {
+            $this->notify($alert['title'], $alert['message']);
         }
 
         $this->closeResolved($titles, $token);
