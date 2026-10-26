@@ -291,6 +291,31 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function syncs_the_ignore_rules_of_dependabot_with_the_policy(): void
+    {
+        $file = static fn (array $rules): string => implode("\n", [
+            'updates:',
+            '  - package-ecosystem: composer',
+            '    directory: /',
+            '    # BEGIN dependency-policy (composer)',
+            ...$rules,
+            '    # END dependency-policy (composer)',
+            '    schedule:',
+            '      interval: weekly',
+            '',
+        ]);
+
+        $this->assertSame(
+            $file(['    ignore:', '      - dependency-name: "a/a"', '      - dependency-name: "b/b"']),
+            Planner::syncDependabot($file([]), ['a/a', 'b/b'], 'composer'),
+        );
+        $this->assertSame($file([]), Planner::syncDependabot($file(['    ignore:', '      - dependency-name: "old/old"']), [], 'composer'));
+        $this->assertSame($file([]), Planner::syncDependabot($file([]), [], 'composer'));
+        $this->assertNull(Planner::syncDependabot($file([]), ['a/a'], 'npm'));
+        $this->assertNull(Planner::syncDependabot("updates: []\n", ['a/a'], 'composer'));
+    }
+
+    #[Test]
     public function tags_when_a_published_range_changed(): void
     {
         $plan = Planner::planTag(Planner::config(['tag' => ['level' => 'minor']]), '1.2.3', ['x'], ['require' => ['a' => '^1']], ['require' => ['a' => '^2']]);
