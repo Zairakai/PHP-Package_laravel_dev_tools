@@ -233,6 +233,10 @@ up to date. The CI template runs it from the jobs `deps:update`, `deps:release`,
 - `release`: brings `develop` into `main` after an update.
 - `tag`: tags `main` (signed) only when a published range (`require`) changed.
 - `cascade`: after the publication on Packagist, starts the update of the projects that use the package.
+- `policy`: in the repository `dependency-policy`, lifts the entries of `php.json` whose condition is met (the latest
+  stable release of every peer accepts the version), with a merge request into `main`.
+- `policy-check <ref>`: fails when the change since `<ref>` updates a package of the dependency policy, in
+  `composer.json` or `composer.lock`. It only reads, so it runs on GitLab and on GitHub.
 
 It is started by a weekly schedule or by a pipeline with `UPDATE_DEPENDENCIES=true`, and reads `.dependency-update.json`
 at the root of the project (`tag.when`: `runtime`, `always` or `never`; `tag.level`; `cascade.groups`). The group

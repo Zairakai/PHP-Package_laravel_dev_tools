@@ -33,6 +33,21 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function accepts_a_version_through_the_constraint_of_composer(): void
+    {
+        $this->assertTrue(Planner::acceptsVersion('^7.8 || ^8.0', '8.0.0'));
+        $this->assertTrue(Planner::acceptsVersion('^7.8 | ^8.0', '8.0.0'));
+        $this->assertTrue(Planner::acceptsVersion('>=8.1, <9.0', '8.4.0'));
+        $this->assertTrue(Planner::acceptsVersion('~1.2', '1.9.0'));
+        $this->assertTrue(Planner::acceptsVersion('1.2.*', '1.2.7'));
+        $this->assertTrue(Planner::acceptsVersion('^1.0@stable', '1.4.0'));
+        $this->assertFalse(Planner::acceptsVersion('^7.8', '8.0.0'));
+        $this->assertFalse(Planner::acceptsVersion('~1.2.3', '1.3.0'));
+        $this->assertFalse(Planner::acceptsVersion('dev-main', '1.0.0'));
+        $this->assertFalse(Planner::acceptsVersion('not a constraint', '1.0.0'));
+    }
+
+    #[Test]
     public function accepts_only_the_move_of_the_ref_of_the_shared_pipeline(): void
     {
         $header = "--- a/.gitlab-ci.yml\n+++ b/.gitlab-ci.yml\n@@ -6 +6 @@\n";
@@ -41,6 +56,18 @@ final class PlannerTest extends TestCase
         $this->assertFalse(Planner::isRefOnlyChange($header . "-    file: \"a.yml\"\n+    file: \"b.yml\""));
         $this->assertFalse(Planner::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1\n+  extra: true"));
         $this->assertFalse(Planner::isRefOnlyChange(''));
+    }
+
+    #[Test]
+    public function completes_the_releases_that_list_only_what_changed(): void
+    {
+        $full = Planner::expandReleases([
+            ['name' => 'a/b', 'version' => '2.1.0', 'description' => 'kept'],
+            ['version' => '2.0.0', 'description' => '__unset'],
+        ]);
+
+        $this->assertSame(['name' => 'a/b', 'version' => '2.1.0', 'description' => 'kept'], $full[0]);
+        $this->assertSame(['name' => 'a/b', 'version' => '2.0.0'], $full[1]);
     }
 
     #[Test]
@@ -127,6 +154,18 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function lifts_an_entry_when_every_peer_accepts_the_version(): void
+    {
+        $entry = ['package' => 'guzzlehttp/guzzle', 'unblock' => ['version' => '8.0.0', 'peers' => ['a/b', 'c/d']]];
+
+        $this->assertFalse(Planner::isLifted($entry, ['a/b' => '^7.8 || ^8.0', 'c/d' => '^7.8']));
+        $this->assertFalse(Planner::isLifted($entry, ['a/b' => '^7.8 || ^8.0', 'c/d' => null]));
+        $this->assertFalse(Planner::isLifted($entry, ['a/b' => '^7.8 || ^8.0']));
+        $this->assertTrue(Planner::isLifted($entry, ['a/b' => '^7.8 || ^8.0', 'c/d' => '~8.0']));
+        $this->assertFalse(Planner::isLifted(['package' => 'x/y'], []));
+    }
+
+    #[Test]
     public function lists_and_formats_the_changes(): void
     {
         $rows = Planner::diffDependencies(['require-dev' => ['pint' => '^1.0']], ['require-dev' => ['pint' => '^1.1', 'rector' => '^2.0']]);
@@ -186,10 +225,40 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function reads_the_range_in_which_the_latest_stable_release_requires_a_package(): void
+    {
+        $releases = [
+            ['name' => 'a/b', 'version' => '3.0.0-beta.1', 'require' => ['g/g' => '^8.0']],
+            ['version' => '2.1.0', 'require' => ['g/g' => '^7.8 || ^8.0']],
+            ['version' => '2.0.0', 'require' => ['g/g' => '^7.8']],
+            ['version' => 'dev-main'],
+        ];
+
+        $this->assertSame('^7.8 || ^8.0', Planner::peerRange($releases, 'g/g'));
+        $this->assertNull(Planner::peerRange($releases, 'other/package'));
+        $this->assertNull(Planner::peerRange([], 'g/g'));
+        $this->assertSame('2.1.0', Planner::latestStable(Planner::expandReleases($releases))['version'] ?? null);
+        $this->assertNull(Planner::latestStable([['version' => 'dev-main']]));
+    }
+
+    #[Test]
     public function refuses_to_sign_without_the_group_variables(): void
     {
         $this->expectException(InvalidArgumentException::class);
         Planner::signerIdentity(['RELEASE_SIGNER_NAME' => 'x']);
+    }
+
+    #[Test]
+    public function reports_the_packages_of_the_policy_that_a_change_updates(): void
+    {
+        $before = ['require' => ['a/a' => '^1.0', 'b/b' => '^1.0'], 'require-dev' => ['c/c' => '^1.0']];
+        $after  = ['require' => ['a/a' => '^2.0', 'b/b' => '^1.1', 'd/d' => '^1.0'], 'require-dev' => []];
+
+        $this->assertSame([], Planner::policyViolations([], $before, $after, [], []));
+        $this->assertSame(
+            ['composer.json: a/a moves from ^1.0 to ^2.0.', 'composer.lock: e/e moves from 1.0.0 to 1.0.1.'],
+            Planner::policyViolations(['a/a', 'c/c', 'd/d', 'e/e', 'f/f'], $before, $after, ['e/e' => '1.0.0', 'f/f' => '1.0.0'], ['e/e' => '1.0.1']),
+        );
     }
 
     #[Test]
@@ -234,5 +303,18 @@ final class PlannerTest extends TestCase
     {
         $this->assertSame('Security advisory: vendor/a (PKSA-1)', Planner::advisoryTitle(['id' => 'PKSA-1', 'package' => 'vendor/a']));
         $this->assertStringStartsWith(Planner::ADVISORY_TITLE_PREFIX, Planner::advisoryTitle(['id' => 'x', 'package' => 'y']));
+    }
+
+    #[Test]
+    public function writes_the_policy_as_the_file_is_and_removes_lifted_entries(): void
+    {
+        $doc = ['entries' => [
+            ['package' => 'a/a', 'reason' => 'r', 'since' => '2026-10-11', 'unblock' => ['version' => '2.0.0', 'peers' => ['b/b']]],
+            ['package' => 'c/c', 'reason' => 'r', 'since' => '2026-10-12'],
+        ]];
+
+        $this->assertSame("{\n  \"entries\": []\n}\n", Planner::encodePolicy(Planner::withoutEntries($doc, ['a/a', 'c/c'])));
+        $this->assertSame(['c/c'], Planner::policyPackages(Planner::withoutEntries($doc, ['a/a'])));
+        $this->assertStringContainsString("\n        \"peers\": [\n          \"b/b\"\n        ]", Planner::encodePolicy($doc));
     }
 }

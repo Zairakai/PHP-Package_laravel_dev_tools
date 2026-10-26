@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Zairakai\LaravelDevTools\Update;
 
 use Closure;
+use Composer\Semver\Comparator;
+use Composer\Semver\VersionParser;
 use InvalidArgumentException;
+use UnexpectedValueException;
 
 /**
  * The decisions of the automatic update, without any side effect: versions, changes of the manifest, tag to create.
@@ -26,6 +29,21 @@ final class Planner
      * The sections of composer.json that are published with the package.
      */
     public const array RUNTIME_SECTIONS = ['require'];
+
+    /**
+     * Whether a Composer constraint accepts a version. A constraint that cannot be read accepts nothing.
+     */
+    public static function acceptsVersion(string $constraint, string $version): bool
+    {
+        $versionParser = new VersionParser();
+
+        try {
+            return $versionParser->parseConstraints($constraint)->matches($versionParser->parseConstraints('== ' . $version));
+        }
+        catch (UnexpectedValueException) {
+            return false;
+        }
+    }
 
     /**
      * The advisories of the JSON report of `composer audit`, one row per advisory.
@@ -189,6 +207,49 @@ final class Planner
     }
 
     /**
+     * A policy document as the file is written: two spaces, a final new line.
+     *
+     * @param array<string, mixed> $doc
+     */
+    public static function encodePolicy(array $doc): string
+    {
+        $json = json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        return preg_replace_callback('/^ +/m', static fn (array $match): string => str_repeat(' ', intdiv(strlen($match[0]), 2)), $json) . "\n";
+    }
+
+    /**
+     * The releases of the metadata of Packagist (p2) in full: after the first one, each lists only what changed.
+     *
+     * @param list<array<string, mixed>> $releases
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function expandReleases(array $releases): array
+    {
+        $previous = [];
+        $full     = [];
+
+        foreach ($releases as $release) {
+            $current = $previous;
+
+            foreach ($release as $key => $value) {
+                if ('__unset' === $value) {
+                    unset($current[$key]);
+                }
+                else {
+                    $current[$key] = $value;
+                }
+            }
+
+            $full[]   = $current;
+            $previous = $current;
+        }
+
+        return $full;
+    }
+
+    /**
      * The changes as a Markdown table, for the merge request and the commit.
      *
      * @param list<array{section: string, name: string, from: ?string, to: ?string}> $rows
@@ -231,6 +292,32 @@ final class Planner
     }
 
     /**
+     * Whether the condition of an entry of the policy is met: every package of `peers` accepts the version in its range.
+     *
+     * @param array<string, mixed>   $entry
+     * @param array<string, ?string> $ranges The range in which each peer requires the package, by peer.
+     */
+    public static function isLifted(array $entry, array $ranges): bool
+    {
+        $unblock = Json::map($entry['unblock'] ?? null);
+        $peers   = Json::strings($unblock['peers'] ?? null);
+
+        if ([] === $peers) {
+            return false;
+        }
+
+        foreach ($peers as $peer) {
+            $range = $ranges[$peer] ?? null;
+
+            if (null === $range || ! self::acceptsVersion($range, Json::text($unblock, 'version'))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Whether an advisory is worth a push notification: medium and above. Unknown counts as notable. Composer says medium, npm says moderate.
      */
     public static function isNotable(string $severity): bool
@@ -268,6 +355,42 @@ final class Planner
     public static function isUrgent(string $severity): bool
     {
         return in_array($severity, ['', 'high', 'critical'], true);
+    }
+
+    /**
+     * The highest stable release, or null.
+     *
+     * @param list<array<string, mixed>> $releases
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function latestStable(array $releases): ?array
+    {
+        $versionParser        = new VersionParser();
+        $latest               = null;
+        $latestVersion        = null;
+
+        foreach ($releases as $release) {
+            $version = Json::text($release, 'version');
+
+            try {
+                $normalized = $versionParser->normalize($version);
+            }
+            catch (UnexpectedValueException) {
+                continue;
+            }
+
+            if ('stable' !== VersionParser::parseStability($version)) {
+                continue;
+            }
+
+            if (null === $latestVersion || Comparator::greaterThan($normalized, $latestVersion)) {
+                $latest        = $release;
+                $latestVersion = $normalized;
+            }
+        }
+
+        return $latest;
     }
 
     /**
@@ -322,6 +445,24 @@ final class Planner
     }
 
     /**
+     * The range in which the latest stable release of a package requires `$name`, from its metadata on Packagist, or null.
+     *
+     * @param list<array<string, mixed>> $releases
+     */
+    public static function peerRange(array $releases, string $name): ?string
+    {
+        $latest = self::latestStable(self::expandReleases($releases));
+
+        if (null === $latest) {
+            return null;
+        }
+
+        $range = Json::requirements($latest['require'] ?? [])[$name] ?? '';
+
+        return '' === $range ? null : $range;
+    }
+
+    /**
      * What `tag` has to do: the version to create (or null) and why.
      *
      * @param array{tag: array{when: string, level: string}} $config
@@ -362,6 +503,37 @@ final class Planner
     public static function policyPackages(array $doc): array
     {
         return array_values(array_filter(array_map(static fn (array $entry): string => Json::text($entry, 'package'), Json::rows($doc['entries'] ?? [])), static fn (string $name): bool => '' !== $name));
+    }
+
+    /**
+     * The packages of the policy whose version changes: in the manifest (a range moves) or in the lock file. A package that is
+     * added or removed is not an update.
+     *
+     * @param list<string>              $blocked
+     * @param array<string, mixed>|null $beforeManifest
+     * @param array<string, mixed>      $afterManifest
+     * @param array<string, string>     $beforeLock
+     * @param array<string, string>     $afterLock
+     *
+     * @return list<string>
+     */
+    public static function policyViolations(array $blocked, ?array $beforeManifest, array $afterManifest, array $beforeLock, array $afterLock): array
+    {
+        $problems = [];
+
+        foreach (self::diffDependencies($beforeManifest, $afterManifest) as $row) {
+            if (in_array($row['name'], $blocked, true) && null !== $row['from'] && null !== $row['to']) {
+                $problems[] = "composer.json: {$row['name']} moves from {$row['from']} to {$row['to']}.";
+            }
+        }
+
+        foreach ($blocked as $name) {
+            if (isset($beforeLock[$name], $afterLock[$name]) && $beforeLock[$name] !== $afterLock[$name]) {
+                $problems[] = "composer.lock: {$name} moves from {$beforeLock[$name]} to {$afterLock[$name]}.";
+            }
+        }
+
+        return $problems;
     }
 
     /**
@@ -466,6 +638,21 @@ final class Planner
         }
 
         return $errors;
+    }
+
+    /**
+     * A policy document without the entries of some packages.
+     *
+     * @param array<string, mixed> $doc
+     * @param list<string>         $names
+     *
+     * @return array<string, mixed>
+     */
+    public static function withoutEntries(array $doc, array $names): array
+    {
+        $doc['entries'] = array_values(array_filter(Json::rows($doc['entries'] ?? []), static fn (array $entry): bool => ! in_array(Json::text($entry, 'package'), $names, true)));
+
+        return $doc;
     }
 
     /**
