@@ -585,6 +585,28 @@ final class Planner
     }
 
     /**
+     * The text of dependabot.yml with the block of the ecosystem rewritten: between `# BEGIN dependency-policy (composer)` and
+     * `# END dependency-policy (composer)`, one ignore rule per package of the policy (nothing when none). Null without markers.
+     *
+     * @param list<string> $names
+     */
+    public static function syncDependabot(string $text, array $names, string $ecosystem): ?string
+    {
+        $begin   = "# BEGIN dependency-policy ({$ecosystem})";
+        $end     = "# END dependency-policy ({$ecosystem})";
+        $pattern = '/^([ \t]*)' . preg_quote($begin, '/') . '\n.*?^[ \t]*' . preg_quote($end, '/') . '$/ms';
+
+        if (1 !== preg_match($pattern, $text, $match)) {
+            return null;
+        }
+
+        $indent = $match[1];
+        $rules  = [] === $names ? [] : ["{$indent}ignore:", ...array_map(static fn (string $name): string => "{$indent}  - dependency-name: \"{$name}\"", $names)];
+
+        return (string) preg_replace_callback($pattern, static fn (): string => implode("\n", ["{$indent}{$begin}", ...$rules, "{$indent}{$end}"]), $text, 1);
+    }
+
+    /**
      * The problems of a policy document, as a list of sentences (empty when it is valid).
      *
      * @param array<string, mixed> $doc

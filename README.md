@@ -237,6 +237,8 @@ up to date. The CI template runs it from the jobs `deps:update`, `deps:release`,
   stable release of every peer accepts the version), with a merge request into `main`.
 - `policy-check <ref>`: fails when the change since `<ref>` updates a package of the dependency policy, in
   `composer.json` or `composer.lock`. It only reads, so it runs on GitLab and on GitHub.
+- `dependabot-sync`: rewrites the ignore rules of `.github/dependabot.yml`, between `# BEGIN dependency-policy (composer)`
+  and `# END dependency-policy (composer)`, with one rule per package of the policy.
 
 It is started by a weekly schedule or by a pipeline with `UPDATE_DEPENDENCIES=true`, and reads `.dependency-update.json`
 at the root of the project (`tag.when`: `runtime`, `always` or `never`; `tag.level`; `cascade.groups`). The group

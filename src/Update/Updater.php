@@ -18,6 +18,7 @@ use Throwable;
  * - audit: look for security advisories, open one issue per advisory and, with AUTO_FIX=true, start an update to fix them.
  * - policy: in the repository dependency-policy, lift the entries of php.json whose condition is met (merge request).
  * - policy-check: fail when the change since a ref updates a package of the dependency policy (GitLab or GitHub).
+ * - dependabot-sync: rewrite the ignore rules of .github/dependabot.yml (between the markers) from the dependency policy.
  *
  * It reads `.dependency-update.json` at the root of the project, like the JavaScript tool of the group.
  */
@@ -28,6 +29,8 @@ final class Updater
     private const string COMMIT_SUBJECT = 'chore(deps): update the dependencies';
 
     private const string CONFIG_FILE = '.dependency-update.json';
+
+    private const string DEPENDABOT_FILE = '.github/dependabot.yml';
 
     /**
      * The files an update may change.
@@ -75,6 +78,12 @@ final class Updater
             return;
         }
 
+        if ('dependabot-sync' === $mode) {
+            $this->dependabotSync();
+
+            return;
+        }
+
         $this->assertEnvironment();
 
         match ($mode) {
@@ -84,7 +93,7 @@ final class Updater
             'cascade' => $this->cascade(),
             'audit'   => $this->audit(),
             'policy'  => $this->policyWatch(),
-            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade | audit | policy | policy-check <ref>'),
+            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade | audit | policy | policy-check <ref> | dependabot-sync'),
         };
     }
 
@@ -333,6 +342,35 @@ final class Updater
         }
 
         return Json::text(Json::map($issue['data']), 'web_url');
+    }
+
+    /**
+     * Rewrite the ignore rules of .github/dependabot.yml from the policy. The workflow of the repository commits the result.
+     */
+    private function dependabotSync(): void
+    {
+        $file = $this->directory . '/' . self::DEPENDABOT_FILE;
+
+        if (! is_file($file)) {
+            throw new RuntimeException(self::DEPENDABOT_FILE . ' does not exist.');
+        }
+
+        $names  = Planner::policyPackages($this->policy());
+        $text   = (string) file_get_contents($file);
+        $synced = Planner::syncDependabot($text, $names, 'composer');
+
+        if (null === $synced) {
+            throw new RuntimeException(self::DEPENDABOT_FILE . ' has no block "# BEGIN dependency-policy (composer)" ... "# END dependency-policy (composer)".');
+        }
+
+        if ($synced === $text) {
+            $this->log('The ignore rules of Dependabot are in sync with the policy.');
+
+            return;
+        }
+
+        file_put_contents($file, $synced);
+        $this->log('The ignore rules of Dependabot are updated: ' . (implode(', ', $names) ?: 'none') . '.');
     }
 
     /**
