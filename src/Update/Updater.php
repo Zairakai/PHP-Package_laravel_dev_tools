@@ -16,6 +16,8 @@ use Throwable;
  * - tag: tag main when a published range changed since the last tag.
  * - cascade: after the publication of this package, start the update of the projects that use it.
  * - audit: look for security advisories, open one issue per advisory and, with AUTO_FIX=true, start an update to fix them.
+ * - policy: in the repository dependency-policy, lift the entries of php.json whose condition is met (merge request).
+ * - policy-check: fail when the change since a ref updates a package of the dependency policy (GitLab or GitHub).
  *
  * It reads `.dependency-update.json` at the root of the project, like the JavaScript tool of the group.
  */
@@ -35,6 +37,10 @@ final class Updater
     private const string ISSUE_LABELS = 'Kind::Security,Area::Security,Automated';
 
     private const string PIPELINE_FILE = '.gitlab-ci.yml';
+
+    private const string POLICY_BRANCH_PREFIX = 'chore/unblock';
+
+    private const string POLICY_FILE = 'php.json';
 
     private const string POLICY_URL = 'https://gitlab.com/zairakai/dependency-policy/-/raw/main';
 
@@ -60,8 +66,15 @@ final class Updater
         }
     }
 
-    public function run(string $mode): void
+    public function run(string $mode, string $argument = ''): void
     {
+        // The check only reads: it runs anywhere, GitHub included.
+        if ('policy-check' === $mode) {
+            $this->policyCheck($argument);
+
+            return;
+        }
+
         $this->assertEnvironment();
 
         match ($mode) {
@@ -70,7 +83,8 @@ final class Updater
             'tag'     => $this->tag(),
             'cascade' => $this->cascade(),
             'audit'   => $this->audit(),
-            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade | audit'),
+            'policy'  => $this->policyWatch(),
+            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade | audit | policy | policy-check <ref>'),
         };
     }
 
@@ -491,12 +505,12 @@ final class Updater
         return false;
     }
 
-    private function openMergeRequest(string $source, string $target, string $description, bool $removeSource): void
+    private function openMergeRequest(string $source, string $target, string $description, bool $removeSource, string $title = self::COMMIT_SUBJECT): void
     {
         $request = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/merge_requests', [
             'source_branch'        => $source,
             'target_branch'        => $target,
-            'title'                => self::COMMIT_SUBJECT,
+            'title'                => $title,
             'description'          => $description,
             'remove_source_branch' => $removeSource,
             ...$this->mergeRequestOptions(),
@@ -520,6 +534,24 @@ final class Updater
         $result = $this->api('GET', '/projects/' . getenv('CI_PROJECT_ID') . '/merge_requests?state=opened&per_page=100' . $query);
 
         return Json::rows($result['data']);
+    }
+
+    /**
+     * The releases of a package on Packagist (metadata p2, as listed), or an empty list.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function packagistReleases(string $name): array
+    {
+        $json = @file_get_contents("https://repo.packagist.org/p2/{$name}.json", false, stream_context_create(['http' => ['timeout' => 20]]));
+
+        if (false === $json) {
+            return [];
+        }
+
+        $data = Json::map(json_decode($json, true));
+
+        return Json::rows(Json::map($data['packages'] ?? null)[$name] ?? []);
     }
 
     /**
@@ -556,6 +588,92 @@ final class Updater
         $this->log('Dependency policy: ' . (implode(', ', Planner::policyPackages($doc)) ?: 'nothing is held back') . '.');
 
         return $doc;
+    }
+
+    /**
+     * Fail when the working tree updates a package of the policy compared with `$base`: a range of composer.json or a locked version.
+     */
+    private function policyCheck(string $base): void
+    {
+        if ('' === $base) {
+            throw new RuntimeException('Usage: update-dependencies policy-check <ref>');
+        }
+
+        $blocked  = Planner::policyPackages($this->policy());
+        $before   = Planner::lockVersions(Json::map(json_decode($this->exec(['git', 'show', "{$base}:composer.lock"], null, [0, 128]) ?: '{}', true)));
+        $problems = Planner::policyViolations($blocked, $this->manifest($base), $this->manifest(), $before, $this->lockVersions());
+
+        if ([] !== $problems) {
+            foreach ($problems as $problem) {
+                fwrite(STDERR, $problem . "\n");
+            }
+
+            throw new RuntimeException('The change updates a package that the dependency policy holds back.');
+        }
+
+        $this->log('No package of the dependency policy is updated.');
+    }
+
+    /**
+     * In the repository dependency-policy: lift the entries of php.json whose condition is met, with a merge request into main.
+     */
+    private function policyWatch(): void
+    {
+        $file = $this->directory . '/' . self::POLICY_FILE;
+
+        if (! is_file($file)) {
+            throw new RuntimeException(self::POLICY_FILE . ' is not in the current directory: run this in the repository dependency-policy.');
+        }
+
+        $doc    = Json::map(json_decode((string) file_get_contents($file), true, 512, JSON_THROW_ON_ERROR));
+        $errors = Planner::validatePolicy($doc);
+
+        if ([] !== $errors) {
+            throw new RuntimeException(self::POLICY_FILE . ' is not valid: ' . implode(' ', $errors));
+        }
+
+        $lifted = [];
+
+        foreach (Json::rows($doc['entries'] ?? []) as $entry) {
+            $peers  = Json::strings(Json::map($entry['unblock'] ?? null)['peers'] ?? null);
+            $ranges = [];
+
+            foreach ($peers as $peer) {
+                $ranges[$peer] = Planner::peerRange($this->packagistReleases($peer), Json::text($entry, 'package'));
+            }
+
+            if (Planner::isLifted($entry, $ranges)) {
+                $lifted[] = $entry;
+            }
+        }
+
+        if ([] === $lifted) {
+            $this->log('No entry can be lifted.');
+
+            return;
+        }
+
+        if ([] !== array_filter($this->openMergeRequests(), static fn (array $request): bool => str_starts_with(Json::text($request, 'source_branch'), self::POLICY_BRANCH_PREFIX))) {
+            $this->log('A merge request that lifts an entry is already open.');
+
+            return;
+        }
+
+        $names   = array_map(static fn (array $entry): string => Json::text($entry, 'package'), $lifted);
+        $list    = implode(', ', $names);
+        $branch  = self::POLICY_BRANCH_PREFIX . '-' . date('Ymd');
+        $subject = "chore(policy): unblock {$list}";
+        $details = implode('; ', array_map(static fn (array $entry): string => Json::text($entry, 'package') . ' ' . Json::text(Json::map($entry['unblock'] ?? null), 'version') . ' (' . implode(', ', Json::strings(Json::map($entry['unblock'] ?? null)['peers'] ?? null)) . ')', $lifted));
+
+        $this->configureSigning();
+        $this->exec(['git', 'switch', '-C', $branch]);
+        file_put_contents($file, Planner::encodePolicy(Planner::withoutEntries($doc, $names)));
+        $this->exec(['git', 'add', self::POLICY_FILE]);
+        $this->exec(['git', 'commit', '-m', $subject, '-m', 'The ranges of the packages that held it back now accept it.']);
+        $this->exec(['git', 'push', $this->remoteUrl(), "HEAD:refs/heads/{$branch}"]);
+
+        $this->openMergeRequest($branch, 'main', "The condition of the entry is met: {$details}. It is merged when its pipeline succeeds, and the update tools take the package at their next run.", true, $subject);
+        $this->notify('Dependency policy: block lifted', "{$list}: {$details}");
     }
 
     private function release(): void

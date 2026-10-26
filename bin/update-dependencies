@@ -15,7 +15,7 @@ foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php
 }
 
 try {
-    (new Updater((string) getcwd()))->run($argv[1] ?? '');
+    (new Updater((string) getcwd()))->run($argv[1] ?? '', $argv[2] ?? '');
 } catch (Throwable $exception) {
     fwrite(STDERR, $exception->getMessage() . "\n");
     exit(1);
