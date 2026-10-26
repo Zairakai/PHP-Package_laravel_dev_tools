@@ -44,6 +44,7 @@
   "require": {
     "php": "^8.4",
     "composer-plugin-api": "^2.0",
+    "composer/semver": "^3.4",
     "driftingly/rector-laravel": "^2.7.0",
     "larastan/larastan": "^3.13.2",
     "phpmetrics/phpmetrics": "^2.11",
