@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c1e2c9637044e1b520542d7bd0942599",
+    "content-hash": "edc6974e517da3a6bc8d4679c4b5d3c0",
     "packages": [
         {
             "name": "brick/math",
@@ -890,16 +890,16 @@
         },
         {
             "name": "driftingly/rector-laravel",
-            "version": "2.7.0",
+            "version": "2.7.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/driftingly/rector-laravel.git",
-                "reference": "64d0c56d948f81e80c40b813e33fc7a7d38bc74e"
+                "reference": "0a333a9c2394d18de71f63f5a3ecbd1777c9622a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/driftingly/rector-laravel/zipball/64d0c56d948f81e80c40b813e33fc7a7d38bc74e",
-                "reference": "64d0c56d948f81e80c40b813e33fc7a7d38bc74e",
+                "url": "https://api.github.com/repos/driftingly/rector-laravel/zipball/0a333a9c2394d18de71f63f5a3ecbd1777c9622a",
+                "reference": "0a333a9c2394d18de71f63f5a3ecbd1777c9622a",
                 "shasum": ""
             },
             "require": {
@@ -953,9 +953,9 @@
             ],
             "support": {
                 "issues": "https://github.com/driftingly/rector-laravel/issues",
-                "source": "https://github.com/driftingly/rector-laravel/tree/2.7.0"
+                "source": "https://github.com/driftingly/rector-laravel/tree/2.7.1"
             },
-            "time": "2026-10-20T13:43:25+00:00"
+            "time": "2026-10-25T22:56:12+00:00"
         },
         {
             "name": "egulias/email-validator",
@@ -5349,21 +5349,21 @@
         },
         {
             "name": "rector/rector",
-            "version": "2.7.0",
+            "version": "2.8.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rectorphp/rector.git",
-                "reference": "4d6a39b7fff302cac0ce90cd959a53c2f6a32776"
+                "reference": "10c96546bb72b38b4e2e9960fcd3f884d7fa02eb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/rector/zipball/4d6a39b7fff302cac0ce90cd959a53c2f6a32776",
-                "reference": "4d6a39b7fff302cac0ce90cd959a53c2f6a32776",
+                "url": "https://api.github.com/repos/rectorphp/rector/zipball/10c96546bb72b38b4e2e9960fcd3f884d7fa02eb",
+                "reference": "10c96546bb72b38b4e2e9960fcd3f884d7fa02eb",
                 "shasum": ""
             },
             "require": {
                 "php": "^7.4|^8.0",
-                "phpstan/phpstan": "^2.3.0"
+                "phpstan/phpstan": "^2.3.2"
             },
             "conflict": {
                 "rector/rector-doctrine": "*",
@@ -5394,7 +5394,7 @@
             ],
             "support": {
                 "issues": "https://github.com/rectorphp/rector/issues",
-                "source": "https://github.com/rectorphp/rector/tree/2.7.0"
+                "source": "https://github.com/rectorphp/rector/tree/2.8.1"
             },
             "funding": [
                 {
@@ -5402,7 +5402,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-06T08:46:45+00:00"
+            "time": "2026-10-26T13:03:01+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -5698,16 +5698,16 @@
         },
         {
             "name": "stanislas-poisson/php-dev-tools",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Stanislas-Poisson/php-dev-tools.git",
-                "reference": "671a0b49d16183de66f13cb286bdecda45e23211"
+                "reference": "cdffe9f2fb154cc6f4ebf838412394ab71de25c0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Stanislas-Poisson/php-dev-tools/zipball/671a0b49d16183de66f13cb286bdecda45e23211",
-                "reference": "671a0b49d16183de66f13cb286bdecda45e23211",
+                "url": "https://api.github.com/repos/Stanislas-Poisson/php-dev-tools/zipball/cdffe9f2fb154cc6f4ebf838412394ab71de25c0",
+                "reference": "cdffe9f2fb154cc6f4ebf838412394ab71de25c0",
                 "shasum": ""
             },
             "require": {
@@ -5790,7 +5790,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-10-10T20:22:26+00:00"
+            "time": "2026-10-26T14:31:33+00:00"
         },
         {
             "name": "symfony/cache",
