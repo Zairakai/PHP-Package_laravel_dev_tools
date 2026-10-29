@@ -781,8 +781,8 @@ final class Updater
         $held    = array_values(array_intersect($blocked, array_keys($locked)));
         $all     = array_values(array_diff(array_keys($locked), $held));
 
-        // A package of the policy keeps its locked version: the others are updated by name, with their dependencies.
-        $this->exec(['composer', 'update', '-W', '--no-interaction', '--no-progress', ...([] === $held ? [] : $all)]);
+        // A package of the policy keeps its locked version, also when another package requires it: the others are updated by name, with their dependencies.
+        $this->exec(['composer', 'update', '-W', '--no-interaction', '--no-progress', ...Planner::heldConstraints($held, $locked), ...([] === $held ? [] : $all)]);
 
         foreach ($held as $name) {
             if (($this->lockVersions()[$name] ?? '') !== $locked[$name]) {
