@@ -430,6 +430,31 @@ final class Planner
     }
 
     /**
+     * The arguments of `composer update` that keep the held back packages at their locked version, also when another package
+     * requires them: `-W` would update them with the packages that need them.
+     *
+     * @param list<string>          $held
+     * @param array<string, string> $locked
+     *
+     * @return list<string>
+     */
+    public static function heldConstraints(array $held, array $locked): array
+    {
+        $arguments = [];
+
+        foreach ($held as $name) {
+            $version = $locked[$name] ?? '';
+
+            if ('' !== $version) {
+                $arguments[] = '--with';
+                $arguments[] = "{$name}:=={$version}";
+            }
+        }
+
+        return $arguments;
+    }
+
+    /**
      * The version after `$last` for a level of change (major, minor or patch).
      */
     public static function nextVersion(string $last, string $level): string
