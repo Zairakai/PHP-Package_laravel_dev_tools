@@ -154,6 +154,17 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
+    public function keeps_the_held_packages_at_their_locked_version(): void
+    {
+        $locked = ['a/b' => 'v2.7.1', 'c/d' => '1.0.0'];
+
+        $this->assertSame([], Planner::heldConstraints([], $locked));
+        $this->assertSame(['--with', 'a/b:==v2.7.1'], Planner::heldConstraints(['a/b'], $locked));
+        $this->assertSame(['--with', 'a/b:==v2.7.1', '--with', 'c/d:==1.0.0'], Planner::heldConstraints(['a/b', 'c/d'], $locked));
+        $this->assertSame([], Planner::heldConstraints(['x/y'], $locked));
+    }
+
+    #[Test]
     public function lifts_an_entry_when_every_peer_accepts_the_version(): void
     {
         $entry = ['package' => 'guzzlehttp/guzzle', 'unblock' => ['version' => '8.0.0', 'peers' => ['a/b', 'c/d']]];
