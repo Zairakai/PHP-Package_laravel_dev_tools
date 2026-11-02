@@ -51,8 +51,8 @@
     "stanislas-poisson/php-dev-tools": "^1.1.2"
   },
   "require-dev": {
-    "composer/composer": "^2.11.0",
-    "ergebnis/composer-normalize": "^2.54",
+    "composer/composer": "^2.11.1",
+    "ergebnis/composer-normalize": "^2.56",
     "illuminate/console": "^12.0 || ^13.0",
     "illuminate/database": "^12.0 || ^13.0",
     "illuminate/filesystem": "^12.0 || ^13.0",
