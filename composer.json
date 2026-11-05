@@ -46,7 +46,7 @@
     "composer-plugin-api": "^2.0",
     "composer/semver": "^3.6.0",
     "driftingly/rector-laravel": "^2.7.1",
-    "larastan/larastan": "^3.13.2",
+    "larastan/larastan": "^3.14.0",
     "phpmetrics/phpmetrics": "^2.11",
     "stanislas-poisson/php-dev-tools": "^1.1.2"
   },
@@ -58,7 +58,7 @@
     "illuminate/filesystem": "^12.0 || ^13.0",
     "illuminate/support": "^12.0 || ^13.0",
     "orchestra/testbench": "^10.0 || ^11.3",
-    "phpunit/phpunit": "^12.5.42"
+    "phpunit/phpunit": "^12.5.43"
   },
   "suggest": {
     "enlightn/enlightn": "Security and performance analysis (Laravel apps only)",
