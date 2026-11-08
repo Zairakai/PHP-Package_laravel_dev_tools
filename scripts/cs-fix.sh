@@ -12,6 +12,9 @@ log_header "Code Style Fix (Laravel Pint)"
 # Check required dependencies
 require_package "laravel/pint" "${PROJECT_ROOT}/${PINT_BIN}" "code style scripts (cs-check.sh, cs-fix.sh)" || exit 1
 
+# The rules of php-dev-tools, extended by this package and by the project
+PINT_CONFIG=$(build_pint_config)
+
 # Build Pint command with config if available
 PINT_ARGS=()
 

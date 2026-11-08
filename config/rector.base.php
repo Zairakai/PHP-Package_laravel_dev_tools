@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Rector;
 
-use Rector\Config\RectorConfig;
-use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Set\ValueObject\LevelSetList;
 use Rector\Set\ValueObject\SetList;
 use RectorLaravel\Set\LaravelSetList;
+use StanislasPoisson\DevTools\Rector;
 
 /**
  * Base Rector Configuration
  * ================
  * Central configuration for Rector dev-tool.
- * Paths, skips, sets, and parallelization defined here.
+ * The sets of PHP come from stanislas-poisson/php-dev-tools; this class adds the paths, the skips and the Laravel sets.
  */
 final class RectorBaseConfig
 {
@@ -26,20 +25,9 @@ final class RectorBaseConfig
         array $extraPaths = [],
         array $extraSkips = [],
     ) {
-        return RectorConfig::configure()
+        return Rector::configure($projectRoot, php: '8.3', paths: [])
             ->withPaths(self::resolvePaths($projectRoot, $extraPaths))
             ->withSkip(self::resolveSkips($projectRoot, $extraSkips))
-            ->withPhpSets(php83: true)
-            ->withPreparedSets(
-                deadCode: true,
-                codeQuality: true,
-                codingStyle: true,
-                typeDeclarations: true,
-                privatization: true,
-                naming: true,
-                instanceOf: true,
-                earlyReturn: true,
-            )
             ->withSets([
                 LevelSetList::UP_TO_PHP_83,
                 SetList::CODE_QUALITY,
@@ -48,8 +36,7 @@ final class RectorBaseConfig
                 SetList::TYPE_DECLARATION,
                 LaravelSetList::LARAVEL_110,
                 LaravelSetList::LARAVEL_CODE_QUALITY,
-            ])
-            ->withParallel();
+            ]);
     }
 
     /**
@@ -77,7 +64,6 @@ final class RectorBaseConfig
     {
         return array_merge([
             $root . '/tests/Fixtures',
-            AddOverrideAttributeToOverriddenMethodsRector::class,
         ], $extra);
     }
 }

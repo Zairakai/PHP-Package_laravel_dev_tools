@@ -1,23 +1,61 @@
 # Base PHPStan configuration - SHARED RULES ONLY
 # Common rules for both package dev and Laravel projects
+#
+# The rules come from stanislas-poisson/php-dev-tools (level max, strict rules, PHPUnit rules, the checks, the report
+# of the ignores that no longer match). This file only holds what is specific to Laravel.
+
+includes:
+  - %rootDir%/../../stanislas-poisson/php-dev-tools/config/phpstan.neon
 
 parameters:
-  level: max
-
   parallel:
     maximumNumberOfProcesses: 4
 
-  checkMissingCallableSignature: true
-  checkTooWideReturnTypesInProtectedAndPublicMethods: true
-  checkUninitializedProperties: true
   checkDynamicProperties: false
-
-  reportUnmatchedIgnoredErrors: false
   treatPhpDocTypesAsCertain: false
 
+  # The ignores below are shared by every project and do not match in all of them: they are not reported
+  # (reportUnmatched: false). php-dev-tools reports the ignores of a project that no longer match.
   ignoreErrors:
-    - identifier: missingType.iterableValue
+    -
+      identifier: missingType.iterableValue
+      reportUnmatched: false
 
     # Laravel patterns
-    - '#Access to an undefined property [a-zA-Z0-9_\\]+::\$[a-zA-Z0-9_]+\.#'
-    - '#Call to an undefined method [a-zA-Z0-9_\\]+::[a-zA-Z0-9_]+\(\)\.#'
+    -
+      message: '#Access to an undefined property [a-zA-Z0-9_\\]+::\$[a-zA-Z0-9_]+\.#'
+      reportUnmatched: false
+    -
+      message: '#Call to an undefined method [a-zA-Z0-9_\\]+::[a-zA-Z0-9_]+\(\)\.#'
+      reportUnmatched: false
+
+    # Strict rules of php-dev-tools that the Laravel code does not follow yet. TEMPORARY: reduce this list rule by rule.
+    # Measured on this package and on French-Postal-Code (517 errors, 506 of them staticMethod.dynamicCall); the
+    # applications will add what they need until the list is reduced.
+    -
+      identifier: staticMethod.dynamicCall # $this->assertSame() in the tests (PHPUnit assertions are static)
+      reportUnmatched: false
+    -
+      identifier: ternary.shortNotAllowed # $a ?: $b
+      reportUnmatched: false
+    -
+      identifier: ternary.condNotBoolean
+      reportUnmatched: false
+    -
+      identifier: if.condNotBoolean
+      reportUnmatched: false
+    -
+      identifier: booleanNot.exprNotBoolean
+      reportUnmatched: false
+    -
+      identifier: empty.notAllowed
+      reportUnmatched: false
+    -
+      identifier: arrayFilter.strict
+      reportUnmatched: false
+    -
+      identifier: plus.leftNonNumeric
+      reportUnmatched: false
+    -
+      identifier: method.childReturnType
+      reportUnmatched: false
