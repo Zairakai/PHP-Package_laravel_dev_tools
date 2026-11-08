@@ -10,3 +10,18 @@ parameters:
     - src
 
   tmpDir: build/phpstan
+
+  # Strict rules of php-dev-tools that the code of this package does not follow yet. TEMPORARY: reduce this list.
+  ignoreErrors:
+    -
+      identifier: ternary.shortNotAllowed
+    -
+      identifier: if.condNotBoolean
+    -
+      identifier: booleanNot.exprNotBoolean
+    -
+      identifier: arrayFilter.strict
+    -
+      identifier: plus.leftNonNumeric
+    -
+      identifier: empty.notAllowed
