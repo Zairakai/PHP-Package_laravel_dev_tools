@@ -12,12 +12,20 @@ parameters:
   checkUninitializedProperties: true
   checkDynamicProperties: false
 
-  reportUnmatchedIgnoredErrors: false
+  # An ignore that no longer matches is reported, so that a project cleans its own. The ignores shared below are
+  # written for every project and do not match in all of them: they are not reported.
+  reportUnmatchedIgnoredErrors: true
   treatPhpDocTypesAsCertain: false
 
   ignoreErrors:
-    - identifier: missingType.iterableValue
+    -
+      identifier: missingType.iterableValue
+      reportUnmatched: false
 
     # Laravel patterns
-    - '#Access to an undefined property [a-zA-Z0-9_\\]+::\$[a-zA-Z0-9_]+\.#'
-    - '#Call to an undefined method [a-zA-Z0-9_\\]+::[a-zA-Z0-9_]+\(\)\.#'
+    -
+      message: '#Access to an undefined property [a-zA-Z0-9_\\]+::\$[a-zA-Z0-9_]+\.#'
+      reportUnmatched: false
+    -
+      message: '#Call to an undefined method [a-zA-Z0-9_\\]+::[a-zA-Z0-9_]+\(\)\.#'
+      reportUnmatched: false
