@@ -37,7 +37,7 @@ for arg in "$@"; do
             echo "  - .editorconfig"
             echo "  - phpstan.neon (only if not manually customized)"
             echo "  - config/dev-tools/ directory (published configs)"
-            echo "  - .githooks/ directory (if installed)"
+            echo "  - .githooks/ directory (older installs) and core.hooksPath of php-dev-tools"
             echo ""
             echo "The following are NOT removed:"
             echo "  - composer.json (scripts added by the plugin)"
@@ -175,6 +175,18 @@ uninstall_package() {
                 (cd "${PROJECT_ROOT}" && git config --unset core.hooksPath)
                 log_success "  Reset git config core.hooksPath to default"
             fi
+        fi
+    fi
+
+    # The hooks of php-dev-tools are read in place: only core.hooksPath is ours to reset
+    if [[ -d "${PROJECT_ROOT}/.git" ]]; then
+        local php_hooks_path
+        php_hooks_path="$(cd "${PROJECT_ROOT}" && git config core.hooksPath 2>/dev/null || echo "")"
+
+        if [[ "$php_hooks_path" == "vendor/stanislas-poisson/php-dev-tools/hooks" ]]; then
+            (cd "${PROJECT_ROOT}" && git config --unset core.hooksPath)
+            log_success "  Reset git config core.hooksPath to default"
+            removed=$((removed + 1))
         fi
     fi
 

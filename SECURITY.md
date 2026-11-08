@@ -26,7 +26,7 @@ Please **do not disclose vulnerabilities publicly** until they have been reviewe
 | **Static Analysis** | PHPStan Level Max compliance and Rector modernizations. |
 | **Execution** | Controlled shell execution via `config.sh` and `scripts/`. |
 | **Filesystem** | Non-destructive defaults for file generation and publishing. |
-| **Git Hooks** | Isolated quality enforcement in project scope (`.githooks`). |
+| **Git Hooks** | Quality enforcement in project scope: the hooks of `php-dev-tools`, read in place through `core.hooksPath`. |
 | **CI Pipeline** | Automated secret detection and ShellCheck validation. |
 
 ---
