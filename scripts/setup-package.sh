@@ -7,7 +7,7 @@
 #   bash setup-package.sh --publish              # Publish all configs to config/dev-tools/
 #   bash setup-package.sh --publish=quality      # Publish quality group
 #   bash setup-package.sh --publish=pint         # Publish specific config
-#   bash setup-package.sh --with-hooks           # Also install git hooks into .githooks/
+#   bash setup-package.sh --with-hooks           # Also activate the git hooks of php-dev-tools
 #   bash setup-package.sh --fullstack            # Force full-stack Makefile + CI stub (PHP + JS)
 #   bash setup-package.sh --force                # Force overwrite existing files
 #   bash setup-package.sh --silent               # Suppress output (errors only)
@@ -85,7 +85,7 @@ for arg in "$@"; do
             echo "  --publish            Publish ALL configs to config/dev-tools/"
             echo "  --publish=<group>    Publish a config group"
             echo "  --publish=<key>      Publish a specific config"
-            echo "  --with-hooks         Also install git hooks into .githooks/"
+            echo "  --with-hooks         Also activate the git hooks of php-dev-tools"
             echo "  --fullstack          Force full-stack Makefile + CI stub (PHP + JS)"
             echo "  --force, -f          Overwrite existing files (creates backups)"
             echo "  --silent, -s         Suppress output (errors only)"
@@ -97,7 +97,7 @@ for arg in "$@"; do
             echo "  quality    phpstan, phpstan-baseline, rector, insights"
             echo "  style      pint, markdownlint"
             echo "  testing    phpunit"
-            echo "  hooks      .githooks/ directory"
+            echo "  hooks      git hooks of php-dev-tools (core.hooksPath)"
             echo "  gitlab-ci  .gitlab-ci.yml (opt-in, not included in 'all')"
             echo "  all        everything except gitlab-ci"
             echo ""
@@ -111,7 +111,7 @@ for arg in "$@"; do
             echo "  pint              → config/dev-tools/pint.json"
             echo "  markdownlint      → config/dev-tools/.markdownlint.json"
             echo "  phpunit           → config/dev-tools/phpunit.xml"
-            echo "  hooks             → .githooks/"
+            echo "  hooks             → core.hooksPath"
             echo "  gitlab-ci         → .gitlab-ci.yml"
             echo "  governance        → SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md"
             echo ""
@@ -470,8 +470,10 @@ do_publish() {
 
 # ============================================================================
 # Git Hooks Installer
-# Installs hooks into .githooks/ (versioned) and configures git
+# Activates the hooks of php-dev-tools (read in place through core.hooksPath, nothing is copied)
 # ============================================================================
+
+HOOKS_PATH="vendor/stanislas-poisson/php-dev-tools/hooks"
 
 install_git_hooks() {
     if [[ ! -d "${PROJECT_ROOT}/.git" ]]; then
@@ -479,48 +481,19 @@ install_git_hooks() {
         return 0
     fi
 
-    local hooks_dir="${PROJECT_ROOT}/.githooks"
-    local stub_hooks_dir="${VENDOR_PATH}/stubs/githooks"
-    local hooks_to_install=("commit-msg" "prepare-commit-msg" "pre-commit" "pre-push")
-    local hooks_installed=0
-    local hooks_skipped=0
-
-    log_step "Installing git hooks into .githooks/…"
-    mkdir -p "$hooks_dir"
-
-    for hook in "${hooks_to_install[@]}"; do
-        local hook_source="${stub_hooks_dir}/${hook}"
-        local hook_target="${hooks_dir}/${hook}"
-
-        [[ ! -f "$hook_source" ]] && continue
-
-        if [[ -f "$hook_target" ]] && \
-           [[ "$FORCE_OVERWRITE" != "true" ]] && \
-           [[ "$CI_MODE" != "true" ]]; then
-            hooks_skipped=$((hooks_skipped + 1))
-            log_info "Skipped hook (exists): ${hook}"
-        else
-            if [[ -f "$hook_target" ]] && [[ "$CI_MODE" != "true" ]]; then
-                backup_file "$hook_target" 2>/dev/null || true
-            fi
-            cp "$hook_source" "$hook_target"
-            chmod +x "$hook_target"
-            hooks_installed=$((hooks_installed + 1))
-            log_success "Installed: .githooks/${hook}"
-        fi
-    done
-
-    # Configure git to use .githooks/ as hooks directory
-    if [[ $hooks_installed -gt 0 ]]; then
-        if (cd "${PROJECT_ROOT}" && git config core.hooksPath .githooks); then
-            log_success "Configured: git config core.hooksPath .githooks"
-        else
-            log_warning "Could not set git config core.hooksPath — run manually:"
-            echo "  cd ${PROJECT_ROOT} && git config core.hooksPath .githooks"
-        fi
+    if [[ ! -d "${PROJECT_ROOT}/${HOOKS_PATH}" ]]; then
+        log_warning "Hooks of php-dev-tools not found (${HOOKS_PATH}) — run: composer install"
+        return 0
     fi
 
-    log_success "Hooks installed: ${hooks_installed}, skipped: ${hooks_skipped}"
+    log_step "Activating the git hooks of php-dev-tools…"
+
+    if (cd "${PROJECT_ROOT}" && git config core.hooksPath "$HOOKS_PATH"); then
+        log_success "Configured: git config core.hooksPath ${HOOKS_PATH}"
+    else
+        log_warning "Could not set git config core.hooksPath — run manually:"
+        echo "  cd ${PROJECT_ROOT} && git config core.hooksPath ${HOOKS_PATH}"
+    fi
 }
 
 # ============================================================================
@@ -683,13 +656,13 @@ setup_package() {
     # ============================================================================
 
     local hooks_installed=0
-    local hooks_skipped=0
 
     if [[ "$WITH_HOOKS" == "true" ]]; then
         install_git_hooks
-        # Read installed count from the function output is not straightforward,
-        # so we check .githooks/ after the call
-        hooks_installed=$(find "${PROJECT_ROOT}/.githooks" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')
+        # The hooks are active when git reads the ones of php-dev-tools
+        if [[ "$(cd "${PROJECT_ROOT}" && git config --get core.hooksPath 2>/dev/null || true)" == "$HOOKS_PATH" ]]; then
+            hooks_installed=1
+        fi
     fi
 
     # ============================================================================
@@ -735,7 +708,7 @@ setup_package() {
     fi
 
     if [[ $hooks_installed -gt 0 ]]; then
-        echo -e "${MAGENTA}│${NC} ${GREEN}✓ Hooks:${NC}   ${hooks_installed} installed in .githooks/"
+        echo -e "${MAGENTA}│${NC} ${GREEN}✓ Hooks:${NC}   php-dev-tools (core.hooksPath)"
     fi
 
     echo -e "${MAGENTA}├────────────────────────────────────────┤${NC}"

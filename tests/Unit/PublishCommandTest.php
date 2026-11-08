@@ -5,6 +5,7 @@ namespace Zairakai\LaravelDevTools\Tests\Unit;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
+use Zairakai\LaravelDevTools\Services\GitHooksActivator;
 use Zairakai\LaravelDevTools\Tests\TestCase;
 
 final class PublishCommandTest extends TestCase
@@ -53,56 +54,6 @@ final class PublishCommandTest extends TestCase
         $this->cleanupTestFiles();
 
         parent::tearDown();
-    }
-
-    /**
-     * All git hooks are installed with correct permissions.
-     */
-    #[Test]
-    public function all_git_hooks_installed_with_permissions(): void
-    {
-        // Initialize git repo
-        $gitDir = $this->basePath . '/.git';
-
-        if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
-        }
-
-        // Run with --with-hooks
-        $exitCode = Artisan::call('dev-tools:publish', [
-            '--force'          => true,
-            '--with-hooks'     => true,
-            '--no-interaction' => true,
-        ]);
-
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
-
-        // Verify all hooks exist and are executable
-        $hooksDir      = $this->basePath . '/.githooks';
-        $expectedHooks = ['pre-commit', 'commit-msg', 'pre-push', 'prepare-commit-msg'];
-
-        foreach ($expectedHooks as $expectedHook) {
-            $hookPath = $hooksDir . '/' . $expectedHook;
-            $this->assertFileExists($hookPath, sprintf('Hook %s should exist', $expectedHook));
-
-            // Verify executable permission (on Unix systems)
-            if (PHP_OS_FAMILY !== 'Windows') {
-                $perms = fileperms($hookPath);
-                $this->assertTrue(
-                    0 !== ($perms & 0111),
-                    sprintf('Hook %s should be executable', $expectedHook),
-                );
-            }
-        }
-
-        // Cleanup
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        if (File::isDirectory($gitDir)) {
-            File::deleteDirectory($gitDir);
-        }
     }
 
     /**
@@ -235,19 +186,13 @@ final class PublishCommandTest extends TestCase
     }
 
     /**
-     * Git hooks are installed with --with-hooks option.
+     * --with-hooks points core.hooksPath at the hooks of php-dev-tools and copies nothing into the project.
      */
     #[Test]
-    public function git_hooks_are_installed_with_option(): void
+    public function git_hooks_are_activated_with_the_hooks_of_php_dev_tools(): void
     {
-        // Initialize git repo
-        $gitDir = $this->basePath . '/.git';
+        $this->initGitRepository();
 
-        if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
-        }
-
-        // Run with --with-hooks
         $exitCode = Artisan::call('dev-tools:publish', [
             '--force'          => true,
             '--with-hooks'     => true,
@@ -255,116 +200,11 @@ final class PublishCommandTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPath());
+        $this->assertDirectoryDoesNotExist($this->basePath . '/.githooks', 'Nothing should be copied into the project');
+        $this->assertStringContainsString('Configured: git config core.hooksPath', Artisan::output());
 
-        // Verify .githooks directory was created
-        $hooksDir = $this->basePath . '/.githooks';
-        $this->assertDirectoryExists($hooksDir, '.githooks directory should be created');
-
-        // Verify hooks were copied
-        $expectedHooks = ['pre-commit', 'commit-msg', 'pre-push', 'prepare-commit-msg'];
-
-        foreach ($expectedHooks as $expectedHook) {
-            $this->assertFileExists(
-                $hooksDir . '/' . $expectedHook,
-                sprintf('Hook %s should be installed', $expectedHook),
-            );
-        }
-
-        // Cleanup
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        if (File::isDirectory($gitDir)) {
-            File::deleteDirectory($gitDir);
-        }
-    }
-
-    /**
-     * Git hooks directory creation is verified.
-     */
-    #[Test]
-    public function git_hooks_directory_is_created(): void
-    {
-        // Initialize git repo
-        $gitDir = $this->basePath . '/.git';
-
-        if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
-        }
-
-        $hooksDir = $this->basePath . '/.githooks';
-
-        // Ensure hooks directory doesn't exist
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        // Run with --with-hooks
-        $exitCode = Artisan::call('dev-tools:publish', [
-            '--force'          => true,
-            '--with-hooks'     => true,
-            '--no-interaction' => true,
-        ]);
-
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
-
-        // Verify directory was created
-        $this->assertDirectoryExists($hooksDir, '.githooks directory should be created');
-
-        $output = Artisan::output();
-        $this->assertStringContainsString('Created: .githooks/', $output, 'Should show creation message');
-
-        // Cleanup
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        if (File::isDirectory($gitDir)) {
-            File::deleteDirectory($gitDir);
-        }
-    }
-
-    /**
-     * Git hooks directory already exists scenario.
-     */
-    #[Test]
-    public function git_hooks_handles_existing_directory(): void
-    {
-        // Initialize git repo
-        $gitDir = $this->basePath . '/.git';
-
-        if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
-        }
-
-        // Pre-create hooks directory
-        $hooksDir = $this->basePath . '/.githooks';
-
-        if (! File::isDirectory($hooksDir)) {
-            File::makeDirectory($hooksDir, 0755, true);
-        }
-
-        // Run with --with-hooks
-        $exitCode = Artisan::call('dev-tools:publish', [
-            '--force'          => true,
-            '--with-hooks'     => true,
-            '--no-interaction' => true,
-        ]);
-
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
-
-        // Directory should still exist and contain hooks
-        $this->assertDirectoryExists($hooksDir, '.githooks directory should exist');
-
-        // Cleanup
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        if (File::isDirectory($gitDir)) {
-            File::deleteDirectory($gitDir);
-        }
+        $this->removeGitRepository();
     }
 
     /**
@@ -399,50 +239,23 @@ final class PublishCommandTest extends TestCase
     }
 
     /**
-     * Git hooks are overwritten when exists with force.
+     * The hooks path of an older install (.githooks) is replaced.
      */
     #[Test]
-    public function git_hooks_overwrite_when_exists_with_force(): void
+    public function git_hooks_replace_the_hooks_path_of_an_older_install(): void
     {
-        // Initialize git repo
-        $gitDir = $this->basePath . '/.git';
+        $this->initGitRepository();
+        exec('git -C ' . escapeshellarg($this->basePath) . ' config core.hooksPath .githooks');
 
-        if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
-        }
-
-        // Create .githooks directory
-        $hooksDir = $this->basePath . '/.githooks';
-
-        if (! File::isDirectory($hooksDir)) {
-            File::makeDirectory($hooksDir, 0755, true);
-        }
-
-        // Create existing hook file
-        $existingHook = $hooksDir . '/pre-commit';
-        File::put($existingHook, '#!/bin/bash' . PHP_EOL . 'echo "existing"');
-
-        // Run with force
-        $exitCode = Artisan::call('dev-tools:publish', [
+        Artisan::call('dev-tools:publish', [
             '--force'          => true,
             '--with-hooks'     => true,
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPath());
 
-        // Verify existing hook was overwritten
-        $content = File::get($existingHook);
-        $this->assertStringNotContainsString('existing', $content, 'Existing hook should be overwritten with --force');
-
-        // Cleanup
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        if (File::isDirectory($gitDir)) {
-            File::deleteDirectory($gitDir);
-        }
+        $this->removeGitRepository();
     }
 
     /**
@@ -531,19 +344,13 @@ final class PublishCommandTest extends TestCase
     }
 
     /**
-     * Verify output shows installed hooks count.
+     * The output says which hooks are active.
      */
     #[Test]
-    public function output_shows_installed_hooks_count(): void
+    public function output_shows_the_active_hooks(): void
     {
-        // Initialize git repo
-        $gitDir = $this->basePath . '/.git';
+        $this->initGitRepository();
 
-        if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
-        }
-
-        // Run with --with-hooks
         $exitCode = Artisan::call('dev-tools:publish', [
             '--force'          => true,
             '--with-hooks'     => true,
@@ -554,19 +361,10 @@ final class PublishCommandTest extends TestCase
 
         $output = Artisan::output();
 
-        // Should show count of installed hooks
-        $this->assertStringContainsString('Installed 4 git hook', $output, 'Should show installed hooks count');
+        $this->assertStringContainsString('Git hooks of php-dev-tools active', $output);
+        $this->assertStringContainsString('composer quality:fast', $output);
 
-        // Cleanup
-        $hooksDir = $this->basePath . '/.githooks';
-
-        if (File::isDirectory($hooksDir)) {
-            File::deleteDirectory($hooksDir);
-        }
-
-        if (File::isDirectory($gitDir)) {
-            File::deleteDirectory($gitDir);
-        }
+        $this->removeGitRepository();
     }
 
     /**
@@ -614,20 +412,16 @@ final class PublishCommandTest extends TestCase
             'Makefile.stub should exist',
         );
 
-        $this->assertDirectoryExists(
-            $stubsPath . '/githooks',
-            'githooks directory should exist',
+        $this->assertFileExists(
+            $stubsPath . '/markdownlint.json.stub',
+            'markdownlint.json.stub should exist',
         );
 
-        // Verify git hooks exist
-        $expectedHooks = ['pre-commit', 'commit-msg', 'pre-push', 'prepare-commit-msg'];
-
-        foreach ($expectedHooks as $expectedHook) {
-            $this->assertFileExists(
-                $stubsPath . '/githooks/' . $expectedHook,
-                sprintf('Git hook stub %s should exist', $expectedHook),
-            );
-        }
+        // The git hooks come from php-dev-tools: nothing is packaged here
+        $this->assertDirectoryDoesNotExist(
+            $stubsPath . '/githooks',
+            'the git hooks come from php-dev-tools',
+        );
     }
 
     /**
@@ -970,5 +764,26 @@ final class PublishCommandTest extends TestCase
         if (File::isDirectory($gitDir)) {
             File::deleteDirectory($gitDir);
         }
+    }
+
+    private function hooksPath(): string
+    {
+        exec('git -C ' . escapeshellarg($this->basePath) . ' config --get core.hooksPath', $output);
+
+        return $output[0] ?? '';
+    }
+
+    /**
+     * A real git repository in the project: git config needs one.
+     */
+    private function initGitRepository(): void
+    {
+        $this->removeGitRepository();
+        exec('git init -q ' . escapeshellarg($this->basePath));
+    }
+
+    private function removeGitRepository(): void
+    {
+        File::deleteDirectory($this->basePath . '/.git');
     }
 }

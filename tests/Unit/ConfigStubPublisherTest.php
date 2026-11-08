@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
+use Zairakai\LaravelDevTools\Services\GitHooksActivator;
 use Zairakai\LaravelDevTools\Tests\TestCase;
 
 /**
@@ -182,14 +183,16 @@ final class ConfigStubPublisherTest extends TestCase
     }
 
     #[Test]
-    public function publish_by_key_hooks_creates_githooks_directory(): void
+    public function publish_by_key_hooks_activates_the_hooks_of_php_dev_tools(): void
     {
-        $result = $this->configStubPublisher->publishByKey('hooks', $this->vendorPath, $this->basePath, true);
+        $repository = $this->makeGitRepository();
+
+        $result = $this->configStubPublisher->publishByKey('hooks', $this->vendorPath, $repository, true);
 
         $this->assertTrue($result);
-        $this->assertDirectoryExists($this->basePath . '/.githooks');
+        $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPathOf($repository));
 
-        File::deleteDirectory($this->basePath . '/.githooks');
+        File::deleteDirectory($repository);
     }
 
     #[Test]
@@ -505,64 +508,61 @@ variables:
         $this->assertFalse($result);
     }
 
+    #[Test]
+    public function publish_hooks_copies_nothing_into_the_project(): void
+    {
+        $repository = $this->makeGitRepository();
+
+        $this->configStubPublisher->publishHooks($this->vendorPath, $repository, true);
+
+        $this->assertDirectoryDoesNotExist($repository . '/.githooks');
+
+        File::deleteDirectory($repository);
+    }
+
+    #[Test]
+    public function publish_hooks_does_not_configure_a_parent_repository_from_an_invalid_git_directory(): void
+    {
+        $parent = $this->makeGitRepository();
+        $child  = $parent . '/project';
+        File::makeDirectory($child . '/.git', 0755, true);
+
+        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $child, true);
+
+        $this->assertFalse($result);
+        $this->assertSame('', $this->hooksPathOf($parent), 'The parent repository must be left alone');
+
+        File::deleteDirectory($parent);
+    }
+
     // =========================================================================
     // publishHooks
     // =========================================================================
 
     #[Test]
-    public function publish_hooks_creates_githooks_directory_and_files(): void
+    public function publish_hooks_points_core_hooks_path_at_the_hooks_of_php_dev_tools(): void
     {
-        $hooksDir = $this->basePath . '/.githooks';
+        $repository = $this->makeGitRepository();
 
-        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $repository, true);
 
         $this->assertTrue($result);
-        $this->assertDirectoryExists($hooksDir);
+        $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPathOf($repository));
 
-        foreach (['commit-msg', 'pre-commit', 'pre-push', 'prepare-commit-msg'] as $hook) {
-            $this->assertFileExists($hooksDir . '/' . $hook, "Missing hook: {$hook}");
-            $this->assertTrue(is_executable($hooksDir . '/' . $hook), "Hook not executable: {$hook}");
-        }
-
-        File::deleteDirectory($hooksDir);
+        File::deleteDirectory($repository);
     }
 
     #[Test]
-    public function publish_hooks_overwrites_existing_hooks_with_force(): void
+    public function publish_hooks_returns_false_when_the_project_is_not_a_git_repository(): void
     {
-        $hooksDir  = $this->basePath . '/.githooks';
-        $preCommit = $hooksDir . '/pre-commit';
+        $directory = sys_get_temp_dir() . '/no-git-' . uniqid('', true);
+        File::makeDirectory($directory, 0755, true);
 
-        File::makeDirectory($hooksDir, 0755, true, true);
-        File::put($preCommit, '#!/bin/bash' . PHP_EOL . 'echo "existing"');
-
-        $this->configStubPublisher->publishHooks($this->vendorPath, $this->basePath, true);
-
-        $this->assertStringNotContainsString('existing', File::get($preCommit));
-        File::deleteDirectory($hooksDir);
-    }
-
-    #[Test]
-    public function publish_hooks_returns_false_when_stubs_dir_missing(): void
-    {
-        $result = $this->configStubPublisher->publishHooks('/nonexistent/vendor/path', $this->basePath, true);
+        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $directory, true);
 
         $this->assertFalse($result);
-    }
 
-    #[Test]
-    public function publish_hooks_skips_existing_hooks_without_force(): void
-    {
-        $hooksDir  = $this->basePath . '/.githooks';
-        $preCommit = $hooksDir . '/pre-commit';
-
-        File::makeDirectory($hooksDir, 0755, true, true);
-        File::put($preCommit, '#!/bin/bash' . PHP_EOL . 'echo "existing"');
-
-        $this->configStubPublisher->publishHooks($this->vendorPath, $this->basePath, false);
-
-        $this->assertStringContainsString('existing', File::get($preCommit));
-        File::deleteDirectory($hooksDir);
+        File::deleteDirectory($directory);
     }
 
     // =========================================================================
@@ -678,5 +678,24 @@ variables:
         if (File::isDirectory($hooksDir)) {
             File::deleteDirectory($hooksDir);
         }
+    }
+
+    private function hooksPathOf(string $repository): string
+    {
+        exec('git -C ' . escapeshellarg($repository) . ' config --get core.hooksPath', $output);
+
+        return $output[0] ?? '';
+    }
+
+    /**
+     * A real git repository: git config needs one.
+     */
+    private function makeGitRepository(): string
+    {
+        $path = sys_get_temp_dir() . '/hooks-' . uniqid('', true);
+        File::makeDirectory($path, 0755, true);
+        exec('git init -q ' . escapeshellarg($path));
+
+        return $path;
     }
 }

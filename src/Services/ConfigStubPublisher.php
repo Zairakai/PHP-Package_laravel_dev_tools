@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\File;
  *   - quality    : phpstan, rector, insights, baseline
  *   - style      : pint, markdownlint
  *   - testing    : phpunit
- *   - hooks      : .githooks/ directory
+ *   - hooks      : git hooks of php-dev-tools (core.hooksPath)
  *   - gitlab-ci  : .gitlab-ci.yml (opt-in, not in 'all')
  *   - governance : CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md (opt-in, not in 'all')
  *   - all        : all groups above except gitlab-ci and governance
@@ -235,30 +235,11 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Publish git hooks stubs into .githooks/ directory.
-     *
-     * Does NOT configure git core.hooksPath — that is handled by GitHooksManager.
+     * Activate the git hooks of php-dev-tools (core.hooksPath): they are read in place, nothing is published.
      */
     public function publishHooks(string $vendorPath, string $basePath, bool $force): bool
     {
-        $stubHooksDir    = $vendorPath . '/stubs/githooks';
-        $projectHooksDir = $basePath . '/.githooks';
-        $hooks           = ['commit-msg', 'pre-commit', 'pre-push', 'prepare-commit-msg'];
-
-        if (! File::isDirectory($stubHooksDir)) {
-            $this->componentsFactory->error('Git hooks stubs directory not found: ' . $stubHooksDir);
-
-            return false;
-        }
-
-        $this->ensureDirectoryExists($projectHooksDir);
-
-        $results = array_map(
-            fn (string $hook): bool => $this->publishSingleHook($stubHooksDir, $projectHooksDir, $hook, $force),
-            $hooks,
-        );
-
-        return ! in_array(false, $results, true);
+        return (new GitHooksActivator($this->componentsFactory))->activate($basePath);
     }
 
     /**
@@ -477,40 +458,6 @@ final readonly class ConfigStubPublisher
         finally {
             File::delete($tempFile);
         }
-    }
-
-    /**
-     * Copy a single hook stub to the .githooks/ directory.
-     */
-    private function publishSingleHook(
-        string $stubHooksDir,
-        string $projectHooksDir,
-        string $hook,
-        bool $force,
-    ): bool {
-        $source      = $stubHooksDir . '/' . $hook;
-        $destination = $projectHooksDir . '/' . $hook;
-
-        if (! File::exists($source)) {
-            // @codeCoverageIgnoreStart
-            // Individual hook stub missing — impossible in practice (all hooks are packaged together).
-            $this->componentsFactory->warn('Hook stub not found: ' . $hook);
-
-            return false;
-            // @codeCoverageIgnoreEnd
-        }
-
-        if (File::exists($destination) && ! $force) {
-            $this->skip('.githooks/' . $hook, 'already exists (use --force to overwrite)');
-
-            return false;
-        }
-
-        File::copy($source, $destination);
-        chmod($destination, 0755);
-        $this->componentsFactory->task('Copied: .githooks/' . $hook);
-
-        return true;
     }
 
     // =========================================================================

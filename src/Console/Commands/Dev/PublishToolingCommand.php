@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Zairakai\LaravelDevTools\Services\ComposerNormalizeManager;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
-use Zairakai\LaravelDevTools\Services\GitHooksManager;
+use Zairakai\LaravelDevTools\Services\GitHooksActivator;
 
 /**
  * Publishes Zairakai Dev Tools configuration into the project.
@@ -23,11 +23,11 @@ use Zairakai\LaravelDevTools\Services\GitHooksManager;
  *   --publish=quality  → publish quality group (phpstan, rector, insights, baseline)
  *   --publish=style    → publish style group (pint, markdownlint)
  *   --publish=testing  → publish testing group (phpunit)
- *   --publish=hooks    → publish git hooks to .githooks/
+ *   --publish=hooks    → activate the git hooks of php-dev-tools
  *   --publish=pint     → publish a single config file by key
  *
  * Git hooks:
- *   --with-hooks       → install git hooks into .githooks/ and configure git
+ *   --with-hooks       → activate the git hooks of php-dev-tools (core.hooksPath)
  */
 final class PublishToolingCommand extends Command
 {
@@ -36,7 +36,7 @@ final class PublishToolingCommand extends Command
     protected $signature = 'dev-tools:publish
                             {--force : Overwrite existing files (respects user-modified file protection)}
                             {--publish= : Publish configs — omit value for all, or pass group/key name}
-                            {--with-hooks : Install git hooks into .githooks/ and configure git}
+                            {--with-hooks : Activate the git hooks of php-dev-tools (core.hooksPath)}
                             {--with-normalize : Install ergebnis/composer-normalize}
                             {--fullstack : Force full-stack Makefile + CI stub (PHP + JS)}';
 
@@ -51,7 +51,7 @@ final class PublishToolingCommand extends Command
         $fullstack  = (bool) $this->option('fullstack');
 
         $configStubPublisher          = new ConfigStubPublisher($this->components);
-        $gitHooksManager              = new GitHooksManager($this, $this->components);
+        $gitHooksActivator            = new GitHooksActivator($this->components);
         $composerNormalizeManager     = new ComposerNormalizeManager($this, $this->components);
 
         $this->components->info('Publishing zairakai/laravel-dev-tools configuration…');
@@ -81,7 +81,7 @@ final class PublishToolingCommand extends Command
 
         if ((bool) $this->option('with-hooks')) {
             $this->newLine();
-            $gitHooksManager->publishGitHooks($vendorPath . '/stubs', $basePath, $force, true);
+            $gitHooksActivator->activate($basePath);
         }
 
         // =====================================================================
@@ -101,14 +101,14 @@ final class PublishToolingCommand extends Command
     private function displayGitHooksInfo(): void
     {
         $this->newLine();
-        $this->line('<fg=yellow>Git hooks installed (versioned in .githooks/):</>');
-        $this->line('  • <fg=cyan>pre-commit</>        - Code style check (staged files only)');
-        $this->line('  • <fg=cyan>commit-msg</>        - Conventional commit format validation');
-        $this->line('  • <fg=cyan>pre-push</>          - PHPStan + Pint (full quality gate)');
+        $this->line('<fg=yellow>Git hooks of php-dev-tools active (core.hooksPath):</>');
+        $this->line('  • <fg=cyan>pre-commit</>        - composer quality:fast');
+        $this->line('  • <fg=cyan>commit-msg</>        - Commit message format validation');
+        $this->line('  • <fg=cyan>pre-push</>          - composer quality (full quality gate)');
         $this->line('  • <fg=cyan>prepare-commit-msg</> - Auto-prefix ticket from branch');
         $this->newLine();
-        $this->line('<fg=yellow>To disable a hook:</> Remove or rename the file in .githooks/');
-        $this->line('  <fg=gray># Example: mv .githooks/pre-push .githooks/pre-push.disabled</>');
+        $this->line('<fg=yellow>To bypass the hooks (emergency only):</> git commit --no-verify');
+        $this->line('<fg=yellow>To deactivate them:</> git config --unset core.hooksPath');
     }
 
     /**

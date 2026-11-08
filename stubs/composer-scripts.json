@@ -3,6 +3,7 @@
   "analyse:baseline": "GENERATE_BASELINE=true bash vendor/zairakai/laravel-dev-tools/scripts/phpstan.sh",
   "cs": "bash vendor/zairakai/laravel-dev-tools/scripts/cs-check.sh",
   "cs-fix": "bash vendor/zairakai/laravel-dev-tools/scripts/cs-fix.sh",
+  "cs:fix": "bash vendor/zairakai/laravel-dev-tools/scripts/cs-fix.sh",
   "insights": "bash vendor/zairakai/laravel-dev-tools/scripts/insights.sh",
   "insights:fix": "bash vendor/zairakai/laravel-dev-tools/scripts/insights.sh --fix",
   "markdown": "bash vendor/zairakai/laravel-dev-tools/scripts/markdownlint.sh",
@@ -11,7 +12,10 @@
   "post-update-cmd": [
     "@setup-dev-tools"
   ],
+  "quality": "make quality",
   "quality-fast": "bash vendor/zairakai/laravel-dev-tools/scripts/ci-quality.sh",
+  "quality:fast": "make quality-fast",
+  "quality:fix": "make quality-fix",
   "rector": "bash vendor/zairakai/laravel-dev-tools/scripts/rector-check.sh",
   "rector:fix": "bash vendor/zairakai/laravel-dev-tools/scripts/rector-fix.sh",
   "setup-dev-tools": "bash vendor/zairakai/laravel-dev-tools/scripts/setup-package.sh",
