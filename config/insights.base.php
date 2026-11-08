@@ -2,138 +2,28 @@
 
 declare(strict_types=1);
 
-/**
- * PHP Insights Base Configuration
- * ================================.
- *
- * IMPORTANT: When extending this config, DO NOT use array_replace_recursive()
- * for arrays with numeric keys (like 'remove', 'add', 'exclude'). These will
- * be replaced instead of merged. Use array_merge() or spread operator instead.
- *
- * Use spread operator for numeric arrays (remove, add, exclude).
- *
- * Style authority: PSR-12 is the baseline. Where PSR-12 is silent,
- * pint.json rules take precedence. PHP Insights must not contradict Pint.
- */
-
 use NunoMaduro\PhpInsights\Domain\Insights\CyclomaticComplexityIsHigh;
-use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenNormalClasses;
-use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenTraits;
-use PHP_CodeSniffer\Standards\Generic\Sniffs\CodeAnalysis\EmptyStatementSniff;
-use PHP_CodeSniffer\Standards\Generic\Sniffs\Files\LineLengthSniff;
-use PHP_CodeSniffer\Standards\Generic\Sniffs\Strings\UnnecessaryStringConcatSniff;
-use PHP_CodeSniffer\Standards\PEAR\Sniffs\WhiteSpace\ScopeClosingBraceSniff;
-use PHP_CodeSniffer\Standards\PSR12\Sniffs\Classes\ClassInstantiationSniff;
-use PhpCsFixer\Fixer\Basic\BracesFixer;
-use PhpCsFixer\Fixer\Import\OrderedImportsFixer;
-use PhpCsFixer\Fixer\Operator\BinaryOperatorSpacesFixer;
-use PhpCsFixer\Fixer\Operator\NewWithBracesFixer;
-use PhpCsFixer\Fixer\Operator\NewWithParenthesesFixer;
-use PhpCsFixer\Fixer\StringNotation\SingleQuoteFixer;
-use PhpCsFixer\Fixer\Whitespace\MethodChainingIndentationFixer;
-use SlevomatCodingStandard\Sniffs\Classes\SuperfluousAbstractClassNamingSniff;
-use SlevomatCodingStandard\Sniffs\Classes\SuperfluousExceptionNamingSniff;
-use SlevomatCodingStandard\Sniffs\Classes\SuperfluousInterfaceNamingSniff;
-use SlevomatCodingStandard\Sniffs\ControlStructures\DisallowYodaComparisonSniff;
-use SlevomatCodingStandard\Sniffs\Functions\FunctionLengthSniff;
-use SlevomatCodingStandard\Sniffs\Functions\UnusedParameterSniff;
-use SlevomatCodingStandard\Sniffs\Namespaces\UseSpacingSniff;
-use SlevomatCodingStandard\Sniffs\TypeHints\DisallowMixedTypeHintSniff;
-use SlevomatCodingStandard\Sniffs\TypeHints\PropertyTypeHintSniff;
-use SlevomatCodingStandard\Sniffs\TypeHints\UselessConstantTypeHintSniff;
+use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenDefineFunctions;
+use SlevomatCodingStandard\Sniffs\Classes\ForbiddenPublicPropertySniff;
+use SlevomatCodingStandard\Sniffs\TypeHints\ReturnTypeHintSniff;
+use StanislasPoisson\DevTools\Insights;
 
-return [
+/*
+ * PHP Insights Base Configuration
+ * ================
+ * The rules come from stanislas-poisson/php-dev-tools (config/phpinsights.php). This file only holds what is specific to
+ * Laravel: the preset, the exclusions, the requirements, and the false positives that Eloquent and the enums cause.
+ *
+ * IMPORTANT:
+ * A project extends this configuration and can override any of it.
+ * For numeric arrays (remove, add, exclude) always merge using spread operator.
+ * Never use array_replace_recursive() — it replaces values by index.
+ */
+return Insights::config([
     'preset' => 'laravel',
 
-    'ide' => null,
-
     'exclude' => [
-        'vendor',
         'tests/Fixtures',
-    ],
-
-    'add' => [],
-
-    'remove' => [
-        // ── Naming conventions ────────────────────────────────────────────────
-        // PSR-12 does not enforce suffix conventions — these are noisy
-        SuperfluousAbstractClassNamingSniff::class,
-        SuperfluousExceptionNamingSniff::class,
-        SuperfluousInterfaceNamingSniff::class,
-
-        // ── Namespaces ────────────────────────────────────────────────────────
-        // Conflicts with Pint blank_line_between_import_groups rule (class/function/const separation)
-        UseSpacingSniff::class,
-
-        // ── Type hints ────────────────────────────────────────────────────────
-        // PSR-12 does not mandate mixed/property type hints at this level
-        DisallowMixedTypeHintSniff::class,
-        PropertyTypeHintSniff::class,
-
-        // ── Code analysis ────────────────────────────────────────────────────
-        // Empty statements are sometimes intentional (catch blocks, etc.)
-        EmptyStatementSniff::class,
-
-        // ── Yoda style ───────────────────────────────────────────────────────
-        // PSR-12 is silent on yoda comparisons.
-        // Pint enforces yoda_style: true — Slevocat's DisallowYodaComparisonSniff
-        // would conflict. Pint wins.
-        DisallowYodaComparisonSniff::class,
-
-        // ── Binary operator alignment ─────────────────────────────────────────
-        // PSR-12 is silent on alignment.
-        // Pint enforces binary_operator_spaces with align_single_space.
-        // Removing Insights' fixer prevents duplicate/conflicting corrections.
-        BinaryOperatorSpacesFixer::class,
-
-        // ── Instantiation & parentheses ──────────────────────────────────────
-        // PSR-12 is silent on instantiation style.
-        // Pint enforces new_with_parentheses: false — no () on new Class.
-        // All three sniffs/fixers below would force () — Pint wins.
-        NewWithParenthesesFixer::class,
-        NewWithBracesFixer::class,
-        ClassInstantiationSniff::class,
-
-        // ── Import ordering ──────────────────────────────────────────────────
-        // PSR-12 does not mandate import order.
-        // Pint enforces ordered_imports (alpha, const > class > function).
-        OrderedImportsFixer::class,
-
-        // ── Quote style ───────────────────────────────────────────────────────
-        // PSR-12 is silent. Pint enforces single_quote: true.
-        SingleQuoteFixer::class,
-
-        // ── Method chaining ───────────────────────────────────────────────────
-        // PSR-12 is silent. Pint enforces method_chaining_indentation.
-        MethodChainingIndentationFixer::class,
-
-        // ── Forbidden constructs ─────────────────────────────────────────────
-        // Normal classes and traits are valid in Laravel projects
-        ForbiddenNormalClasses::class,
-        ForbiddenTraits::class,
-
-        // ── Brace style ───────────────────────────────────────────────────────
-        // PSR-12 is silent on empty body placement and else continuation style.
-        // Our style: `() {}` compact bodies, `else` on new line after `}`.
-        // Pint controls both — Insights must not interfere.
-        // PEAR\ScopeClosingBraceSniff: flags `() {}` compact constructor bodies
-        ScopeClosingBraceSniff::class,
-        // BracesFixer: forces `} else {` same line and expands empty bodies
-        BracesFixer::class,
-
-        // ── String concatenation ──────────────────────────────────────────────
-        // PSR-12 is silent on concat style.
-        // Pint splits long lines using `.` concat — this sniff would flag that.
-        UnnecessaryStringConcatSniff::class,
-
-        // ── Unused parameter false positives ─────────────────────────────────
-        // Pint sometimes flags parameters that are forwarded via variadic calls
-        // or used indirectly. Removing globally — noise > value here.
-        UnusedParameterSniff::class,
-
-        // ── Useless type hint on constants ────────────────────────────────────
-        // PSR-12 is silent. @var on typed constants is informational, not useless.
-        UselessConstantTypeHintSniff::class,
     ],
 
     'config' => [
@@ -141,35 +31,37 @@ return [
             'maxComplexity' => 15,
             'exclude'       => [
                 'Console/Commands/Dev/PublishToolingCommand.php',
-                // ConfigStubPublisher has high aggregate complexity by design:
-                // it is a publisher registry with one method per publishable asset.
                 'Services/ConfigStubPublisher.php',
             ],
         ],
 
-        FunctionLengthSniff::class => [
-            'maxLinesLength' => 50,
+        // Eloquent and the queue read these properties publicly ($timestamps, $timeout, $tries, promoted job arguments).
+        ForbiddenPublicPropertySniff::class => [
+            'exclude' => [
+                'app/Models',
+                'app/Jobs',
+            ],
         ],
 
-        LineLengthSniff::class => [
-            'lineLimit'         => 120,
-            'absoluteLineLimit' => 160,
-            'ignoreComments'    => true,
+        // Eloquent relations are typed with generics (BelongsTo<Commune, $this>) that the sniff cannot read.
+        ReturnTypeHintSniff::class => [
+            'exclude' => [
+                'app/Models',
+            ],
+        ],
+
+        // PHPInsights does not read the methods of an enum and takes them for global functions.
+        ForbiddenDefineFunctions::class => [
+            'exclude' => [
+                'app/Enums',
+            ],
         ],
     ],
 
     'requirements' => [
-        'min-quality'            => 80,
-        'min-complexity'         => 40,
-        'min-architecture'       => 75,
-        // Style is enforced exclusively by Pint (pint.json).
-        // PHP Insights cannot be configured to match our style choices
-        // (CurlyBracesPositionFixer, ControlStructureContinuationPositionFixer
-        // are applied by the preset regardless of remove/config entries).
-        // Setting to 0 disables style gating here — Pint handles it in CI.
-        'min-style'              => 0,
-        'disable-security-check' => false,
+        'min-quality'      => 80,
+        'min-complexity'   => 40,
+        'min-architecture' => 75,
+        'min-style'        => 0,
     ],
-
-    'threads' => null,
-];
+]);
