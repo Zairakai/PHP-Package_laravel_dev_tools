@@ -38,7 +38,7 @@ run_commit_msg() {
 
     printf '%b' "$1" > "$msg_file"
 
-    run bash "${PROJECT_ROOT}/stubs/githooks/commit-msg" "$msg_file"
+    run bash "${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/commit-msg" "$msg_file"
 }
 
 @test "commit-msg accepts the handbook format" {
@@ -153,7 +153,7 @@ prepare_message() {
 
     printf '%s\n' "$message" > "$msg_file"
 
-    bash "${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg" "$msg_file" "$source" >/dev/null 2>&1
+    bash "${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/prepare-commit-msg" "$msg_file" "$source" >/dev/null 2>&1
 
     head -n1 "$msg_file"
 }
@@ -211,25 +211,27 @@ prepare_message() {
 # ============================================================================
 
 @test "pre-commit hook exists and is executable" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/pre-commit"
+    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-commit"
 
     [ -f "$hook" ]
     [ -x "$hook" ]
 }
 
 @test "pre-commit hook has correct shebang" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/pre-commit"
+    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-commit"
 
     run head -n1 "$hook"
 
     [[ "$output" =~ "#!/usr/bin/env bash" ]]
 }
 
-@test "pre-commit hook calls make quality-fast" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/pre-commit"
+@test "pre-commit hook calls composer quality:fast, which runs make quality-fast" {
+    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-commit"
 
-    run grep -q "make quality-fast" "$hook"
+    run grep -q "composer quality:fast" "$hook"
+    [ "$status" -eq 0 ]
 
+    run grep -q '"quality:fast": "make quality-fast"' "${PROJECT_ROOT}/stubs/composer-scripts.json"
     [ "$status" -eq 0 ]
 }
 
@@ -238,24 +240,26 @@ prepare_message() {
 # ============================================================================
 
 @test "pre-push hook exists and is executable" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/pre-push"
+    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-push"
 
     [ -f "$hook" ]
     [ -x "$hook" ]
 }
 
 @test "pre-push hook has correct shebang" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/pre-push"
+    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-push"
 
     run head -n1 "$hook"
 
     [[ "$output" =~ "#!/usr/bin/env bash" ]]
 }
 
-@test "pre-push hook runs quality gate" {
-    local hook="${PROJECT_ROOT}/stubs/githooks/pre-push"
+@test "pre-push hook runs composer quality, which runs make quality" {
+    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-push"
 
-    run grep -q "make quality" "$hook"
+    run grep -q "composer quality" "$hook"
+    [ "$status" -eq 0 ]
 
+    run grep -q '"quality": "make quality"' "${PROJECT_ROOT}/stubs/composer-scripts.json"
     [ "$status" -eq 0 ]
 }
