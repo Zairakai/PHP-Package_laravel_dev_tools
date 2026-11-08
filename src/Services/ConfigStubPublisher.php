@@ -282,7 +282,7 @@ final readonly class ConfigStubPublisher
     public function publishMarkdownlint(string $vendorPath, string $basePath, bool $force): bool
     {
         return $this->publishStub(
-            stubFile: $vendorPath . '/.markdownlint.json',
+            stubFile: $vendorPath . '/stubs/markdownlint.json.stub',
             targetFile: $basePath . '/config/dev-tools/markdownlint.json',
             force: $force,
             label: 'config/dev-tools/markdownlint.json',

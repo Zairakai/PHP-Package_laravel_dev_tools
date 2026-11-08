@@ -158,16 +158,29 @@ unset _phpstan_vendor_default
 PHPSTAN_BASELINE=$(resolve_config "baseline.neon")
 export PHPSTAN_BASELINE="${PHPSTAN_BASELINE:-config/dev-tools/baseline.neon}"
 
-# Pint
+# Pint: the rules are the ones of stanislas-poisson/php-dev-tools, which the Laravel layer of this package and the
+# pint.json of the project extend. build_pint_config writes the merged file; the scripts of Pint call it once they run
+# where PHP is (maybe_dockerize).
 PINT_CONFIG=$(resolve_config "pint.json" "vendor/zairakai/laravel-dev-tools/config/pint.json")
 export PINT_CONFIG="${PINT_CONFIG:-}"
+
+build_pint_config() {
+    local laravel_layer="${PROJECT_ROOT}/vendor/zairakai/laravel-dev-tools/config/pint.json"
+    local layers=()
+
+    [[ -f "$laravel_layer" ]] && layers+=("$laravel_layer")
+    [[ -n "$PINT_CONFIG" && "$PINT_CONFIG" != "$laravel_layer" ]] && layers+=("$PINT_CONFIG")
+
+    php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "${layers[@]}"
+}
+export -f build_pint_config
 
 # Rector
 RECTOR_CONFIG=$(resolve_config "rector.php" "vendor/zairakai/laravel-dev-tools/config/rector.php")
 export RECTOR_CONFIG="${RECTOR_CONFIG:-}"
 
 # Markdownlint
-MARKDOWNLINT_CONFIG=$(resolve_config ".markdownlint.json" "vendor/zairakai/laravel-dev-tools/.markdownlint.json")
+MARKDOWNLINT_CONFIG=$(resolve_config ".markdownlint.json" "vendor/stanislas-poisson/php-dev-tools/config/markdownlint.json")
 export MARKDOWNLINT_CONFIG="${MARKDOWNLINT_CONFIG:-}"
 
 MARKDOWNLINT_IGNORE=$(resolve_config ".markdownlintignore" "vendor/zairakai/laravel-dev-tools/.markdownlintignore")

@@ -588,7 +588,9 @@ final class PublishCommandTest extends TestCase
         $pintConfig  = json_decode($pintContent, true);
 
         $this->assertIsArray($pintConfig, 'pint.json should be valid JSON');
-        $this->assertArrayHasKey('preset', $pintConfig, 'pint.json should have preset key');
+        // The rules come from php-dev-tools: this file only extends them.
+        $this->assertArrayHasKey('finder', $pintConfig, 'pint.json should have the finder exclusions of Laravel');
+        $this->assertArrayNotHasKey('rules', $pintConfig, 'pint.json should not copy the rules of php-dev-tools');
     }
 
     /**
@@ -626,6 +628,31 @@ final class PublishCommandTest extends TestCase
                 sprintf('Git hook stub %s should exist', $expectedHook),
             );
         }
+    }
+
+    /**
+     * The configuration of Pint is the one of php-dev-tools, extended by this package.
+     */
+    #[Test]
+    public function pint_config_extends_the_rules_of_php_dev_tools(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $file = trim((string) shell_exec(sprintf(
+            '%s %s %s %s',
+            escapeshellarg(PHP_BINARY),
+            escapeshellarg($root . '/scripts/pint-config.php'),
+            escapeshellarg($root),
+            escapeshellarg($root . '/config/pint.json'),
+        )));
+
+        $this->assertFileExists($file);
+
+        $config = json_decode(File::get($file), true);
+
+        $this->assertIsArray($config);
+        $this->assertSame('laravel', $config['preset']);
+        $this->assertNotEmpty($config['rules'], 'the rules come from php-dev-tools');
+        $this->assertContains('storage', $config['finder']['exclude'], 'the exclusions of Laravel are added');
     }
 
     /**
