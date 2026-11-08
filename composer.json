@@ -48,7 +48,7 @@
     "driftingly/rector-laravel": "^2.7.1",
     "larastan/larastan": "^3.14.0",
     "phpmetrics/phpmetrics": "^2.11",
-    "stanislas-poisson/php-dev-tools": "^1.1.2"
+    "stanislas-poisson/php-dev-tools": "^1.1.3"
   },
   "require-dev": {
     "composer/composer": "^2.11.1",
