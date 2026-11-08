@@ -28,7 +28,7 @@ setup() {
         chmod +x "${TEST_TEMP_DIR}/${HOOKS_PATH}/${hook}"
     done
 
-    cd "${TEST_TEMP_DIR}"
+    cd "${TEST_TEMP_DIR}" || exit 1
     git init -q .
 }
 
@@ -41,7 +41,7 @@ teardown() {
 # ============================================================================
 
 @test "install-hooks detects non-git repository" {
-    rm -rf "${TEST_TEMP_DIR}/.git"
+    rm -rf "${TEST_TEMP_DIR:?}/.git"
 
     run bash "${TEST_VENDOR_DIR}/scripts/install-hooks.sh"
 
@@ -50,7 +50,7 @@ teardown() {
 }
 
 @test "install-hooks fails when the hooks of php-dev-tools are not installed" {
-    rm -rf "${TEST_TEMP_DIR}/${HOOKS_PATH}"
+    rm -rf "${TEST_TEMP_DIR:?}/${HOOKS_PATH}"
 
     run bash "${TEST_VENDOR_DIR}/scripts/install-hooks.sh"
 
@@ -70,7 +70,7 @@ teardown() {
 
     [ "$status" -eq 0 ]
     [ ! -e "${TEST_TEMP_DIR}/.githooks" ]
-    [ -z "$(ls -A "${TEST_TEMP_DIR}/.git/hooks" | grep -v '\.sample$' || true)" ]
+    [ -z "$(find "${TEST_TEMP_DIR}/.git/hooks" -type f ! -name '*.sample')" ]
 }
 
 @test "install-hooks lists the four hooks" {
