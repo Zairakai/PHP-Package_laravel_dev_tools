@@ -8,31 +8,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "$SCRIPT_DIR" =~ /vendor/zairakai/laravel-dev-tools/scripts ]]; then
-    # Running as vendor dependency
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+  # Running as vendor dependency
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 else
-    # Running in package development
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+  # Running in package development
+  PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 fi
 
 # PROJECT TYPE DETECTION
 # ================
 # Returns "laravel" or "package"
 detect_project_type() {
-    if [[ -f "${PROJECT_ROOT}/artisan" ]] && \
-       grep -q '"laravel/framework"' "${PROJECT_ROOT}/composer.json" 2>/dev/null; then
-        echo "laravel"
-        return 0
-    fi
+  if [[ -f "${PROJECT_ROOT}/artisan" ]] && \
+     grep -q '"laravel/framework"' "${PROJECT_ROOT}/composer.json" 2>/dev/null; then
+    echo "laravel"
+    return 0
+  fi
 
-    if [[ -d "${PROJECT_ROOT}/src" ]] || \
-       grep -q '"type":\s*"library"' "${PROJECT_ROOT}/composer.json" 2>/dev/null; then
-        echo "package"
-        return 0
-    fi
-
-    # Default fallback
+  if [[ -d "${PROJECT_ROOT}/src" ]] || \
+     grep -q '"type":\s*"library"' "${PROJECT_ROOT}/composer.json" 2>/dev/null; then
     echo "package"
+    return 0
+  fi
+
+  # Default fallback
+  echo "package"
 }
 
 is_laravel_app() { [[ "laravel" == "$(detect_project_type)" ]]; }
@@ -58,40 +58,40 @@ export -f detect_project_type is_laravel_app is_package
 DEV_TOOLS_DOCKER_ENV_VARS=(CI COVERAGE GENERATE_BASELINE TESTSUITE)
 
 maybe_dockerize() {
-    local script_path="$1"
-    shift
+  local script_path="$1"
+  shift
 
-    # Already running inside a container — nothing to dispatch.
-    [[ -f /.dockerenv ]] && return 0
+  # Already running inside a container — nothing to dispatch.
+  [[ -f /.dockerenv ]] && return 0
 
-    # Explicit opt-out.
-    [[ "${DEV_TOOLS_NO_DOCKER:-false}" == "true" ]] && return 0
+  # Explicit opt-out.
+  [[ "${DEV_TOOLS_NO_DOCKER:-false}" == "true" ]] && return 0
 
-    # CI runners execute inside a single job image, not this dev compose stack.
-    [[ "${CI:-false}" == "true" || "${GITLAB_CI:-false}" == "true" ]] && return 0
+  # CI runners execute inside a single job image, not this dev compose stack.
+  [[ "${CI:-false}" == "true" || "${GITLAB_CI:-false}" == "true" ]] && return 0
 
-    command -v docker >/dev/null 2>&1 || return 0
-    [[ -f "${PROJECT_ROOT}/docker-compose.yml" ]] || return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  [[ -f "${PROJECT_ROOT}/docker-compose.yml" ]] || return 0
 
-    local service="${DEV_TOOLS_PHP_SERVICE:-php}"
-    local mount="${DEV_TOOLS_PHP_SERVICE_MOUNT:-/var/www/html}"
+  local service="${DEV_TOOLS_PHP_SERVICE:-php}"
+  local mount="${DEV_TOOLS_PHP_SERVICE_MOUNT:-/var/www/html}"
 
-    # Only dispatch when the target service is already running — never start
-    # it as a side effect of running a quality check.
-    if ! (cd "$PROJECT_ROOT" && docker compose ps --status running --services 2>/dev/null | grep -qx "$service"); then
-        return 0
-    fi
+  # Only dispatch when the target service is already running — never start
+  # it as a side effect of running a quality check.
+  if ! (cd "$PROJECT_ROOT" && docker compose ps --status running --services 2>/dev/null | grep -qx "$service"); then
+    return 0
+  fi
 
-    local rel_script="${script_path#"${PROJECT_ROOT}"/}"
-    local env_flags=()
-    local var
-    for var in "${DEV_TOOLS_DOCKER_ENV_VARS[@]}"; do
-        [[ -n "${!var:-}" ]] && env_flags+=(-e "$var")
-    done
+  local rel_script="${script_path#"${PROJECT_ROOT}"/}"
+  local env_flags=()
+  local var
+  for var in "${DEV_TOOLS_DOCKER_ENV_VARS[@]}"; do
+    [[ -n "${!var:-}" ]] && env_flags+=(-e "$var")
+  done
 
-    log_step "Dispatching to '${service}' container..."
-    cd "$PROJECT_ROOT"
-    exec docker compose exec -T "${env_flags[@]}" "$service" bash "${mount}/${rel_script}" "$@"
+  log_step "Dispatching to '${service}' container..."
+  cd "$PROJECT_ROOT"
+  exec docker compose exec -T "${env_flags[@]}" "$service" bash "${mount}/${rel_script}" "$@"
 }
 export -f maybe_dockerize
 
@@ -109,9 +109,9 @@ export NC='\033[0m'
 # ================
 # Auto-detect Pest when installed — Pest refuses to run via phpunit directly
 if [[ -x "${PROJECT_ROOT}/vendor/bin/pest" ]]; then
-    export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/pest}"
+  export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/pest}"
 else
-    export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/phpunit}"
+  export PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/phpunit}"
 fi
 export PHPSTAN_BIN="${PHPSTAN_BIN:-vendor/bin/phpstan}"
 export PINT_BIN="${PINT_BIN:-vendor/bin/pint}"
@@ -125,15 +125,15 @@ export PHPMETRICS_BIN="${PHPMETRICS_BIN:-vendor/bin/phpmetrics}"
 #          3. config/$filename                 (legacy or intermediate)
 #          4. vendor fallback path             (bundled default)
 resolve_config() {
-    local filename="$1"
-    local vendor_fallback="${2:-}"
+  local filename="$1"
+  local vendor_fallback="${2:-}"
 
-    [[ -f "${PROJECT_ROOT}/${filename}" ]]                  && { echo "${PROJECT_ROOT}/${filename}"; return 0; }
-    [[ -f "${PROJECT_ROOT}/config/dev-tools/${filename}" ]] && { echo "${PROJECT_ROOT}/config/dev-tools/${filename}"; return 0; }
-    [[ -f "${PROJECT_ROOT}/config/${filename}" ]]           && { echo "${PROJECT_ROOT}/config/${filename}"; return 0; }
-    [[ -n "$vendor_fallback" && -f "${PROJECT_ROOT}/${vendor_fallback}" ]] && { echo "${PROJECT_ROOT}/${vendor_fallback}"; return 0; }
+  [[ -f "${PROJECT_ROOT}/${filename}" ]]                  && { echo "${PROJECT_ROOT}/${filename}"; return 0; }
+  [[ -f "${PROJECT_ROOT}/config/dev-tools/${filename}" ]] && { echo "${PROJECT_ROOT}/config/dev-tools/${filename}"; return 0; }
+  [[ -f "${PROJECT_ROOT}/config/${filename}" ]]           && { echo "${PROJECT_ROOT}/config/${filename}"; return 0; }
+  [[ -n "$vendor_fallback" && -f "${PROJECT_ROOT}/${vendor_fallback}" ]] && { echo "${PROJECT_ROOT}/${vendor_fallback}"; return 0; }
 
-    echo ""
+  echo ""
 }
 export -f resolve_config
 
@@ -148,7 +148,7 @@ export PHPUNIT_CONFIG="${PHPUNIT_CONFIG:-}"
 _phpstan_vendor_default="vendor/zairakai/laravel-dev-tools/config/library.neon"
 # Use if/then to avoid set -e treating false return from is_laravel_app as an error
 if is_laravel_app; then
-    _phpstan_vendor_default="vendor/zairakai/laravel-dev-tools/config/app.neon"
+  _phpstan_vendor_default="vendor/zairakai/laravel-dev-tools/config/app.neon"
 fi
 PHPSTAN_CONFIG=$(resolve_config "phpstan-local.neon")
 [[ -z "$PHPSTAN_CONFIG" ]] && PHPSTAN_CONFIG=$(resolve_config "phpstan.neon" "$_phpstan_vendor_default")
@@ -165,13 +165,13 @@ PINT_CONFIG=$(resolve_config "pint.json" "vendor/zairakai/laravel-dev-tools/conf
 export PINT_CONFIG="${PINT_CONFIG:-}"
 
 build_pint_config() {
-    local laravel_layer="${PROJECT_ROOT}/vendor/zairakai/laravel-dev-tools/config/pint.json"
-    local layers=()
+  local laravel_layer="${PROJECT_ROOT}/vendor/zairakai/laravel-dev-tools/config/pint.json"
+  local layers=()
 
-    [[ -f "$laravel_layer" ]] && layers+=("$laravel_layer")
-    [[ -n "$PINT_CONFIG" && "$PINT_CONFIG" != "$laravel_layer" ]] && layers+=("$PINT_CONFIG")
+  [[ -f "$laravel_layer" ]] && layers+=("$laravel_layer")
+  [[ -n "$PINT_CONFIG" && "$PINT_CONFIG" != "$laravel_layer" ]] && layers+=("$PINT_CONFIG")
 
-    php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "${layers[@]}"
+  php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "${layers[@]}"
 }
 export -f build_pint_config
 
@@ -234,13 +234,13 @@ get_dirty_php_files() { [[ "$HAS_GIT" == "true" ]] && git diff --name-only --dif
 ensure_dir()          { [[ ! -d "$1" ]] && mkdir -p "$1" && log_step "Created directory: $1" || true; }
 
 require_package() {
-    local name="$1"; local path="$2"; local script_name="${3:-this script}"
-    [[ -f "$path" ]] || { log_error "Required package '$name' not installed"; echo -e "${YELLOW}Required by $script_name${NC}\n${CYAN}Install with:\n  ${GREEN}composer require --dev $name${NC}\n"; return 1; }
+  local name="$1"; local path="$2"; local script_name="${3:-this script}"
+  [[ -f "$path" ]] || { log_error "Required package '$name' not installed"; echo -e "${YELLOW}Required by $script_name${NC}\n${CYAN}Install with:\n  ${GREEN}composer require --dev $name${NC}\n"; return 1; }
 }
 
 check_optional_package() {
-    local name="$1"; local path="$2"; local feature="${3:-this feature}"
-    [[ -f "$path" ]] || { log_warning "Skipping $feature (package not installed)"; echo -e "${YELLOW}$feature requires $name${NC}\n${CYAN}Install with:\n  ${GREEN}composer require --dev $name${NC}\n"; return 1; }
+  local name="$1"; local path="$2"; local feature="${3:-this feature}"
+  [[ -f "$path" ]] || { log_warning "Skipping $feature (package not installed)"; echo -e "${YELLOW}$feature requires $name${NC}\n${CYAN}Install with:\n  ${GREEN}composer require --dev $name${NC}\n"; return 1; }
 }
 
 # ERROR COUNTER PATTERN
@@ -251,37 +251,37 @@ increment_error_counter() { ERROR_COUNT=$((ERROR_COUNT + 1)); }
 get_error_count()         { echo "$ERROR_COUNT"; }
 
 exit_with_error_count() {
-    local name="${1:-Checks}"
-    if [[ $ERROR_COUNT -eq 0 ]]; then log_header "✅ All ${name} Passed"; return 0; else log_header "❌ ${ERROR_COUNT} ${name} Failed"; return 1; fi
+  local name="${1:-Checks}"
+  if [[ $ERROR_COUNT -eq 0 ]]; then log_header "✅ All ${name} Passed"; return 0; else log_header "❌ ${ERROR_COUNT} ${name} Failed"; return 1; fi
 }
 
 run_check() {
-    local name="$1"; local cmd="$2"
-    log_info "Running: ${name}"
-    eval "$cmd" && log_success "${name} passed" || { log_error "${name} failed"; increment_error_counter; return 1; }
+  local name="$1"; local cmd="$2"
+  log_info "Running: ${name}"
+  eval "$cmd" && log_success "${name} passed" || { log_error "${name} failed"; increment_error_counter; return 1; }
 }
 
 # BACKUP & FILE HELPERS
 # ================
 BACKUP_DIR=""
 backup_file() {
-    local file="$1"; local base="${2:-${PROJECT_ROOT}/.dev-tools-backup}"
-    [[ ! -f "$file" || -L "$file" ]] && return 1
-    [[ -z "$BACKUP_DIR" ]] && BACKUP_DIR="${base}/$(date +%Y%m%d-%H%M%S)" && mkdir -p "$BACKUP_DIR"
-    local rel="${file#"${PROJECT_ROOT}"/}"; local dest="${BACKUP_DIR}/${rel}"
-    mkdir -p "$(dirname "$dest")"
-    cp "$file" "$dest" 2>/dev/null
+  local file="$1"; local base="${2:-${PROJECT_ROOT}/.dev-tools-backup}"
+  [[ ! -f "$file" || -L "$file" ]] && return 1
+  [[ -z "$BACKUP_DIR" ]] && BACKUP_DIR="${base}/$(date +%Y%m%d-%H%M%S)" && mkdir -p "$BACKUP_DIR"
+  local rel="${file#"${PROJECT_ROOT}"/}"; local dest="${BACKUP_DIR}/${rel}"
+  mkdir -p "$(dirname "$dest")"
+  cp "$file" "$dest" 2>/dev/null
 }
 
 file_hash() {
-    local file="$1"
-    if command_exists sha256sum; then
-        sha256sum "$file" | cut -d' ' -f1
-    elif command_exists shasum; then
-        shasum -a 256 "$file" | cut -d' ' -f1
-    else
-        echo ""
-    fi
+  local file="$1"
+  if command_exists sha256sum; then
+    sha256sum "$file" | cut -d' ' -f1
+  elif command_exists shasum; then
+    shasum -a 256 "$file" | cut -d' ' -f1
+  else
+    echo ""
+  fi
 }
 
 cleanup_temp_files() { true; }
@@ -293,6 +293,6 @@ cd "$PROJECT_ROOT"
 
 # Check if vendor directory exists
 if [[ ! -d "vendor" ]]; then
-    log_error "Dependencies not installed. Run: composer install"
-    exit 1
+  log_error "Dependencies not installed. Run: composer install"
+  exit 1
 fi

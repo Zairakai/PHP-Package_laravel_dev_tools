@@ -19,37 +19,37 @@ ensure_dir "build/reports"
 #      e.g. "outdatedIgnore": ["orchestra/testbench"]
 # ──────────────────────────────────────────────────────────────────────────────
 build_jq_filter() {
-    local ignore_csv="${OUTDATED_IGNORE:-}"
-    local composer_json="${PROJECT_ROOT}/composer.json"
-    local from_composer=""
+  local ignore_csv="${OUTDATED_IGNORE:-}"
+  local composer_json="${PROJECT_ROOT}/composer.json"
+  local from_composer=""
 
-    if command_exists jq && [[ -f "$composer_json" ]]; then
-        from_composer="$(jq -r '(.outdatedIgnore // []) | join(",")' "$composer_json" 2>/dev/null || true)"
-    fi
+  if command_exists jq && [[ -f "$composer_json" ]]; then
+    from_composer="$(jq -r '(.outdatedIgnore // []) | join(",")' "$composer_json" 2>/dev/null || true)"
+  fi
 
-    # Merge both sources
-    local combined="${ignore_csv}${ignore_csv:+,}${from_composer}"
+  # Merge both sources
+  local combined="${ignore_csv}${ignore_csv:+,}${from_composer}"
 
-    if [[ -z "$combined" ]]; then
-        echo "."
-        return
-    fi
+  if [[ -z "$combined" ]]; then
+    echo "."
+    return
+  fi
 
-    # Build: .installed |= map(select(.name != "pkg1" and .name != "pkg2"))
-    local conditions=""
-    IFS=',' read -ra packages <<< "$combined"
-    for pkg in "${packages[@]}"; do
-        pkg="${pkg// /}"  # trim spaces
-        [[ -z "$pkg" ]] && continue
-        conditions+="${conditions:+ and }.name != \"${pkg}\""
-    done
+  # Build: .installed |= map(select(.name != "pkg1" and .name != "pkg2"))
+  local conditions=""
+  IFS=',' read -ra packages <<< "$combined"
+  for pkg in "${packages[@]}"; do
+    pkg="${pkg// /}"  # trim spaces
+    [[ -z "$pkg" ]] && continue
+    conditions+="${conditions:+ and }.name != \"${pkg}\""
+  done
 
-    if [[ -z "$conditions" ]]; then
-        echo "."
-        return
-    fi
+  if [[ -z "$conditions" ]]; then
+    echo "."
+    return
+  fi
 
-    echo ".installed |= map(select(${conditions}))"
+  echo ".installed |= map(select(${conditions}))"
 }
 
 log_step "Checking direct dependencies for outdated packages..."
@@ -59,16 +59,16 @@ composer outdated --direct --format=json > build/reports/outdated.json 2>/dev/nu
 JQ_FILTER="$(build_jq_filter)"
 
 if command_exists jq && [[ "$JQ_FILTER" != "." ]]; then
-    log_step "Ignoring: ${OUTDATED_IGNORE:-}$(jq -r '(.outdatedIgnore // []) | join(", ")' "${PROJECT_ROOT}/composer.json" 2>/dev/null || true)"
-    filtered="$(jq "${JQ_FILTER}" build/reports/outdated.json 2>/dev/null || cat build/reports/outdated.json)"
-    echo "$filtered" > build/reports/outdated.json
+  log_step "Ignoring: ${OUTDATED_IGNORE:-}$(jq -r '(.outdatedIgnore // []) | join(", ")' "${PROJECT_ROOT}/composer.json" 2>/dev/null || true)"
+  filtered="$(jq "${JQ_FILTER}" build/reports/outdated.json 2>/dev/null || cat build/reports/outdated.json)"
+  echo "$filtered" > build/reports/outdated.json
 fi
 
 count="$(jq '.installed | length' build/reports/outdated.json 2>/dev/null || echo "0")"
 
 if [[ "$count" -eq 0 ]]; then
-    log_success "All dependencies are up to date"
-    exit 0
+  log_success "All dependencies are up to date"
+  exit 0
 fi
 
 log_error "Outdated packages found:"

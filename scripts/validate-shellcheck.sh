@@ -23,11 +23,11 @@ log_info "Severity: ${SEVERITY}"
 log_info "Format: ${FORMAT}"
 
 if ! command_exists "shellcheck"; then
-    log_error "ShellCheck not found. Please install shellcheck."
-    log_info "  Alpine: apk add shellcheck"
-    log_info "  Debian/Ubuntu: apt-get install shellcheck"
-    log_info "  macOS: brew install shellcheck"
-    exit 1
+  log_error "ShellCheck not found. Please install shellcheck."
+  log_info "  Alpine: apk add shellcheck"
+  log_info "  Debian/Ubuntu: apt-get install shellcheck"
+  log_info "  macOS: brew install shellcheck"
+  exit 1
 fi
 
 SHELLCHECK_VERSION="$(shellcheck --version | grep "version:" | awk '{print $2}')"
@@ -41,8 +41,8 @@ SCRIPT_COUNT=${#SHELL_SCRIPTS[@]}
 log_info "Found ${SCRIPT_COUNT} shell scripts"
 
 if [[ ${SCRIPT_COUNT} -eq 0 ]]; then
-    log_warning "No shell scripts found"
-    exit 0
+  log_warning "No shell scripts found"
+  exit 0
 fi
 
 log_info "→ Running ShellCheck validation…"
@@ -51,22 +51,22 @@ FAILED=0
 TOTAL=0
 
 for script in "${SHELL_SCRIPTS[@]}"; do
-    TOTAL=$((TOTAL + 1))
+  TOTAL=$((TOTAL + 1))
 
-    if shellcheck --severity="${SEVERITY}" --format="${FORMAT}" "${script}"; then
-        :
-    else
-        log_error "  ✗ ${script} — ShellCheck failed"
-        FAILED=$((FAILED + 1))
-    fi
+  if shellcheck --severity="${SEVERITY}" --format="${FORMAT}" "${script}"; then
+    :
+  else
+    log_error "  ✗ ${script} — ShellCheck failed"
+    FAILED=$((FAILED + 1))
+  fi
 done
 
 log_header "ShellCheck Validation Summary"
 
 if [[ ${FAILED} -eq 0 ]]; then
-    log_success "All ${TOTAL} scripts passed ShellCheck validation"
-    exit 0
+  log_success "All ${TOTAL} scripts passed ShellCheck validation"
+  exit 0
 else
-    log_error "${FAILED}/${TOTAL} scripts failed ShellCheck validation"
-    exit 1
+  log_error "${FAILED}/${TOTAL} scripts failed ShellCheck validation"
+  exit 1
 fi

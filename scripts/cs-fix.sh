@@ -19,30 +19,30 @@ PINT_CONFIG=$(build_pint_config)
 PINT_ARGS=()
 
 if [[ -n "$PINT_CONFIG" ]]; then
-    log_step "Using configuration: ${PINT_CONFIG#"$PROJECT_ROOT"/}"
-    PINT_ARGS+=("--config=$PINT_CONFIG")
+  log_step "Using configuration: ${PINT_CONFIG#"$PROJECT_ROOT"/}"
+  PINT_ARGS+=("--config=$PINT_CONFIG")
 else
-    log_step "Using default Pint configuration"
+  log_step "Using default Pint configuration"
 fi
 
 # Determine what to fix
 if [[ "$HAS_GIT" == "true" ]]; then
-    # Git available: fix dirty files only
-    DIRTY_FILES=$(get_dirty_php_files)
+  # Git available: fix dirty files only
+  DIRTY_FILES=$(get_dirty_php_files)
 
-    if [[ -n "$DIRTY_FILES" ]]; then
-        FILE_COUNT=$(echo "$DIRTY_FILES" | wc -l | tr -d ' ')
-        log_step "Fixing $FILE_COUNT dirty file(s)"
+  if [[ -n "$DIRTY_FILES" ]]; then
+    FILE_COUNT=$(echo "$DIRTY_FILES" | wc -l | tr -d ' ')
+    log_step "Fixing $FILE_COUNT dirty file(s)"
 
-        # Use --dirty flag
-        PINT_ARGS+=("--dirty")
-    else
-        log_warning "No dirty PHP files found"
-        log_step "Fixing all files"
-    fi
-else
-    # No git: fix everything
+    # Use --dirty flag
+    PINT_ARGS+=("--dirty")
+  else
+    log_warning "No dirty PHP files found"
     log_step "Fixing all files"
+  fi
+else
+  # No git: fix everything
+  log_step "Fixing all files"
 fi
 
 # Run Pint

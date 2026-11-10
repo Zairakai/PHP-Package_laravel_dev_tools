@@ -27,30 +27,30 @@ echo -e "${CYAN}Available Tools:${NC}"
 echo ""
 echo -e "${CYAN}Coverage Drivers:${NC}"
 if has_coverage_driver; then
-    DRIVER=$(php -m 2>/dev/null | grep -E '(xdebug|pcov)' | head -n1)
-    echo "  ✅ $DRIVER available"
+  DRIVER=$(php -m 2>/dev/null | grep -E '(xdebug|pcov)' | head -n1)
+  echo "  ✅ $DRIVER available"
 else
-    echo "  ⚠️  No coverage driver (Xdebug/PCOV)"
+  echo "  ⚠️  No coverage driver (Xdebug/PCOV)"
 fi
 
 echo ""
 echo -e "${CYAN}Git Repository:${NC}"
 if [[ "$HAS_GIT" == "true" ]]; then
-    echo "  ✅ Git repository detected"
-    BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-    echo "  → Branch: $BRANCH"
+  echo "  ✅ Git repository detected"
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  echo "  → Branch: $BRANCH"
 else
-    echo "  ⚠️  Not a Git repository"
+  echo "  ⚠️  Not a Git repository"
 fi
 
 echo ""
 echo -e "${CYAN}CI/CD Detection:${NC}"
 if [[ "$IS_CI" == "true" ]]; then
-    echo "  ✅ Running in CI environment"
-    [[ "$IS_GITLAB_CI" == "true" ]] && echo "  → Platform: GitLab CI"
-    [[ "$IS_GITHUB_ACTIONS" == "true" ]] && echo "  → Platform: GitHub Actions"
+  echo "  ✅ Running in CI environment"
+  [[ "$IS_GITLAB_CI" == "true" ]] && echo "  → Platform: GitLab CI"
+  [[ "$IS_GITHUB_ACTIONS" == "true" ]] && echo "  → Platform: GitHub Actions"
 else
-    echo "  ℹ️  Local development environment"
+  echo "  ℹ️  Local development environment"
 fi
 
 echo ""
@@ -58,58 +58,58 @@ echo -e "${CYAN}Configuration Files (resolved):${NC}"
 
 # PHPUnit
 if [[ -n "$PHPUNIT_CONFIG" ]] && [[ -f "$PHPUNIT_CONFIG" ]]; then
-    RELATIVE_PATH="${PHPUNIT_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ PHPUnit: $RELATIVE_PATH"
+  RELATIVE_PATH="${PHPUNIT_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ PHPUnit: $RELATIVE_PATH"
 else
-    echo "  ⚠️  PHPUnit: No configuration found"
+  echo "  ⚠️  PHPUnit: No configuration found"
 fi
 
 # PHPStan
 if [[ -n "$PHPSTAN_CONFIG" ]] && [[ -f "$PHPSTAN_CONFIG" ]]; then
-    RELATIVE_PATH="${PHPSTAN_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ PHPStan: $RELATIVE_PATH"
+  RELATIVE_PATH="${PHPSTAN_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ PHPStan: $RELATIVE_PATH"
 else
-    echo "  ⚠️  PHPStan: No configuration found"
+  echo "  ⚠️  PHPStan: No configuration found"
 fi
 
 # Pint
 if [[ -n "$PINT_CONFIG" ]] && [[ -f "$PINT_CONFIG" ]]; then
-    RELATIVE_PATH="${PINT_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ Pint: $RELATIVE_PATH"
+  RELATIVE_PATH="${PINT_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ Pint: $RELATIVE_PATH"
 else
-    echo "  ℹ️  Pint: Using defaults (no config file)"
+  echo "  ℹ️  Pint: Using defaults (no config file)"
 fi
 
 # Rector
 if [[ -n "$RECTOR_CONFIG" ]] && [[ -f "$RECTOR_CONFIG" ]]; then
-    RELATIVE_PATH="${RECTOR_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ Rector: $RELATIVE_PATH"
+  RELATIVE_PATH="${RECTOR_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ Rector: $RELATIVE_PATH"
 else
-    echo "  ⚠️  Rector: No configuration found"
+  echo "  ⚠️  Rector: No configuration found"
 fi
 
 # PHPMetrics (optional - works without config)
 if [[ -n "${PHPMETRICS_CONFIG:-}" ]] && [[ -f "$PHPMETRICS_CONFIG" ]]; then
-    RELATIVE_PATH="${PHPMETRICS_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ PHPMetrics: $RELATIVE_PATH"
+  RELATIVE_PATH="${PHPMETRICS_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ PHPMetrics: $RELATIVE_PATH"
 else
-    echo "  ℹ️  PHPMetrics: Using defaults (no config file)"
+  echo "  ℹ️  PHPMetrics: Using defaults (no config file)"
 fi
 
 # PHPInsights
 if [[ -n "$INSIGHTS_CONFIG" ]] && [[ -f "$INSIGHTS_CONFIG" ]]; then
-    RELATIVE_PATH="${INSIGHTS_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ PHPInsights: $RELATIVE_PATH"
+  RELATIVE_PATH="${INSIGHTS_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ PHPInsights: $RELATIVE_PATH"
 else
-    echo "  ℹ️  PHPInsights: Using defaults (no config file)"
+  echo "  ℹ️  PHPInsights: Using defaults (no config file)"
 fi
 
 # Markdownlint
 if [[ -n "$MARKDOWNLINT_CONFIG" ]] && [[ -f "$MARKDOWNLINT_CONFIG" ]]; then
-    RELATIVE_PATH="${MARKDOWNLINT_CONFIG#"$PROJECT_ROOT"/}"
-    echo "  ✅ Markdownlint: $RELATIVE_PATH"
+  RELATIVE_PATH="${MARKDOWNLINT_CONFIG#"$PROJECT_ROOT"/}"
+  echo "  ✅ Markdownlint: $RELATIVE_PATH"
 else
-    echo "  ⚠️  Markdownlint: No configuration found"
+  echo "  ⚠️  Markdownlint: No configuration found"
 fi
 
 echo ""

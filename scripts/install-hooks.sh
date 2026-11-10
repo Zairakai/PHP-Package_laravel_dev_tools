@@ -28,55 +28,55 @@ HOOKS_PATH="vendor/stanislas-poisson/php-dev-tools/hooks"
 # ============================================================================
 
 install_hooks() {
-    log_header "📦 Installing Git Hooks"
+  log_header "📦 Installing Git Hooks"
 
-    if [[ ! -d "${PROJECT_ROOT}/.git" ]] && [[ ! -f "${PROJECT_ROOT}/.git" ]]; then
-        log_error "Not a git repository"
-        log_info "Git hooks can only be installed in a git repository"
-        exit 1
-    fi
+  if [[ ! -d "${PROJECT_ROOT}/.git" ]] && [[ ! -f "${PROJECT_ROOT}/.git" ]]; then
+    log_error "Not a git repository"
+    log_info "Git hooks can only be installed in a git repository"
+    exit 1
+  fi
 
-    if [[ ! -d "${PROJECT_ROOT}/${HOOKS_PATH}" ]]; then
-        log_error "Hooks not found: ${HOOKS_PATH}"
-        log_info "Install the dependencies first: composer install"
-        exit 1
-    fi
+  if [[ ! -d "${PROJECT_ROOT}/${HOOKS_PATH}" ]]; then
+    log_error "Hooks not found: ${HOOKS_PATH}"
+    log_info "Install the dependencies first: composer install"
+    exit 1
+  fi
 
-    git -C "$PROJECT_ROOT" config core.hooksPath "$HOOKS_PATH"
-    log_success "Configured: git config core.hooksPath ${HOOKS_PATH}"
+  git -C "$PROJECT_ROOT" config core.hooksPath "$HOOKS_PATH"
+  log_success "Configured: git config core.hooksPath ${HOOKS_PATH}"
 
-    echo ""
-    log_info "Active hooks:"
-    echo -e "  ${GREEN}✓${NC} commit-msg ${YELLOW}→${NC} Validate the commit message format"
-    echo -e "  ${GREEN}✓${NC} prepare-commit-msg ${YELLOW}→${NC} Auto-prefix the ticket number from the branch"
-    echo -e "  ${GREEN}✓${NC} pre-commit ${YELLOW}→${NC} composer quality:fast"
-    echo -e "  ${GREEN}✓${NC} pre-push ${YELLOW}→${NC} composer quality"
+  echo ""
+  log_info "Active hooks:"
+  echo -e "  ${GREEN}✓${NC} commit-msg ${YELLOW}→${NC} Validate the commit message format"
+  echo -e "  ${GREEN}✓${NC} prepare-commit-msg ${YELLOW}→${NC} Auto-prefix the ticket number from the branch"
+  echo -e "  ${GREEN}✓${NC} pre-commit ${YELLOW}→${NC} composer quality:fast"
+  echo -e "  ${GREEN}✓${NC} pre-push ${YELLOW}→${NC} composer quality"
 
-    echo ""
-    log_info "To bypass hooks (emergency only):"
-    echo -e "  ${CYAN}git commit --no-verify${NC}"
-    echo ""
+  echo ""
+  log_info "To bypass hooks (emergency only):"
+  echo -e "  ${CYAN}git commit --no-verify${NC}"
+  echo ""
 }
 
 remove_hooks() {
-    log_header "🗑️  Removing Git Hooks"
+  log_header "🗑️  Removing Git Hooks"
 
-    if [[ ! -d "${PROJECT_ROOT}/.git" ]] && [[ ! -f "${PROJECT_ROOT}/.git" ]]; then
-        log_error "Not a git repository"
-        exit 1
-    fi
+  if [[ ! -d "${PROJECT_ROOT}/.git" ]] && [[ ! -f "${PROJECT_ROOT}/.git" ]]; then
+    log_error "Not a git repository"
+    exit 1
+  fi
 
-    local current
-    current="$(git -C "$PROJECT_ROOT" config --get core.hooksPath || true)"
+  local current
+  current="$(git -C "$PROJECT_ROOT" config --get core.hooksPath || true)"
 
-    if [[ "$current" != "$HOOKS_PATH" ]]; then
-        log_info "The hooks of php-dev-tools are not active (core.hooksPath: ${current:-not set})"
-        exit 0
-    fi
+  if [[ "$current" != "$HOOKS_PATH" ]]; then
+    log_info "The hooks of php-dev-tools are not active (core.hooksPath: ${current:-not set})"
+    exit 0
+  fi
 
-    git -C "$PROJECT_ROOT" config --unset core.hooksPath
-    log_success "Removed: git config core.hooksPath"
-    echo ""
+  git -C "$PROJECT_ROOT" config --unset core.hooksPath
+  log_success "Removed: git config core.hooksPath"
+  echo ""
 }
 
 # ============================================================================
@@ -84,10 +84,10 @@ remove_hooks() {
 # ============================================================================
 
 case "${1:-install}" in
-    --remove|-r)
-        remove_hooks
-        ;;
-    --install|-i|install|*)
-        install_hooks
-        ;;
+  --remove|-r)
+    remove_hooks
+    ;;
+  --install|-i|install|*)
+    install_hooks
+    ;;
 esac
