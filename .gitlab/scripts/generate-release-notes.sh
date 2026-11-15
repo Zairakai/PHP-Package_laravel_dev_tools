@@ -22,13 +22,27 @@ fetch_history() {
 }
 
 # The version tags, newest first, with or without the old "v" prefix (v2.2.0
-# then 2.3.0). A pre-release (1.0.0-rc.1)
-# comes before its release: sort reads the "~" before anything else.
+# then 2.3.0). The order does not rely on "sort -V": the busybox of the images
+# of the CI sorts a pre-release (1.0.0-rc.1) after its release. The key of a
+# tag is its three numbers, padded, then "1" for a release, which comes before
+# its pre-releases ("0" and the pre-release).
 version_tags() {
   git tag \
     | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+(-.+)?$' \
-    | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+)-(.+)$/\1~\2 &/; t; s/^v?(.*)$/\1 &/' \
-    | sort -k1,1 -Vr \
+    | awk '{
+      version = $0
+      sub(/^v/, "", version)
+      pre = ""
+      dash = index(version, "-")
+      if (dash > 0) {
+        pre = substr(version, dash + 1)
+        version = substr(version, 1, dash - 1)
+      }
+      split(version, number, ".")
+      printf "%010d.%010d.%010d.%s %s\n", number[1], number[2], number[3], \
+        (pre == "" ? "1" : "0" pre), $0
+    }' \
+    | sort -r \
     | cut -d' ' -f2 \
     || true
 }
@@ -203,7 +217,7 @@ ISSUES=$({
   git log "${RANGE}" --pretty=format:"%b" --no-merges \
     | grep -oE "(Closes|Fixes|Resolves) #[0-9]+(, #[0-9]+)*" \
     | grep -oE "#[0-9]+" || true
-} | sort -uV)
+} | sed 's/^#//' | sort -nu | sed 's/^/#/')
 
 if [ -n "${ISSUES}" ]; then
   output "The issues of this release:"
