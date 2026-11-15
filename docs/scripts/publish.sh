@@ -79,8 +79,9 @@ done
 for tag in "${versions[@]}"; do
   echo "== documentation of $tag"
   mkdir -p "$work/$tag"
+  # Not git archive: it leaves out the docs, which .gitattributes marks with export-ignore.
   # shellcheck disable=SC2086
-  git archive "$tag" $archive_paths | tar -x -C "$work/$tag"
+  bash docs/scripts/export-tree.sh "$tag" "$work/$tag" $archive_paths
 
   # What built it: the tag, and this pipeline.
   export CI_COMMIT_REF_NAME="$tag"

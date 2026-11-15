@@ -31,7 +31,7 @@ else
 NPM_DIRECTORY_TOOLS_AVAILABLE := false
 endif
 
-# ---- Help (single — laravel help.mk greps full MAKEFILE_LIST automatically) ----
+# ---- Help (single - laravel help.mk greps full MAKEFILE_LIST automatically) ----
 # One help target is enough: it greps MAKEFILE_LIST which contains every
 # included .mk file from both toolchains.
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)help.mk
@@ -43,7 +43,7 @@ include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)shellcheck.mk
 # ---- Code Modernization (PHP) ----
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)rector.mk
 
-# ---- Code Style — PHP then JS, grouped under one "Code Style" section ----
+# ---- Code Style - PHP then JS, grouped under one "Code Style" section ----
 # laravel/code-style.mk prints the "🎨 Code Style" section header (pint).
 # npm/code-style.mk has the same header → deduped by help awk → eslint/prettier/
 # stylelint appear immediately after pint in the same section. Intentional.
@@ -87,7 +87,7 @@ endif
 
 # ---- JS extensions: quality/test aggregator append + JS-specific targets ----
 # Included last so "JS Testing" appears at the end of make help.
-# fullstack-js.mk only enters MAKEFILE_LIST when npm is present — the grep
+# fullstack-js.mk only enters MAKEFILE_LIST when npm is present - the grep
 # in help.mk only sees its ## headers when it is actually included.
 ifneq ($(NPM_DIRECTORY_TOOLS_AVAILABLE),false)
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)fullstack-js.mk

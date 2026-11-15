@@ -2,10 +2,10 @@
 # For packages that consume laravel-dev-tools
 
 includes:
-    - base.neon
+  - phpstan.neon
 
 parameters:
-    paths:
-        - ../../../../src
+  paths:
+    - ../../../../src
 
-    tmpDir: ../../../../build/phpstan
+  tmpDir: ../../../../build/phpstan

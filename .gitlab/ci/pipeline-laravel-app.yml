@@ -1,6 +1,5 @@
-# ================================
-# PIPELINE TEMPLATE — Application Laravel
-# ================================
+# PIPELINE TEMPLATE - Application Laravel
+# ================
 # Extends pipeline-php-package.yml for Laravel applications (not packages).
 # Overrides the php:test job (migrate + seed) and disables publish/release.
 #
@@ -14,16 +13,14 @@
 #   variables:
 #     CACHE_KEY: "my-app"
 #     APP_ENV: "testing"
-# ================================
 
 include:
   - project: "zairakai/php-packages/laravel-dev-tools"
     ref: main
     file: ".gitlab/ci/pipeline-php-package.yml"
 
-# ================================
-# STAGES — deploy added, publish/release removed
-# ================================
+# STAGES - deploy added, publish/release removed
+# ================
 stages:
   - security
   - install
@@ -33,9 +30,8 @@ stages:
   - deploy
   - metrics
 
-# ================================
 # LARAVEL VARIABLES
-# ================================
+# ================
 variables:
   APP_ENV: "testing"
   APP_DEBUG: "false"
@@ -45,9 +41,8 @@ variables:
   QUEUE_CONNECTION: "sync"
   SESSION_DRIVER: "array"
 
-# ================================
-# INSTALL — Override: bootstrap .env before composer install
-# ================================
+# INSTALL - Override: bootstrap .env before composer install
+# ================
 # Without .env, artisan package:discover (triggered by --optimize-autoloader)
 # cannot resolve the Blade cache path and fails with "Please provide a valid cache path".
 php:install:
@@ -55,9 +50,8 @@ php:install:
     - git config --global --add safe.directory '*'
     - cp .env.testing .env 2>/dev/null || cp .env.example .env
 
-# ================================
-# TEST — Overrides with migrate + seed
-# ================================
+# TEST - Overrides with migrate + seed
+# ================
 php:test:
   before_script:
     - mkdir -p build/logs build/coverage
@@ -68,9 +62,8 @@ php:test:
     - git config --global user.name "GitLab CI"
     - git config --global --add safe.directory '*'
 
-# ================================
-# PUBLISH — Disabled for apps
-# ================================
+# PUBLISH - Disabled for apps
+# ================
 php:publish:
   rules:
     - when: never
@@ -79,9 +72,8 @@ php:release:
   rules:
     - when: never
 
-# ================================
-# DEPLOY — Commented examples, adapt to your setup
-# ================================
+# DEPLOY - Commented examples, adapt to your setup
+# ================
 
 # ── Laravel Forge ─────────────────────────────────────────────────────────
 # deploy:staging:

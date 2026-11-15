@@ -1,0 +1,3 @@
+{
+  "extends": "./vendor/zairakai/laravel-dev-tools/config/.markdownlint.json"
+}

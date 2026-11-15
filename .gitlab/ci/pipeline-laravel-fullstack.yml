@@ -1,6 +1,5 @@
-# ================================
-# PIPELINE TEMPLATE — Laravel Full-Stack (PHP + JS)
-# ================================
+# PIPELINE TEMPLATE - Laravel Full-Stack (PHP + JS)
+# ================
 # Single include point for fullstack Laravel apps.
 # Mirrors the fullstack.mk approach: one file, both toolchains.
 #
@@ -22,24 +21,22 @@
 #
 #   variables:
 #     CACHE_KEY: "my-app-v1"
-# ================================
 
 include:
-  # PHP side — all Laravel CI jobs (install, validate, quality, test, deploy, metrics)
+  # PHP side - all Laravel CI jobs (install, validate, quality, test, deploy, metrics)
   - project: "zairakai/php-packages/laravel-dev-tools"
     ref: main
     file: ".gitlab/ci/pipeline-laravel-app.yml"
-  # JS side — pipeline-js-app.yml includes pipeline-js-package.yml + disables build/publish/release
+  # JS side - pipeline-js-app.yml includes pipeline-js-package.yml + disables build/publish/release
   - project: "zairakai/npm-packages/js-dev-tools"
     ref: v1.2.4
     file: ".gitlab/ci/pipeline-js-app.yml"
 
-# ================================
-# STAGES — unified ordered list
+# STAGES - unified ordered list
+# ================
 # build/publish/release are kept for jobs disabled via rules: when: never
-# in pipeline-laravel-app.yml and pipeline-js-app.yml — GitLab requires all
+# in pipeline-laravel-app.yml and pipeline-js-app.yml - GitLab requires all
 # referenced stages to exist even for never-running jobs.
-# ================================
 stages:
   - security
   - install
@@ -52,9 +49,8 @@ stages:
   - deploy
   - metrics
 
-# ================================
 # FULLSTACK VARIABLES
-# ================================
+# ================
 variables:
   # Combined git clean: preserve both PHP vendor/ and JS node_modules/
   GIT_CLEAN_FLAGS: "-ffdx -e vendor/ -e .composer-cache/ -e node_modules/ -e .npm/"

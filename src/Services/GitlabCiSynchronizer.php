@@ -33,7 +33,7 @@ final class GitlabCiSynchronizer
     private const string PACKAGE_NAME     = 'zairakai/laravel-dev-tools';
 
     /**
-     * Optional version resolver — injectable for testing.
+     * Optional version resolver - injectable for testing.
      *
      * When null, resolves via InstalledVersions::getPrettyVersion().
      * In tests, inject a closure that returns a fixed version string
@@ -75,7 +75,11 @@ final class GitlabCiSynchronizer
             return;
         }
 
-        $this->synchronizeExistingFile($path, $installedVersion, $autoFix);
+        $this->synchronizeExistingFile(
+            $path,
+            $installedVersion,
+            $autoFix,
+        );
     }
 
     /**
@@ -88,10 +92,14 @@ final class GitlabCiSynchronizer
         string $installedVersion,
     ): void {
         $pattern = '/(\bref:\s*)[\'"]?' . preg_quote($currentRef, '/') . '[\'"]?/';
-        $updated = preg_replace($pattern, '${1}' . $installedVersion, $content);
+        $updated = preg_replace(
+            $pattern,
+            '${1}' . $installedVersion,
+            $content,
+        );
 
         // @codeCoverageIgnoreStart
-        // preg_replace() returns null only on internal PCRE error — not reproducible in tests
+        // preg_replace() returns null only on internal PCRE error - not reproducible in tests
         if (null === $updated || $updated === $content) {
             $this->warnOutOfSync($currentRef, $installedVersion);
 
@@ -120,9 +128,8 @@ final class GitlabCiSynchronizer
         ));
     }
 
-    // =========================================================================
-    // Private — YAML parsing (line-by-line, no external dependency)
-    // =========================================================================
+    // Private - YAML parsing (line-by-line, no external dependency)
+    // ================
 
     /**
      * Check whether the YAML content contains a laravel-dev-tools include block.
@@ -158,7 +165,7 @@ final class GitlabCiSynchronizer
 
         // @codeCoverageIgnoreStart
         // InstalledVersions path is only reached in production (no resolver injected).
-        // Tests always inject a resolver — covering this branch would require a
+        // Tests always inject a resolver - covering this branch would require a
         // test without resolver that depends on the real installed version string,
         // making it environment-sensitive and brittle.
         try {
@@ -175,8 +182,8 @@ final class GitlabCiSynchronizer
      * Iterate lines to locate the ref: value inside the dev-tools include block.
      *
      * State machine with two flags:
-     *   $inIncludeBlock — true while parsing an include: top-level block
-     *   $foundProject   — true once the dev-tools project: line is seen
+     *   $inIncludeBlock - true while parsing an include: top-level block
+     *   $foundProject   - true once the dev-tools project: line is seen
      *
      * Delegates guard checks to shouldSkipLine() to keep CC ≤ 5.
      *
@@ -196,7 +203,12 @@ final class GitlabCiSynchronizer
                 continue;
             }
 
-            if ($this->shouldSkipLine($line, $trimmed, $inIncludeBlock, $foundProject)) {
+            if ($this->shouldSkipLine(
+                $line,
+                $trimmed,
+                $inIncludeBlock,
+                $foundProject,
+            )) {
                 continue;
             }
 
@@ -220,9 +232,8 @@ final class GitlabCiSynchronizer
         return null;
     }
 
-    // =========================================================================
-    // Private — actions
-    // =========================================================================
+    // Private - actions
+    // ================
 
     /**
      * Log info when .gitlab-ci.yml is absent and offer template creation.
@@ -252,13 +263,17 @@ final class GitlabCiSynchronizer
      *
      * Warns (install mode) or applies a fix (update mode) when out of sync.
      */
-    private function handleRefSync(string $path, string $content, string $installedVersion, bool $autoFix): void
-    {
+    private function handleRefSync(
+        string $path,
+        string $content,
+        string $installedVersion,
+        bool $autoFix,
+    ): void {
         $currentRef = $this->extractRef($content);
 
         if (null === $currentRef) {
             $this->io->write(sprintf(
-                '<warning>dev-tools: Could not parse ref: in %s — please verify manually.</warning>',
+                '<warning>dev-tools: Could not parse ref: in %s - please verify manually.</warning>',
                 self::GITLAB_CI_FILENAME,
             ));
 
@@ -270,7 +285,12 @@ final class GitlabCiSynchronizer
         }
 
         if ($autoFix) {
-            $this->applyFix($path, $content, $currentRef, $installedVersion);
+            $this->applyFix(
+                $path,
+                $content,
+                $currentRef,
+                $installedVersion,
+            );
         }
         else {
             $this->warnOutOfSync($currentRef, $installedVersion);
@@ -281,13 +301,15 @@ final class GitlabCiSynchronizer
      * Determine if the consumer project is a Composer package (library or plugin)
      * rather than a Laravel application (project type).
      *
-     * Reads the project composer.json — presence of type: library or
+     * Reads the project composer.json - presence of type: library or
      * type: composer-plugin indicates a package context.
      */
     private function isPackageProject(): bool
     {
         $path    = $this->projectRoot . '/composer.json';
-        $content = file_exists($path) ? file_get_contents($path) : false;
+        $content = file_exists($path)
+            ? file_get_contents($path)
+            : false;
 
         if (false === $content) {
             return false;
@@ -297,7 +319,7 @@ final class GitlabCiSynchronizer
         $json = json_decode($content, true);
 
         // @codeCoverageIgnoreStart
-        // json_decode() returns null only when JSON is invalid — composer.json is always valid JSON in practice
+        // json_decode() returns null only when JSON is invalid - composer.json is always valid JSON in practice
         if (! is_array($json)) {
             return false;
         }
@@ -306,7 +328,14 @@ final class GitlabCiSynchronizer
 
         $type = $json['type'] ?? '';
 
-        return in_array($type, ['library', 'composer-plugin'], true);
+        return in_array(
+            $type,
+            [
+                'library',
+                'composer-plugin',
+            ],
+            true,
+        );
     }
 
     /**
@@ -319,23 +348,28 @@ final class GitlabCiSynchronizer
      */
     private function parseRefValue(string $refLine): ?string
     {
-        if (! preg_match('/^ref:\s*[\'"]?([^\s\'"]+)[\'"]?\s*$/', $refLine, $matches)) {
+        if (! preg_match(
+            '/^ref:\s*[\'"]?([^\s\'"]+)[\'"]?\s*$/',
+            $refLine,
+            $matches,
+        )) {
             return null;
         }
 
         $value = trim($matches[1]);
 
-        return '' !== $value ? $value : null;
+        return '' !== $value
+            ? $value
+            : null;
     }
 
-    // =========================================================================
-    // Private — version resolution
-    // =========================================================================
+    // Private - version resolution
+    // ================
 
     /**
      * Resolve the installed package version as a plain tag string (no v prefix).
      *
-     * Returns null when the version cannot be determined — e.g. when running
+     * Returns null when the version cannot be determined - e.g. when running
      * the plugin on the package itself during development.
      */
     private function resolveInstalledVersion(): ?string
@@ -365,7 +399,12 @@ final class GitlabCiSynchronizer
         bool &$inIncludeBlock,
         bool &$foundProject,
     ): bool {
-        if ($inIncludeBlock && '' !== $trimmed && ! str_starts_with($line, ' ') && ! str_starts_with($line, '-')) {
+        if (
+            $inIncludeBlock
+            && '' !== $trimmed
+            && ! str_starts_with($line, ' ')
+            && ! str_starts_with($line, '-')
+        ) {
             $inIncludeBlock = false;
             $foundProject   = false;
         }
@@ -373,9 +412,8 @@ final class GitlabCiSynchronizer
         return ! $inIncludeBlock;
     }
 
-    // =========================================================================
-    // Private — synchronization flow
-    // =========================================================================
+    // Private - synchronization flow
+    // ================
 
     /**
      * Handle synchronization for an existing .gitlab-ci.yml file.
@@ -383,8 +421,11 @@ final class GitlabCiSynchronizer
      * Reads the file and verifies it contains our CI template before
      * delegating ref comparison and fix logic to handleRefSync().
      */
-    private function synchronizeExistingFile(string $path, string $installedVersion, bool $autoFix): void
-    {
+    private function synchronizeExistingFile(
+        string $path,
+        string $installedVersion,
+        bool $autoFix,
+    ): void {
         $content = file_get_contents($path);
 
         // @codeCoverageIgnoreStart
@@ -399,7 +440,12 @@ final class GitlabCiSynchronizer
             return;
         }
 
-        $this->handleRefSync($path, $content, $installedVersion, $autoFix);
+        $this->handleRefSync(
+            $path,
+            $content,
+            $installedVersion,
+            $autoFix,
+        );
     }
 
     /**

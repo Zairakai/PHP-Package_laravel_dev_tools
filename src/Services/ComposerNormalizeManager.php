@@ -103,7 +103,10 @@ final readonly class ComposerNormalizeManager
             },
         );
 
-        if ($installed && $this->isComposerNormalizeInstalled($basePath)) {
+        if (
+            $installed
+            && $this->isComposerNormalizeInstalled($basePath)
+        ) {
             $this->componentsFactory->info('composer-normalize installed successfully');
         }
         else {

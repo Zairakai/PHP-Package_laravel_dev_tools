@@ -14,7 +14,7 @@ trait RemoveTrailingSlashes
     protected string $tagPlaceholder = 'TAGS';
 
     /**
-     * HTML5 void elements — must not carry self-closing slashes.
+     * HTML5 void elements - must not carry self-closing slashes.
      *
      * @var array<string>
      */
@@ -29,13 +29,21 @@ trait RemoveTrailingSlashes
     protected function processAutoClosingTags(string $htmlContent): string
     {
         $voidElementsPattern = implode('|', $this->voidElements);
-        $regex               = str_replace($this->tagPlaceholder, $voidElementsPattern, $this->htmlTagRegex);
+        $regex               = str_replace(
+            $this->tagPlaceholder,
+            $voidElementsPattern,
+            $this->htmlTagRegex,
+        );
 
         return (string) preg_replace_callback($regex, function (array $matches): string {
             $tag = $matches[0];
 
             // Remove any trailing slash before the closing >
-            return (string) preg_replace('/\s*\/>$/', '>', $tag);
+            return (string) preg_replace(
+                '/\s*\/>$/',
+                '>',
+                $tag,
+            );
         }, $htmlContent);
     }
 }

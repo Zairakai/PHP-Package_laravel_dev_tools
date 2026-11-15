@@ -21,13 +21,13 @@ use Zairakai\LaravelDevTools\Services\GitHooksActivator;
  * Publishing on demand:
  *   --publish          → publish all groups (quality, style, testing, hooks)
  *   --publish=quality  → publish quality group (phpstan, rector, insights, baseline)
- *   --publish=style    → publish style group (pint, markdownlint)
+ *   --publish=style    → publish style group (pint, markdownlint, markdownlintignore)
  *   --publish=testing  → publish testing group (phpunit)
- *   --publish=hooks    → activate the git hooks of php-dev-tools
+ *   --publish=hooks    → activate the git hooks of laravel-dev-tools
  *   --publish=pint     → publish a single config file by key
  *
  * Git hooks:
- *   --with-hooks       → activate the git hooks of php-dev-tools (core.hooksPath)
+ *   --with-hooks       → activate the git hooks of laravel-dev-tools (core.hooksPath)
  */
 final class PublishToolingCommand extends Command
 {
@@ -35,8 +35,8 @@ final class PublishToolingCommand extends Command
 
     protected $signature = 'dev-tools:publish
                             {--force : Overwrite existing files (respects user-modified file protection)}
-                            {--publish= : Publish configs — omit value for all, or pass group/key name}
-                            {--with-hooks : Activate the git hooks of php-dev-tools (core.hooksPath)}
+                            {--publish= : Publish configs - omit value for all, or pass group/key name}
+                            {--with-hooks : Activate the git hooks of laravel-dev-tools (core.hooksPath)}
                             {--with-normalize : Install ergebnis/composer-normalize}
                             {--fullstack : Force full-stack Makefile + CI stub (PHP + JS)}';
 
@@ -57,36 +57,50 @@ final class PublishToolingCommand extends Command
         $this->components->info('Publishing zairakai/laravel-dev-tools configuration…');
         $this->newLine();
 
-        // =====================================================================
         // --publish mode: publish configs on demand
-        // =====================================================================
+        // ================
 
-        if ($this->hasOption('publish') && null !== $this->option('publish')) {
-            return $this->handlePublish($configStubPublisher, $vendorPath, $basePath, $force, $fullstack);
+        if (
+            $this->hasOption('publish')
+            && null !== $this->option('publish')
+        ) {
+            return $this->handlePublish(
+                $configStubPublisher,
+                $vendorPath,
+                $basePath,
+                $force,
+                $fullstack,
+            );
         }
 
-        // =====================================================================
         // Default setup: Makefile + .editorconfig + baseline only
-        // =====================================================================
+        // ================
 
-        $this->publishMakefile($basePath, $vendorPath, $force, $fullstack);
-        $this->publishEditorConfig($basePath, $vendorPath, $force);
+        $this->publishMakefile(
+            $basePath,
+            $vendorPath,
+            $force,
+            $fullstack,
+        );
+        $this->publishEditorConfig(
+            $basePath,
+            $vendorPath,
+            $force,
+        );
 
         // Baseline is always created if missing (never force-overwritten)
         $configStubPublisher->publishBaseline($vendorPath, $basePath);
 
-        // =====================================================================
         // Optional: git hooks
-        // =====================================================================
+        // ================
 
         if ((bool) $this->option('with-hooks')) {
             $this->newLine();
             $gitHooksActivator->activate($basePath);
         }
 
-        // =====================================================================
         // Optional: composer-normalize
-        // =====================================================================
+        // ================
 
         $composerNormalizeManager->handleComposerNormalizeOption($basePath);
 
@@ -101,7 +115,7 @@ final class PublishToolingCommand extends Command
     private function displayGitHooksInfo(): void
     {
         $this->newLine();
-        $this->line('<fg=yellow>Git hooks of php-dev-tools active (core.hooksPath):</>');
+        $this->line('<fg=yellow>Git hooks of laravel-dev-tools active (core.hooksPath):</>');
         $this->line('  • <fg=cyan>pre-commit</>        - composer quality:fast');
         $this->line('  • <fg=cyan>commit-msg</>        - Commit message format validation');
         $this->line('  • <fg=cyan>pre-push</>          - composer quality (full quality gate)');
@@ -143,9 +157,8 @@ final class PublishToolingCommand extends Command
         $this->line('  <fg=green>make git-cleanup</>  - Remove obsolete branches');
     }
 
-    // =========================================================================
     // Output helpers
-    // =========================================================================
+    // ================
 
     /**
      * Display the final success message with next steps.
@@ -174,9 +187,8 @@ final class PublishToolingCommand extends Command
         }
     }
 
-    // =========================================================================
     // --publish handler
-    // =========================================================================
+    // ================
 
     /**
      * Handle the --publish option.
@@ -203,15 +215,43 @@ final class PublishToolingCommand extends Command
         $availableGroups = $configStubPublisher->availableGroups();
         $availableKeys   = $configStubPublisher->availableKeys();
 
-        if ('gitlab-ci' === $target && ($fullstack || file_exists($basePath . '/package.json'))) {
-            $configStubPublisher->publishGitlabCiFullstack($vendorPath, $basePath, $force);
+        if (
+            'gitlab-ci' === $target
+            && (
+                $fullstack
+                || file_exists($basePath . '/package.json')
+            )
+        ) {
+            $configStubPublisher->publishGitlabCiFullstack(
+                $vendorPath,
+                $basePath,
+                $force,
+            );
         }
         // Attempt to publish as group first, then as individual key
-        elseif (in_array($target, $availableGroups, true)) {
-            $configStubPublisher->publishGroup($target, $vendorPath, $basePath, $force);
+        elseif (in_array(
+            $target,
+            $availableGroups,
+            true,
+        )) {
+            $configStubPublisher->publishGroup(
+                $target,
+                $vendorPath,
+                $basePath,
+                $force,
+            );
         }
-        elseif (in_array($target, $availableKeys, true)) {
-            $configStubPublisher->publishByKey($target, $vendorPath, $basePath, $force);
+        elseif (in_array(
+            $target,
+            $availableKeys,
+            true,
+        )) {
+            $configStubPublisher->publishByKey(
+                $target,
+                $vendorPath,
+                $basePath,
+                $force,
+            );
         }
         else {
             $this->components->error(sprintf('Unknown publish target: "%s"', $target));
@@ -239,14 +279,17 @@ final class PublishToolingCommand extends Command
     /**
      * Copy the .editorconfig stub into the project root.
      */
-    private function publishEditorConfig(string $basePath, string $vendorPath, bool $force): void
-    {
+    private function publishEditorConfig(
+        string $basePath,
+        string $vendorPath,
+        bool $force,
+    ): void {
         $targetFile = $basePath . '/.editorconfig';
         $stubFile   = $vendorPath . '/.editorconfig';
 
         if (! File::exists($stubFile)) {
             // @codeCoverageIgnoreStart
-            // .editorconfig is optional — no error if missing from package.
+            // .editorconfig is optional - no error if missing from package.
             return;
             // @codeCoverageIgnoreEnd
         }
@@ -264,26 +307,29 @@ final class PublishToolingCommand extends Command
         $this->components->task('Copied: .editorconfig');
     }
 
-    // =========================================================================
     // Default setup file publishers
-    // =========================================================================
+    // ================
 
     /**
      * Copy the Makefile stub into the project root.
      */
-    private function publishMakefile(string $basePath, string $vendorPath, bool $force, bool $fullstack): void
-    {
+    private function publishMakefile(
+        string $basePath,
+        string $vendorPath,
+        bool $force,
+        bool $fullstack,
+    ): void {
         $targetFile   = $basePath . '/Makefile';
-        $stubFile     = $vendorPath . '/stubs/Makefile.stub';
+        $stubFile     = $vendorPath . '/stubs/Makefile';
         $useFullstack = $fullstack || file_exists($basePath . '/package.json');
 
         if ($useFullstack) {
-            $stubFile = $vendorPath . '/stubs/Makefile.fullstack.stub';
+            $stubFile = $vendorPath . '/stubs/Makefile.fullstack';
         }
 
         if (! File::exists($stubFile)) {
             // @codeCoverageIgnoreStart
-            // Makefile stub is always packaged with the vendor — this path is not reachable in practice.
+            // Makefile stub is always packaged with the vendor - this path is not reachable in practice.
             $this->components->error('Makefile stub not found.');
 
             return;

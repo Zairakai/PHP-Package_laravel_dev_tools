@@ -1,0 +1,11 @@
+.cache/
+.git/
+.phpunit.cache/
+build/
+coverage/
+dist/
+docs/
+node_modules/
+vendor/
+
+*.min.md

@@ -1,9 +1,8 @@
-# ================================
-# PIPELINE TEMPLATE — Package Laravel PHP
-# ================================
+# PIPELINE TEMPLATE - Package Laravel PHP
+# ================
 # Shared pipeline template for Composer/Laravel packages in the Zairakai namespace.
 # Self-contained: anchors and jobs are all in this single file.
-# YAML anchors do not survive cross-file include: — this is a YAML parser
+# YAML anchors do not survive cross-file include: - this is a YAML parser
 # limitation, not a GitLab one. Everything is therefore kept here.
 #
 # All job names are prefixed php: to avoid any collision with JS or custom
@@ -30,14 +29,12 @@
 #     PACKAGIST_PACKAGE: "zairakai/laravel-dev-tools"
 #     DEV_TOOLS_SCRIPTS: "scripts"
 #     DEV_TOOLS_GITLAB_SCRIPTS: ".gitlab/scripts"
-# ================================
 
 include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
-# ================================
 # WORKFLOW
-# ================================
+# ================
 workflow:
   rules:
     - if: $CI_COMMIT_TAG
@@ -47,9 +44,8 @@ workflow:
     - if: $CI_COMMIT_REF_NAME =~ /^feature\// || $CI_COMMIT_REF_NAME =~ /^fix\// || $CI_COMMIT_REF_NAME =~ /^hotfix\//
     - when: never
 
-# ================================
 # STAGES
-# ================================
+# ================
 stages:
   - security
   - install
@@ -60,9 +56,8 @@ stages:
   - release
   - metrics
 
-# ================================
 # DEFAULT VARIABLES
-# ================================
+# ================
 variables:
   # ── OVERRIDE PER PROJECT ──────────────────────────────────────────────────
   CACHE_KEY: "zairakai-package"
@@ -98,9 +93,8 @@ variables:
   SAST_EXCLUDED_PATHS: "docs/,tests/"
   SECRET_DETECTION_EXCLUDED_PATHS: "docs/,tests/"
 
-# ================================
 # ANCHORS
-# ================================
+# ================
 .base_job: &base_job
   retry:
     max: 2
@@ -136,9 +130,8 @@ variables:
   before_script:
     - composer --version
 
-# ================================
 # SECURITY
-# ================================
+# ================
 secret_detection:
   stage: security
   rules:
@@ -172,9 +165,8 @@ php:tag-format:
       fi
       echo "Tag $CI_COMMIT_TAG: format OK"
 
-# ================================
 # INSTALL
-# ================================
+# ================
 php:install:
   <<: [*base_job, *cache_composer_push]
   stage: install
@@ -186,9 +178,8 @@ php:install:
   script:
     - composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-# ================================
 # VALIDATE
-# ================================
+# ================
 php:validate:markdownlint:
   <<: [*base_job, *cache_composer]
   stage: validate
@@ -231,9 +222,8 @@ php:validate:shellcheck:
   script:
     - bash $DEV_TOOLS_SCRIPTS/validate-shellcheck.sh
 
-# ================================
 # QUALITY
-# ================================
+# ================
 php:quality:code-style:
   <<: *job_php
   stage: quality
@@ -326,9 +316,8 @@ php:quality:security:
     expire_in: 1 month
     when: always
 
-# ================================
 # TEST
-# ================================
+# ================
 php:test:
   <<: *job_php
   stage: test
@@ -357,9 +346,8 @@ php:test:
     expire_in: 1 week
     when: always
 
-# ================================
 # PUBLISH
-# ================================
+# ================
 php:publish:
   <<: [*base_job, *cache_composer]
   stage: publish
@@ -375,9 +363,8 @@ php:publish:
   script:
     - bash "$DEV_TOOLS_GITLAB_SCRIPTS/packagist-release.sh"
 
-# ================================
 # RELEASE
-# ================================
+# ================
 php:release:
   <<: [*base_job, *cache_composer]
   stage: release
@@ -410,9 +397,8 @@ php:release:
       - release_notes.md
     expire_in: 1 year
 
-# ================================
 # METRICS
-# ================================
+# ================
 php:metrics:
   <<: *job_php
   stage: metrics
@@ -429,9 +415,8 @@ php:metrics:
       - build/phpmetrics/
     expire_in: 1 month
 
-# ================================
 # DOCUMENTATION
-# ================================
+# ================
 # The documentation site (GitLab Pages): every released version, each built from its own tag, and next, with a version
 # selector. See docs/scripts/publish.sh in the project. It comes with the release: a tag is always a release of main, and
 # nothing is published if the publication failed. A project without docs/scripts/publish.sh has no site.
@@ -462,9 +447,8 @@ pages:
       exists:
         - docs/scripts/publish.sh
 
-# ================================
 # AUTOMATIC UPDATES
-# ================================
+# ================
 # The group variable GITLAB_TOKEN (protected, so these jobs run on main, develop and the tags) opens the merge requests,
 # merges them and creates the tags. The pipeline of each merge request is the gate: nothing is tested by these jobs.
 # A weekly schedule (or a pipeline started by the cascade) with UPDATE_DEPENDENCIES=true prepares the update.

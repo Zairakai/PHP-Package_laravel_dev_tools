@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Rector;
 
+use Rector\Configuration\RectorConfigBuilder;
 use Rector\Set\ValueObject\LevelSetList;
 use Rector\Set\ValueObject\SetList;
 use RectorLaravel\Set\LaravelSetList;
@@ -19,17 +20,24 @@ final class RectorBaseConfig
 {
     /**
      * Build RectorConfig instance.
+     *
+     * @param list<string> $extraPaths directories added to the ones of the project
+     * @param list<string> $extraSkips paths added to the ones that are skipped
      */
     public static function configure(
         string $projectRoot,
         array $extraPaths = [],
         array $extraSkips = [],
-    ) {
-        return Rector::configure($projectRoot, php: '8.3', paths: [])
+    ): RectorConfigBuilder {
+        return Rector::configure(
+            $projectRoot,
+            php: '8.4',
+            paths: [],
+        )
             ->withPaths(self::resolvePaths($projectRoot, $extraPaths))
             ->withSkip(self::resolveSkips($projectRoot, $extraSkips))
             ->withSets([
-                LevelSetList::UP_TO_PHP_83,
+                LevelSetList::UP_TO_PHP_84,
                 SetList::CODE_QUALITY,
                 SetList::DEAD_CODE,
                 SetList::EARLY_RETURN,
@@ -42,12 +50,20 @@ final class RectorBaseConfig
     /**
      * Resolve source paths
      * ================.
+     *
+     * @param list<string> $extra
+     *
+     * @return list<string>
      */
     private static function resolvePaths(string $root, array $extra): array
     {
         $paths = [];
 
-        foreach (['app', 'src', 'tests'] as $dir) {
+        foreach ([
+            'app',
+            'src',
+            'tests',
+        ] as $dir) {
             if (is_dir($root . '/' . $dir)) {
                 $paths[] = $root . '/' . $dir;
             }
@@ -59,6 +75,10 @@ final class RectorBaseConfig
     /**
      * Resolve paths to skip
      * ================.
+     *
+     * @param list<string> $extra
+     *
+     * @return list<string>
      */
     private static function resolveSkips(string $root, array $extra): array
     {

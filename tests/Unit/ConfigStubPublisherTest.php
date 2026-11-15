@@ -13,7 +13,7 @@ use Zairakai\LaravelDevTools\Services\GitHooksActivator;
 use Zairakai\LaravelDevTools\Tests\TestCase;
 
 /**
- * Tests for ConfigStubPublisher — covers all publish methods, force logic,
+ * Tests for ConfigStubPublisher - covers all publish methods, force logic,
  * user-modification protection, and error paths.
  */
 final class ConfigStubPublisherTest extends TestCase
@@ -31,7 +31,7 @@ final class ConfigStubPublisherTest extends TestCase
         $this->basePath   = $this->app->basePath();
         $this->vendorPath = dirname(__DIR__, 2);
 
-        // Factory requires an OutputInterface — use BufferedOutput to capture output silently
+        // Factory requires an OutputInterface - use BufferedOutput to capture output silently
         $bufferedOutput  = new BufferedOutput();
         $factory         = new Factory($bufferedOutput);
 
@@ -55,9 +55,8 @@ final class ConfigStubPublisherTest extends TestCase
         $this->assertContains('gitlab-ci', $groups);
     }
 
-    // =========================================================================
     // publishGovernanceFiles
-    // =========================================================================
+    // ================
 
     #[Test]
     public function available_groups_includes_governance(): void
@@ -66,9 +65,8 @@ final class ConfigStubPublisherTest extends TestCase
         $this->assertContains('governance', $groups);
     }
 
-    // =========================================================================
     // availableGroups / availableKeys
-    // =========================================================================
+    // ================
 
     #[Test]
     public function available_groups_returns_expected_keys(): void
@@ -110,16 +108,27 @@ final class ConfigStubPublisherTest extends TestCase
     {
         $keys = $this->configStubPublisher->availableKeys();
 
-        $expectedKeys = ['phpstan', 'rector', 'insights', 'baseline', 'pint', 'markdownlint', 'phpunit', 'hooks', 'gitlab-ci', 'governance'];
+        $expectedKeys = [
+            'phpstan',
+            'rector',
+            'insights',
+            'baseline',
+            'pint',
+            'markdownlint',
+            'markdownlintignore',
+            'phpunit',
+            'hooks',
+            'gitlab-ci',
+            'governance',
+        ];
 
         foreach ($expectedKeys as $expectedKey) {
             $this->assertContains($expectedKey, $keys);
         }
     }
 
-    // =========================================================================
     // publishBaseline
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_baseline_creates_file_when_missing(): void
@@ -136,10 +145,15 @@ final class ConfigStubPublisherTest extends TestCase
     public function publish_baseline_skips_when_file_exists(): void
     {
         $targetPath = $this->basePath . '/config/dev-tools/baseline.neon';
-        File::makeDirectory(dirname($targetPath), 0755, true, true);
+        File::makeDirectory(
+            dirname($targetPath),
+            0755,
+            true,
+            true,
+        );
         File::put($targetPath, 'existing content');
 
-        // Baseline is never overwritten — returns false when skipped
+        // Baseline is never overwritten - returns false when skipped
         $result = $this->configStubPublisher->publishBaseline($this->vendorPath, $this->basePath);
 
         $this->assertFalse($result);
@@ -149,7 +163,12 @@ final class ConfigStubPublisherTest extends TestCase
     #[Test]
     public function publish_by_key_baseline_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('baseline', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'baseline',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($this->basePath . '/config/dev-tools/baseline.neon');
@@ -160,7 +179,12 @@ final class ConfigStubPublisherTest extends TestCase
     {
         $targetPath = $this->basePath . '/.gitlab-ci.yml';
 
-        $result = $this->configStubPublisher->publishByKey('gitlab-ci', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'gitlab-ci',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($targetPath);
@@ -170,7 +194,12 @@ final class ConfigStubPublisherTest extends TestCase
     #[Test]
     public function publish_by_key_governance_creates_files(): void
     {
-        $result = $this->configStubPublisher->publishByKey('governance', $this->vendorPath, $this->basePath, false);
+        $result = $this->configStubPublisher->publishByKey(
+            'governance',
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
@@ -187,7 +216,12 @@ final class ConfigStubPublisherTest extends TestCase
     {
         $repository = $this->makeGitRepository();
 
-        $result = $this->configStubPublisher->publishByKey('hooks', $this->vendorPath, $repository, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'hooks',
+            $this->vendorPath,
+            $repository,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPathOf($repository));
@@ -198,79 +232,130 @@ final class ConfigStubPublisherTest extends TestCase
     #[Test]
     public function publish_by_key_insights_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('insights', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'insights',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/insights.php');
+        $this->assertFileExists($this->basePath . '/phpinsights.php');
     }
 
     #[Test]
     public function publish_by_key_markdownlint_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('markdownlint', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'markdownlint',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/markdownlint.json');
+        $this->assertFileExists($this->basePath . '/.markdownlint.json');
+    }
+
+    #[Test]
+    public function publish_by_key_markdownlintignore_creates_the_file_of_the_root(): void
+    {
+        $result = $this->configStubPublisher->publishByKey(
+            'markdownlintignore',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $this->assertTrue($result);
+        $this->assertFileExists($this->basePath . '/.markdownlintignore');
     }
 
     #[Test]
     public function publish_by_key_phpstan_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('phpstan', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'phpstan',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/phpstan.neon');
+        $this->assertFileExists($this->basePath . '/phpstan.neon');
     }
 
     #[Test]
     public function publish_by_key_phpunit_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('phpunit', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'phpunit',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($this->basePath . '/config/dev-tools/phpunit.xml');
     }
 
-    // =========================================================================
     // publishByKey
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_by_key_pint_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('pint', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'pint',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
+        $this->assertFileExists($this->basePath . '/pint.json');
     }
 
     #[Test]
     public function publish_by_key_rector_creates_file(): void
     {
-        $result = $this->configStubPublisher->publishByKey('rector', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'rector',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
+        $this->assertFileExists($this->basePath . '/rector.php');
     }
 
     #[Test]
     public function publish_by_key_unknown_returns_false(): void
     {
-        $result = $this->configStubPublisher->publishByKey('nonexistent-key', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishByKey(
+            'nonexistent-key',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertFalse($result);
     }
 
-    // =========================================================================
     // publishEnlightn
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_enlightn_creates_config_file(): void
     {
         $targetPath = $this->basePath . '/config/enlightn.php';
 
-        $this->configStubPublisher->publishEnlightn($this->vendorPath, $this->basePath, true);
+        $this->configStubPublisher->publishEnlightn(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertFileExists($targetPath);
         File::delete($targetPath);
@@ -280,10 +365,19 @@ final class ConfigStubPublisherTest extends TestCase
     public function publish_enlightn_overwrites_with_force(): void
     {
         $targetPath = $this->basePath . '/config/enlightn.php';
-        File::makeDirectory(dirname($targetPath), 0755, true, true);
+        File::makeDirectory(
+            dirname($targetPath),
+            0755,
+            true,
+            true,
+        );
         File::put($targetPath, '<?php return ["existing" => true];');
 
-        $this->configStubPublisher->publishEnlightn($this->vendorPath, $this->basePath, true);
+        $this->configStubPublisher->publishEnlightn(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertStringNotContainsString('existing', File::get($targetPath));
         File::delete($targetPath);
@@ -293,25 +387,37 @@ final class ConfigStubPublisherTest extends TestCase
     public function publish_enlightn_skips_when_exists_without_force(): void
     {
         $targetPath = $this->basePath . '/config/enlightn.php';
-        File::makeDirectory(dirname($targetPath), 0755, true, true);
+        File::makeDirectory(
+            dirname($targetPath),
+            0755,
+            true,
+            true,
+        );
         File::put($targetPath, '<?php return ["existing" => true];');
 
-        $this->configStubPublisher->publishEnlightn($this->vendorPath, $this->basePath, false);
+        $this->configStubPublisher->publishEnlightn(
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
 
         $this->assertStringContainsString('existing', File::get($targetPath));
         File::delete($targetPath);
     }
 
-    // =========================================================================
     // publishGitlabCi
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_gitlab_ci_creates_file_at_project_root(): void
     {
         $targetPath = $this->basePath . '/.gitlab-ci.yml';
 
-        $result = $this->configStubPublisher->publishGitlabCi($this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGitlabCi(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($targetPath);
@@ -332,7 +438,11 @@ variables:
   PACKAGIST_PACKAGE: 'zairakai/my-package'
 ");
 
-        $result = $this->configStubPublisher->publishGitlabCi($this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGitlabCi(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertFalse($result);
         $this->assertStringContainsString('my-custom-project', File::get($targetPath));
@@ -345,7 +455,11 @@ variables:
         $targetPath = $this->basePath . '/.gitlab-ci.yml';
         File::put($targetPath, 'existing content');
 
-        $result = $this->configStubPublisher->publishGitlabCi($this->vendorPath, $this->basePath, false);
+        $result = $this->configStubPublisher->publishGitlabCi(
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
 
         $this->assertFalse($result);
         $this->assertStringContainsString('existing content', File::get($targetPath));
@@ -357,7 +471,11 @@ variables:
     {
         $targetPath = $this->basePath . '/.gitlab-ci.yml';
 
-        $this->configStubPublisher->publishGitlabCi($this->vendorPath, $this->basePath, true);
+        $this->configStubPublisher->publishGitlabCi(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $content = File::get($targetPath);
 
@@ -371,7 +489,11 @@ variables:
     #[Test]
     public function publish_governance_files_creates_all_three_files(): void
     {
-        $result = $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, false);
+        $result = $this->configStubPublisher->publishGovernanceFiles(
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($this->basePath . '/CONTRIBUTING.md');
@@ -389,7 +511,11 @@ variables:
         $contributingPath = $this->basePath . '/CONTRIBUTING.md';
         File::put($contributingPath, '# My custom contributing guide');
 
-        $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, true);
+        $this->configStubPublisher->publishGovernanceFiles(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertStringNotContainsString('My custom contributing guide', File::get($contributingPath));
 
@@ -405,7 +531,11 @@ variables:
         $composerPath = $this->basePath . '/composer.json';
         File::put($composerPath, '{"name": "zairakai/test-package"}');
 
-        $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, false);
+        $this->configStubPublisher->publishGovernanceFiles(
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
 
         $security = File::get($this->basePath . '/SECURITY.md');
         $this->assertStringNotContainsString('PACKAGE_GITLAB_ISSUES', $security);
@@ -420,7 +550,11 @@ variables:
     #[Test]
     public function publish_governance_files_returns_false_when_stubs_dir_missing(): void
     {
-        $result = $this->configStubPublisher->publishGovernanceFiles('/nonexistent/vendor/path', $this->basePath, false);
+        $result = $this->configStubPublisher->publishGovernanceFiles(
+            '/nonexistent/vendor/path',
+            $this->basePath,
+            false,
+        );
         $this->assertFalse($result);
     }
 
@@ -430,7 +564,11 @@ variables:
         $contributingPath = $this->basePath . '/CONTRIBUTING.md';
         File::put($contributingPath, '# My custom contributing guide');
 
-        $this->configStubPublisher->publishGovernanceFiles($this->vendorPath, $this->basePath, false);
+        $this->configStubPublisher->publishGovernanceFiles(
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
 
         $this->assertStringContainsString('My custom contributing guide', File::get($contributingPath));
 
@@ -442,11 +580,24 @@ variables:
     #[Test]
     public function publish_group_all_creates_all_files(): void
     {
-        $result = $this->configStubPublisher->publishGroup('all', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGroup(
+            'all',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
 
-        foreach (['/config/dev-tools/phpstan.neon', '/config/dev-tools/rector.php', '/config/dev-tools/insights.php', '/config/dev-tools/baseline.neon', '/config/dev-tools/pint.json', '/config/dev-tools/markdownlint.json', '/config/dev-tools/phpunit.xml'] as $file) {
+        foreach ([
+            '/phpstan.neon',
+            '/rector.php',
+            '/phpinsights.php',
+            '/config/dev-tools/baseline.neon',
+            '/pint.json',
+            '/.markdownlint.json',
+            '/config/dev-tools/phpunit.xml',
+        ] as $file) {
             $this->assertFileExists($this->basePath . $file, "Missing: {$file}");
         }
 
@@ -458,25 +609,39 @@ variables:
     {
         $targetPath = $this->basePath . '/.gitlab-ci.yml';
 
-        $result = $this->configStubPublisher->publishGroup('gitlab-ci', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGroup(
+            'gitlab-ci',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($targetPath);
         File::delete($targetPath);
     }
 
-    // =========================================================================
     // publishGroup
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_group_quality_creates_all_quality_files(): void
     {
-        $result = $this->configStubPublisher->publishGroup('quality', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGroup(
+            'quality',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
 
-        foreach (['/config/dev-tools/phpstan.neon', '/config/dev-tools/rector.php', '/config/dev-tools/insights.php', '/config/dev-tools/baseline.neon'] as $file) {
+        foreach ([
+            '/phpstan.neon',
+            '/rector.php',
+            '/phpinsights.php',
+            '/config/dev-tools/baseline.neon',
+        ] as $file) {
             $this->assertFileExists($this->basePath . $file, "Missing: {$file}");
         }
     }
@@ -484,17 +649,27 @@ variables:
     #[Test]
     public function publish_group_style_creates_style_files(): void
     {
-        $result = $this->configStubPublisher->publishGroup('style', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGroup(
+            'style',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
-        $this->assertFileExists($this->basePath . '/config/dev-tools/markdownlint.json');
+        $this->assertFileExists($this->basePath . '/pint.json');
+        $this->assertFileExists($this->basePath . '/.markdownlint.json');
     }
 
     #[Test]
     public function publish_group_testing_creates_phpunit_file(): void
     {
-        $result = $this->configStubPublisher->publishGroup('testing', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGroup(
+            'testing',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($this->basePath . '/config/dev-tools/phpunit.xml');
@@ -503,7 +678,12 @@ variables:
     #[Test]
     public function publish_group_unknown_returns_false(): void
     {
-        $result = $this->configStubPublisher->publishGroup('nonexistent-group', $this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishGroup(
+            'nonexistent-group',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertFalse($result);
     }
@@ -513,7 +693,11 @@ variables:
     {
         $repository = $this->makeGitRepository();
 
-        $this->configStubPublisher->publishHooks($this->vendorPath, $repository, true);
+        $this->configStubPublisher->publishHooks(
+            $this->vendorPath,
+            $repository,
+            true,
+        );
 
         $this->assertDirectoryDoesNotExist($repository . '/.githooks');
 
@@ -525,26 +709,41 @@ variables:
     {
         $parent = $this->makeGitRepository();
         $child  = $parent . '/project';
-        File::makeDirectory($child . '/.git', 0755, true);
+        File::makeDirectory(
+            $child . '/.git',
+            0755,
+            true,
+        );
 
-        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $child, true);
+        $result = $this->configStubPublisher->publishHooks(
+            $this->vendorPath,
+            $child,
+            true,
+        );
 
         $this->assertFalse($result);
-        $this->assertSame('', $this->hooksPathOf($parent), 'The parent repository must be left alone');
+        $this->assertSame(
+            '',
+            $this->hooksPathOf($parent),
+            'The parent repository must be left alone',
+        );
 
         File::deleteDirectory($parent);
     }
 
-    // =========================================================================
     // publishHooks
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_hooks_points_core_hooks_path_at_the_hooks_of_php_dev_tools(): void
     {
         $repository = $this->makeGitRepository();
 
-        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $repository, true);
+        $result = $this->configStubPublisher->publishHooks(
+            $this->vendorPath,
+            $repository,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPathOf($repository));
@@ -556,23 +755,34 @@ variables:
     public function publish_hooks_returns_false_when_the_project_is_not_a_git_repository(): void
     {
         $directory = sys_get_temp_dir() . '/no-git-' . uniqid('', true);
-        File::makeDirectory($directory, 0755, true);
+        File::makeDirectory(
+            $directory,
+            0755,
+            true,
+        );
 
-        $result = $this->configStubPublisher->publishHooks($this->vendorPath, $directory, true);
+        $result = $this->configStubPublisher->publishHooks(
+            $this->vendorPath,
+            $directory,
+            true,
+        );
 
         $this->assertFalse($result);
 
         File::deleteDirectory($directory);
     }
 
-    // =========================================================================
     // Stub missing → graceful handling
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_insights_returns_false_when_stub_missing(): void
     {
-        $result = $this->configStubPublisher->publishInsights('/nonexistent/vendor/path', $this->basePath, true);
+        $result = $this->configStubPublisher->publishInsights(
+            '/nonexistent/vendor/path',
+            $this->basePath,
+            true,
+        );
 
         $this->assertFalse($result);
     }
@@ -587,80 +797,103 @@ variables:
         File::put($artisanPath, '#!/usr/bin/env php');
         File::put($composerPath, '{"require": {"laravel/framework": "^11.0"}}');
 
-        $result = $this->configStubPublisher->publishPhpunit($this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishPhpunit(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         File::delete($artisanPath);
         File::delete($composerPath);
     }
 
-    // =========================================================================
-    // publishPhpunit — Laravel app vs package detection
-    // =========================================================================
+    // publishPhpunit - Laravel app vs package detection
+    // ================
 
     #[Test]
     public function publish_phpunit_uses_package_config_when_no_artisan(): void
     {
         // Testbench environment has no artisan at basePath → uses package config
-        $result = $this->configStubPublisher->publishPhpunit($this->vendorPath, $this->basePath, true);
+        $result = $this->configStubPublisher->publishPhpunit(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
 
         $this->assertTrue($result);
         $this->assertFileExists($this->basePath . '/config/dev-tools/phpunit.xml');
     }
 
     #[Test]
-    public function publish_pint_overwrites_unmodified_file_with_force(): void
+    public function publish_pint_adds_the_changes_kept_apart_by_the_project(): void
     {
-        $targetPath = $this->basePath . '/config/dev-tools/pint.json';
-        $stubPath   = $this->vendorPath . '/config/pint.json';
+        File::makeDirectory(
+            $this->basePath . '/config/dev-tools',
+            0755,
+            true,
+            true,
+        );
+        File::put(
+            $this->basePath . '/config/dev-tools/pint.json',
+            '{"rules": {"single_quote": false}, "finder": {"exclude": ["generated"]}}',
+        );
 
-        File::makeDirectory(dirname($targetPath), 0755, true, true);
-        // Identical to stub → not user-modified → force overwrites
-        File::copy($stubPath, $targetPath);
+        $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
 
-        $result = $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath, true);
+        $config = json_decode(File::get($this->basePath . '/pint.json'), true);
+
+        $this->assertIsArray($config);
+        $this->assertFalse($config['rules']['single_quote']);
+        $this->assertContains('generated', $config['finder']['exclude']);
+        $this->assertContains('storage', $config['finder']['exclude']);
+    }
+
+    #[Test]
+    public function publish_pint_generates_the_file_of_the_root_from_the_rules_of_php_dev_tools(): void
+    {
+        $result = $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
 
         $this->assertTrue($result);
+
+        $config = json_decode(File::get($this->basePath . '/pint.json'), true);
+
+        $this->assertIsArray($config);
+        $this->assertSame('laravel', $config['preset']);
+        $this->assertNotEmpty($config['rules'], 'the rules come from php-dev-tools');
+        $this->assertContains(
+            'storage',
+            $config['finder']['exclude'],
+            'the exclusions of Laravel are added',
+        );
     }
 
     #[Test]
-    public function publish_pint_protects_user_modified_file_with_force(): void
+    public function publish_pint_writes_the_file_again_each_time(): void
     {
-        $targetPath = $this->basePath . '/config/dev-tools/pint.json';
-        File::makeDirectory(dirname($targetPath), 0755, true, true);
+        File::put($this->basePath . '/pint.json', '{"stale": true}');
 
-        // Content different from the stub → user-modified
-        File::put($targetPath, '{"custom-user-content": true, "preset": "modified"}');
-
-        $result = $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath, true);
-
-        $this->assertFalse($result);
-        $this->assertStringContainsString('custom-user-content', File::get($targetPath));
+        $this->assertTrue($this->configStubPublisher->publishPint($this->vendorPath, $this->basePath));
+        $this->assertStringNotContainsString('stale', File::get($this->basePath . '/pint.json'));
     }
 
-    // =========================================================================
-    // publishPint — skip / force / user protection
-    // =========================================================================
-
-    #[Test]
-    public function publish_pint_skips_when_exists_without_force(): void
-    {
-        $targetPath = $this->basePath . '/config/dev-tools/pint.json';
-        File::makeDirectory(dirname($targetPath), 0755, true, true);
-        File::put($targetPath, '{"existing": true}');
-
-        $result = $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath, false);
-
-        $this->assertFalse($result);
-        $this->assertStringContainsString('existing', File::get($targetPath));
-    }
-
-    // =========================================================================
     // Helpers
-    // =========================================================================
+    // ================
 
     private function cleanDevToolsDir(): void
     {
+        // The thin files that the tests publish to the root of the skeleton
+        foreach ([
+            'phpstan.neon',
+            'rector.php',
+            'phpinsights.php',
+            'pint.json',
+            '.markdownlint.json',
+            '.markdownlintignore',
+        ] as $file) {
+            File::delete($this->basePath . '/' . $file);
+        }
+
         $devToolsDir = $this->basePath . '/config/dev-tools';
 
         if (File::isDirectory($devToolsDir)) {
@@ -693,7 +926,11 @@ variables:
     private function makeGitRepository(): string
     {
         $path = sys_get_temp_dir() . '/hooks-' . uniqid('', true);
-        File::makeDirectory($path, 0755, true);
+        File::makeDirectory(
+            $path,
+            0755,
+            true,
+        );
         exec('git init -q ' . escapeshellarg($path));
 
         return $path;

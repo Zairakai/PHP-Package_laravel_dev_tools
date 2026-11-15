@@ -9,40 +9,22 @@ use SlevomatCodingStandard\Sniffs\Functions\UnusedParameterSniff;
 /**
  * PHP Insights Package Override
  * ================
- * Extends the base configuration from laravel-dev-tools.
+ * Extends the base configuration of laravel-dev-tools (config/phpinsights.php).
  *
  * IMPORTANT:
  * For numeric arrays (remove, add, exclude) always merge using spread operator.
- * Never use array_replace_recursive() — it replaces values by index.
+ * Never use array_replace_recursive() - it replaces values by index.
  */
 
-/**
- *  Load base configuration
+/*
+ * Base configuration
  * ================
- *  Supports:
- *  - Normal Laravel install
- *  - Orchestra Testbench
- *  - Local project override.
+ * The Laravel configuration of this package, which extends the one of php-dev-tools.
  */
-$baseConfig  = [];
-$currentFile = __FILE__;
+$baseConfig = require __DIR__ . '/config/phpinsights.php';
 
-$possiblePaths = [
-    dirname(__DIR__) . '/vendor/zairakai/laravel-dev-tools/config/insights.base.php',
-    dirname(__DIR__, 5) . '/config/insights.base.php',
-    dirname(__DIR__) . '/config/insights.base.php',
-];
-
-foreach ($possiblePaths as $path) {
-    if (
-        file_exists($path)
-        && realpath($path) !== realpath($currentFile)
-    ) {
-        $baseConfig = require $path;
-
-        break;
-    }
-}
+// The stubs are files for the projects, not code of this package.
+$baseConfig['exclude'] = [...($baseConfig['exclude'] ?? []), 'stubs'];
 
 /*
  *  Package specific tuning
@@ -59,7 +41,7 @@ $baseConfig['config'][CyclomaticComplexityIsHigh::class] = [
         ...($baseConfig['config'][CyclomaticComplexityIsHigh::class]['exclude'] ?? []),
         'Console/Commands/Dev/PublishToolingCommand.php',
         'Composer/DevToolsPlugin.php',
-        // GitlabCiSynchronizer has 13 small methods (CC ≤ 5 each) — class total
+        // GitlabCiSynchronizer has 13 small methods (CC ≤ 5 each) - class total
         // inevitably exceeds 15 without any method being genuinely complex.
         'Services/GitlabCiSynchronizer.php',
     ],

@@ -1,6 +1,5 @@
-# ================================
-# LARAVEL-DEV-TOOLS — Pipeline CI/CD
-# ================================
+# LARAVEL-DEV-TOOLS - Pipeline CI/CD
+# ================
 # Self-hosted pipeline: uses local templates (local:)
 # because this project IS the source of the templates.
 #

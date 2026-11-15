@@ -177,7 +177,11 @@ final class CleanAfterIdeHelperCommand extends Command
             ? 'Would clean'
             : 'Cleaned';
 
-        $this->info(sprintf('%s %d files.', $action, $cleanedCount));
+        $this->info(sprintf(
+            '%s %d files.',
+            $action,
+            $cleanedCount,
+        ));
 
         if ($dryRun) {
             return;

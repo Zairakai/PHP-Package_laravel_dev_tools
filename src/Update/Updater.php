@@ -35,9 +35,19 @@ final class Updater
     /**
      * The files an update may change.
      */
-    private const array FILES = ['composer.json', 'composer.lock'];
+    private const array FILES = [
+        'composer.json',
+        'composer.lock',
+    ];
 
-    private const string ISSUE_LABELS = 'Kind::Security,Area::Security,Automated';
+    /**
+     * The labels of the issue of an advisory, before its priority.
+     */
+    private const array ISSUE_LABELS = [
+        'Area::Security',
+        'Automated',
+        'Kind::Security',
+    ];
 
     private const string PIPELINE_FILE = '.gitlab-ci.yml';
 
@@ -58,14 +68,21 @@ final class Updater
 
         if (is_file($this->directory . '/' . self::CONFIG_FILE)) {
             /** @var array<string, mixed> $user */
-            $user = json_decode((string) file_get_contents($this->directory . '/' . self::CONFIG_FILE), true, 512, JSON_THROW_ON_ERROR);
+            $user = json_decode(
+                (string) file_get_contents($this->directory . '/' . self::CONFIG_FILE),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
         }
 
         $this->config = Planner::config($user);
 
         // Composer has no cooling period or exclusion: refuse to ignore a setting silently.
         if ([] !== $this->config['reject']) {
-            throw new RuntimeException('"reject" is not supported for a Composer project: remove it from ' . self::CONFIG_FILE . '.');
+            throw new RuntimeException(
+                '"reject" is not supported for a Composer project: remove it from ' . self::CONFIG_FILE . '.',
+            );
         }
     }
 
@@ -93,7 +110,9 @@ final class Updater
             'cascade' => $this->cascade(),
             'audit'   => $this->audit(),
             'policy'  => $this->policyWatch(),
-            default   => throw new RuntimeException('Usage: update-dependencies update | release | tag | cascade | audit | policy | policy-check <ref> | dependabot-sync'),
+            default   => throw new RuntimeException(
+                'Usage: update-dependencies update | release | tag | cascade | audit | policy | policy-check <ref> | dependabot-sync',
+            ),
         };
     }
 
@@ -104,35 +123,83 @@ final class Updater
      *
      * @return array{status: int, ok: bool, data: mixed}
      */
-    private function api(string $method, string $path, ?array $body = null, ?string $token = null): array
-    {
-        $handle  = curl_init((getenv('CI_API_V4_URL') ?: 'https://gitlab.com/api/v4') . $path);
-        curl_setopt($handle, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($handle, CURLOPT_HTTPHEADER, ['PRIVATE-TOKEN: ' . ($token ?? getenv('GITLAB_TOKEN')), 'Content-Type: application/json']);
-        curl_setopt($handle, CURLOPT_TIMEOUT, 60);
+    private function api(
+        string $method,
+        string $path,
+        ?array $body = null,
+        ?string $token = null,
+    ): array {
+        $handle = curl_init($this->env('CI_API_V4_URL', 'https://gitlab.com/api/v4') . $path);
+
+        curl_setopt(
+            $handle,
+            CURLOPT_CUSTOMREQUEST,
+            $method,
+        );
+
+        curl_setopt(
+            $handle,
+            CURLOPT_RETURNTRANSFER,
+            true,
+        );
+
+        curl_setopt($handle, CURLOPT_HTTPHEADER, [
+            'PRIVATE-TOKEN: ' . ($token ?? getenv('GITLAB_TOKEN')),
+            'Content-Type: application/json',
+        ]);
+
+        curl_setopt(
+            $handle,
+            CURLOPT_TIMEOUT,
+            60,
+        );
 
         if (null !== $body) {
-            curl_setopt($handle, CURLOPT_POSTFIELDS, json_encode($body, JSON_THROW_ON_ERROR));
+            curl_setopt(
+                $handle,
+                CURLOPT_POSTFIELDS,
+                json_encode($body, JSON_THROW_ON_ERROR),
+            );
         }
 
         $text   = (string) curl_exec($handle);
         $status = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+
         curl_close($handle);
 
-        return ['status' => $status, 'ok' => 200 <= $status && 300 > $status, 'data' => json_decode($text, true) ?? $text];
+        return [
+            'status' => $status,
+            'ok'     => 200 <= $status && 300 > $status,
+            'data'   => json_decode($text, true) ?? $text,
+        ];
     }
 
     private function assertEnvironment(): void
     {
-        foreach (['GITLAB_TOKEN', 'CI_PROJECT_ID', 'CI_PROJECT_PATH', 'CI_SERVER_HOST'] as $name) {
-            if (false === getenv($name) || '' === getenv($name)) {
-                throw new RuntimeException("{$name} is not set: run this in GitLab CI, with the group variable GITLAB_TOKEN.");
+        $envTagsName = [
+            'GITLAB_TOKEN',
+            'CI_PROJECT_ID',
+            'CI_PROJECT_PATH',
+            'CI_SERVER_HOST',
+        ];
+
+        foreach ($envTagsName as $name) {
+            if ('' === $this->env($name)) {
+                throw new RuntimeException(
+                    "{$name} is not set: run this in GitLab CI, with the group variable GITLAB_TOKEN.",
+                );
             }
         }
 
         // The runner clones the project with another user than the one of the job: Git refuses it otherwise.
-        $this->exec(['git', 'config', '--global', '--add', 'safe.directory', $this->directory]);
+        $this->exec([
+            'git',
+            'config',
+            '--global',
+            '--add',
+            'safe.directory',
+            $this->directory,
+        ]);
     }
 
     /**
@@ -141,14 +208,39 @@ final class Updater
      */
     private function audit(): void
     {
-        $report = json_decode($this->exec(['composer', 'audit', '--locked', '--format=json', '--no-interaction'], null, [0, 1, 2, 3]), true, 512, JSON_THROW_ON_ERROR);
+        $report = json_decode(
+            $this->exec(
+                [
+                    'composer',
+                    'audit',
+                    '--locked',
+                    '--format=json',
+                    '--no-interaction',
+                ],
+                null,
+                [
+                    0,
+                    1,
+                    2,
+                    3,
+                ],
+            ),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
         $found  = Planner::advisories(Json::map($report));
-        $auto   = 'true' === getenv('AUTO_FIX');
-        $token  = (string) (getenv('FRESHNESS_TOKEN') ?: getenv('GITLAB_TOKEN'));
+        $auto   = getenv('AUTO_FIX') === 'true';
+        $token  = $this->env('FRESHNESS_TOKEN', $this->env('GITLAB_TOKEN'));
         $titles = [];
         $opened = [];
         $urgent = false;
-        $lock   = is_file($this->directory . '/composer.lock') ? Json::map(json_decode((string) file_get_contents($this->directory . '/composer.lock'), true)) : [];
+        $lock   = is_file($this->directory . '/composer.lock')
+            ? Json::map(
+                json_decode((string) file_get_contents($this->directory . '/composer.lock'), true),
+            )
+            : [];
 
         $this->log(count($found) . ' security advisory(ies) found.');
 
@@ -164,15 +256,31 @@ final class Updater
             }
 
             // Inherited from a package of the group: the issue is in the package that brings it, and the update of this project takes the fix when there is one.
-            if (Planner::isInherited($lock, $this->manifest(), $advisory['package'])) {
+            if (Planner::isInherited(
+                $lock,
+                $this->manifest(),
+                $advisory['package'],
+            )) {
                 $this->log("Inherited from the group, followed in the package that brings it: {$title}");
 
                 continue;
             }
 
-            $url = $this->createIssue($title, Planner::advisoryIssueBody($advisory, (string) getenv('CI_PIPELINE_URL'), $auto), Planner::advisoryLabels($advisory, self::ISSUE_LABELS), $token);
+            $url = $this->createIssue(
+                $title,
+                Planner::advisoryIssueBody(
+                    $advisory,
+                    (string) getenv('CI_PIPELINE_URL'),
+                    $auto,
+                ),
+                Planner::advisoryLabels($advisory, self::ISSUE_LABELS),
+                $token,
+            );
             $this->log("Issue created: {$url}");
-            $opened[] = ['advisory' => $advisory, 'url' => $url];
+            $opened[] = [
+                'advisory' => $advisory,
+                'url'      => $url,
+            ];
         }
 
         // One message per audit, whatever the number of new advisories.
@@ -185,7 +293,11 @@ final class Updater
         $this->closeResolved($titles, $token);
 
         if (! $auto || ! $urgent) {
-            $this->log($auto ? 'Nothing urgent: the weekly update takes the rest.' : 'AUTO_FIX is off: update by hand.');
+            $this->log(
+                $auto
+                    ? 'Nothing urgent: the weekly update takes the rest.'
+                    : 'AUTO_FIX is off: update by hand.',
+            );
 
             return;
         }
@@ -196,8 +308,26 @@ final class Updater
             return;
         }
 
-        $started = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/pipeline', ['ref' => 'develop', 'variables' => [['key' => 'UPDATE_DEPENDENCIES', 'value' => 'true']]], $token);
-        $this->log($started['ok'] ? 'Update started.' : "The update could not be started ({$started['status']}).");
+        $started = $this->api(
+            'POST',
+            '/projects/' . getenv('CI_PROJECT_ID') . '/pipeline',
+            [
+                'ref'       => 'develop',
+                'variables' => [
+                    [
+                        'key'   => 'UPDATE_DEPENDENCIES',
+                        'value' => 'true',
+                    ],
+                ],
+            ],
+            $token,
+        );
+
+        $this->log(
+            $started['ok']
+                ? 'Update started.'
+                : "The update could not be started ({$started['status']}).",
+        );
     }
 
     private function cascade(): void
@@ -231,7 +361,10 @@ final class Updater
         }
 
         foreach ($this->config['cascade']['groups'] ?? [] as $group) {
-            $projects = $this->api('GET', '/groups/' . rawurlencode($group) . '/projects?include_subgroups=true&archived=false&per_page=100');
+            $projects = $this->api(
+                'GET',
+                '/groups/' . rawurlencode($group) . '/projects?include_subgroups=true&archived=false&per_page=100',
+            );
 
             foreach (Json::rows($projects['data']) as $project) {
                 $id   = Json::text($project, 'id');
@@ -242,7 +375,10 @@ final class Updater
                 }
 
                 // Opt-in: a project is updated only if it has the same file.
-                $file = $this->api('GET', "/projects/{$id}/repository/files/" . rawurlencode(self::CONFIG_FILE) . '?ref=develop');
+                $file = $this->api(
+                    'GET',
+                    "/projects/{$id}/repository/files/" . rawurlencode(self::CONFIG_FILE) . '?ref=develop',
+                );
 
                 if (! $file['ok']) {
                     $this->log("{$path}: no " . self::CONFIG_FILE . ', skipped.');
@@ -250,8 +386,23 @@ final class Updater
                     continue;
                 }
 
-                $started = $this->api('POST', "/projects/{$id}/pipeline", ['ref' => 'develop', 'variables' => [['key' => 'UPDATE_DEPENDENCIES', 'value' => 'true']]]);
-                $this->log("{$path}: " . ($started['ok'] ? 'update started' : "not started ({$started['status']})") . '.');
+                $started = $this->api('POST', "/projects/{$id}/pipeline", [
+                    'ref'       => 'develop',
+                    'variables' => [
+                        [
+                            'key'   => 'UPDATE_DEPENDENCIES',
+                            'value' => 'true',
+                        ],
+                    ],
+                ]);
+
+                $this->log(
+                    "{$path}: " . (
+                        $started['ok']
+                            ? 'update started'
+                            : "not started ({$started['status']})"
+                    ) . '.',
+                );
             }
         }
     }
@@ -262,13 +413,36 @@ final class Updater
     private function closeObsolete(): void
     {
         try {
-            $report = json_decode($this->exec(['composer', 'audit', '--locked', '--format=json', '--no-interaction'], null, [0, 1, 2, 3]), true, 512, JSON_THROW_ON_ERROR);
+            $report = json_decode(
+                $this->exec(
+                    [
+                        'composer',
+                        'audit',
+                        '--locked',
+                        '--format=json',
+                        '--no-interaction',
+                    ],
+                    null,
+                    [
+                        0,
+                        1,
+                        2,
+                        3,
+                    ],
+                ),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
+
             $titles = array_map(Planner::advisoryTitle(...), Planner::advisories(Json::map($report)));
 
-            $this->closeResolved($titles, (string) (getenv('FRESHNESS_TOKEN') ?: getenv('GITLAB_TOKEN')));
+            $this->closeResolved($titles, $this->env('FRESHNESS_TOKEN', $this->env('GITLAB_TOKEN')));
         }
         catch (Throwable $throwable) {
-            $this->log('The obsolete issues could not be checked: ' . strtok($this->mask($throwable->getMessage()), "\n"));
+            $this->log(
+                'The obsolete issues could not be checked: ' . strtok($this->mask($throwable->getMessage()), "\n"),
+            );
         }
     }
 
@@ -279,20 +453,59 @@ final class Updater
      */
     private function closeResolved(array $titles, string $token): void
     {
-        $query  = http_build_query(['state' => 'opened', 'labels' => 'Automated', 'search' => Planner::ADVISORY_TITLE_PREFIX, 'in' => 'title', 'per_page' => 100]);
-        $issues = $this->api('GET', '/projects/' . getenv('CI_PROJECT_ID') . "/issues?{$query}", null, $token);
+        $query = http_build_query([
+            'state'    => 'opened',
+            'labels'   => 'Automated',
+            'search'   => Planner::ADVISORY_TITLE_PREFIX,
+            'in'       => 'title',
+            'per_page' => 100,
+        ]);
+        $issues = $this->api(
+            'GET',
+            '/projects/' . getenv('CI_PROJECT_ID') . "/issues?{$query}",
+            null,
+            $token,
+        );
 
         foreach (Json::rows($issues['data']) as $issue) {
             $title = Json::text($issue, 'title');
 
-            if (! str_starts_with($title, Planner::ADVISORY_TITLE_PREFIX) || in_array($title, $titles, true)) {
+            if (
+                ! str_starts_with($title, Planner::ADVISORY_TITLE_PREFIX)
+                || in_array(
+                    $title,
+                    $titles,
+                    true,
+                )
+            ) {
                 continue;
             }
 
             $path = '/projects/' . getenv('CI_PROJECT_ID') . '/issues/' . Json::int($issue, 'iid');
-            $this->api('POST', "{$path}/notes", ['body' => 'The audit of ' . getenv('CI_PIPELINE_URL') . ' no longer finds this advisory.'], $token);
-            $closed = $this->api('PUT', $path, ['state_event' => 'close'], $token);
-            $this->log($closed['ok'] ? "Issue closed: {$title}" : "Issue not closed ({$closed['status']}): {$title}");
+
+            $this->api(
+                'POST',
+                "{$path}/notes",
+                [
+                    'body' => 'The audit of ' . getenv('CI_PIPELINE_URL') . ' no longer finds this advisory.',
+                ],
+                $token,
+            );
+
+            $closed = $this->api(
+                'PUT',
+                $path,
+                [
+                    'state_event' => 'close',
+                ],
+                $token,
+            );
+
+            $this->log(
+                $closed['ok']
+                    ? "Issue closed: {$title}"
+                    : "Issue not closed ({$closed['status']}): {$title}",
+            );
         }
     }
 
@@ -303,10 +516,18 @@ final class Updater
     {
         $signer = Planner::signerIdentity(getenv());
 
-        $this->exec(['gpg', '--batch', '--import'], $signer['key']);
+        $this->exec([
+            'gpg',
+            '--batch',
+            '--import',
+        ], $signer['key']);
         $fingerprint = '';
 
-        foreach (explode("\n", $this->exec(['gpg', '--list-secret-keys', '--with-colons'])) as $line) {
+        foreach (explode("\n", $this->exec([
+            'gpg',
+            '--list-secret-keys',
+            '--with-colons',
+        ])) as $line) {
             if (str_starts_with($line, 'fpr')) {
                 $fingerprint = explode(':', $line)[9];
 
@@ -314,31 +535,73 @@ final class Updater
             }
         }
 
-        $this->exec(['git', 'config', 'user.name', $signer['name']]);
-        $this->exec(['git', 'config', 'user.email', $signer['email']]);
-        $this->exec(['git', 'config', 'user.signingkey', $fingerprint]);
-        $this->exec(['git', 'config', 'commit.gpgsign', 'true']);
-        $this->exec(['git', 'config', 'tag.gpgsign', 'true']);
+        $this->exec([
+            'git',
+            'config',
+            'user.name',
+            $signer['name'],
+        ]);
+
+        $this->exec([
+            'git',
+            'config',
+            'user.email',
+            $signer['email'],
+        ]);
+
+        $this->exec([
+            'git',
+            'config',
+            'user.signingkey',
+            $fingerprint,
+        ]);
+
+        $this->exec([
+            'git',
+            'config',
+            'commit.gpgsign',
+            'true',
+        ]);
+
+        $this->exec([
+            'git',
+            'config',
+            'tag.gpgsign',
+            'true',
+        ]);
     }
 
-    private function createIssue(string $title, string $description, string $labels, string $token): string
-    {
+    private function createIssue(
+        string $title,
+        string $description,
+        string $labels,
+        string $token,
+    ): string {
         // The assignee is given by the variable ISSUE_ASSIGNEE_ID; without it, the user of the token.
         $assignee = (int) getenv('ISSUE_ASSIGNEE_ID');
 
         if (0 === $assignee) {
-            $assignee = Json::int(Json::map($this->api('GET', '/user', null, $token)['data']), 'id');
+            $assignee = Json::int(Json::map($this->api(
+                'GET',
+                '/user',
+                null,
+                $token,
+            )['data']), 'id');
         }
 
         $issue = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/issues', [
             'title'        => $title,
             'description'  => $description,
             'labels'       => $labels,
-            'assignee_ids' => 0 < $assignee ? [$assignee] : [],
+            'assignee_ids' => 0 < $assignee ? [
+                $assignee,
+            ] : [],
         ], $token);
 
         if (! $issue['ok']) {
-            throw new RuntimeException('The issue could not be created: ' . $this->mask((string) json_encode($issue['data'])));
+            throw new RuntimeException(
+                'The issue could not be created: ' . $this->mask((string) json_encode($issue['data'])),
+            );
         }
 
         return Json::text(Json::map($issue['data']), 'web_url');
@@ -357,10 +620,16 @@ final class Updater
 
         $names  = Planner::policyPackages($this->policy());
         $text   = (string) file_get_contents($file);
-        $synced = Planner::syncDependabot($text, $names, 'composer');
+        $synced = Planner::syncDependabot(
+            $text,
+            $names,
+            'composer',
+        );
 
         if (null === $synced) {
-            throw new RuntimeException(self::DEPENDABOT_FILE . ' has no block "# BEGIN dependency-policy (composer)" ... "# END dependency-policy (composer)".');
+            throw new RuntimeException(
+                self::DEPENDABOT_FILE . ' has no block "# BEGIN dependency-policy (composer)" ... "# END dependency-policy (composer)".',
+            );
         }
 
         if ($synced === $text) {
@@ -370,16 +639,68 @@ final class Updater
         }
 
         file_put_contents($file, $synced);
-        $this->log('The ignore rules of Dependabot are updated: ' . (implode(', ', $names) ?: 'none') . '.');
+        $list = [] === $names
+            ? 'none'
+            : implode(', ', $names);
+
+        $this->log('The ignore rules of Dependabot are updated: ' . $list . '.');
+    }
+
+    /**
+     * A request that can fail: the failure is the value false, never a warning.
+     *
+     * @param resource|null $context
+     */
+    private function download(string $url, $context = null): string|false
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+            return file_get_contents(
+                $url,
+                false,
+                $context,
+            );
+        }
+        finally {
+            restore_error_handler();
+        }
+    }
+
+    /**
+     * An environment variable, or the default one when it is not set or empty.
+     */
+    private function env(string $name, string $default = ''): string
+    {
+        $value = getenv($name);
+
+        return false === $value || '' === $value
+            ? $default
+            : $value;
     }
 
     /**
      * @param list<string> $command
      * @param list<int>    $allowed The exit statuses that are not a failure.
      */
-    private function exec(array $command, ?string $input = null, array $allowed = [0]): string
+    private function exec(array $command, ?string $input = null, array $allowed = [
+        0,
+    ]): string
     {
-        $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->directory);
+        $process = proc_open($command, [
+            0 => [
+                'pipe',
+                'r',
+            ],
+            1 => [
+                'pipe',
+                'w',
+            ],
+            2 => [
+                'pipe',
+                'w',
+            ],
+        ], $pipes, $this->directory);
 
         if (! is_resource($process)) {
             throw new RuntimeException('Cannot run ' . $command[0] . '.');
@@ -392,7 +713,11 @@ final class Updater
         fclose($pipes[1]);
         fclose($pipes[2]);
 
-        if (! in_array(proc_close($process), $allowed, true)) {
+        if (! in_array(
+            proc_close($process),
+            $allowed,
+            true,
+        )) {
             throw new RuntimeException($this->mask(implode(' ', $command) . ' failed: ' . $error));
         }
 
@@ -401,27 +726,30 @@ final class Updater
 
     private function hasOpenUpdate(): bool
     {
-        foreach ($this->openMergeRequests() as $request) {
-            if (str_starts_with(Json::text($request, 'source_branch'), self::BRANCH_PREFIX)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(
+            $this->openMergeRequests(),
+            fn (array $request): bool => str_starts_with(Json::text($request, 'source_branch'), self::BRANCH_PREFIX),
+        );
     }
 
     private function issueExists(string $title, string $token): bool
     {
-        $query  = http_build_query(['state' => 'opened', 'search' => $title, 'in' => 'title']);
-        $issues = $this->api('GET', '/projects/' . getenv('CI_PROJECT_ID') . "/issues?{$query}", null, $token);
+        $query = http_build_query([
+            'state'  => 'opened',
+            'search' => $title,
+            'in'     => 'title',
+        ]);
+        $issues = $this->api(
+            'GET',
+            '/projects/' . getenv('CI_PROJECT_ID') . "/issues?{$query}",
+            null,
+            $token,
+        );
 
-        foreach (Json::rows($issues['data']) as $issue) {
-            if (Json::text($issue, 'title') === $title) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(
+            Json::rows($issues['data']),
+            fn (array $issue): bool => Json::text($issue, 'title') === $title,
+        );
     }
 
     /**
@@ -431,7 +759,9 @@ final class Updater
     {
         $file = $this->directory . '/composer.lock';
 
-        return is_file($file) ? Planner::lockVersions(Json::map(json_decode((string) file_get_contents($file), true))) : [];
+        return is_file($file) ? Planner::lockVersions(
+            Json::map(json_decode((string) file_get_contents($file), true)),
+        ) : [];
     }
 
     private function log(string $message): void
@@ -444,17 +774,36 @@ final class Updater
      */
     private function manifest(?string $ref = null): array
     {
-        $json = null === $ref ? (string) file_get_contents($this->directory . '/composer.json') : $this->exec(['git', 'show', "{$ref}:composer.json"]);
+        $json = null === $ref
+            ? (string) file_get_contents($this->directory . '/composer.json')
+            : $this->exec([
+                'git',
+                'show',
+                "{$ref}:composer.json",
+            ]);
 
-        /** @var array<string, mixed> */
-        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        return Json::map(json_decode(
+            $json,
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        ));
     }
 
     private function mask(string $text): string
     {
-        foreach (['GITLAB_TOKEN', 'FRESHNESS_TOKEN'] as $name) {
+        foreach ([
+            'GITLAB_TOKEN',
+            'FRESHNESS_TOKEN',
+        ] as $name) {
             $token = (string) getenv($name);
-            $text  = '' === $token ? $text : str_replace($token, '***', $text);
+            $text  = '' === $token
+                ? $text
+                : str_replace(
+                    $token,
+                    '***',
+                    $text,
+                );
         }
 
         return $text;
@@ -471,7 +820,7 @@ final class Updater
         $milestone  = null;
 
         foreach ($list as $item) {
-            if ('Maintenance' === Json::text($item, 'title')) {
+            if (Json::text($item, 'title') === 'Maintenance') {
                 $milestone = $item;
             }
         }
@@ -482,9 +831,13 @@ final class Updater
 
         return [
             'assignee_id'  => $account,
-            'reviewer_ids' => [$account],
+            'reviewer_ids' => [
+                $account,
+            ],
             'labels'       => 'Kind::Chore',
-            ...(null !== $milestone ? ['milestone_id' => Json::int($milestone, 'id')] : []),
+            ...(null !== $milestone ? [
+                'milestone_id' => Json::int($milestone, 'id'),
+            ] : []),
         ];
     }
 
@@ -494,7 +847,10 @@ final class Updater
     private function mergeWhenGreen(int $iid): void
     {
         for ($attempt = 0; 18 > $attempt; $attempt++) {
-            $result = $this->api('PUT', '/projects/' . getenv('CI_PROJECT_ID') . "/merge_requests/{$iid}/merge", ['merge_when_pipeline_succeeds' => true, 'should_remove_source_branch' => true]);
+            $result = $this->api('PUT', '/projects/' . getenv('CI_PROJECT_ID') . "/merge_requests/{$iid}/merge", [
+                'merge_when_pipeline_succeeds' => true,
+                'should_remove_source_branch'  => true,
+            ]);
 
             if ($result['ok']) {
                 $this->log("Merge request !{$iid}: it is merged when its pipeline succeeds.");
@@ -519,13 +875,21 @@ final class Updater
             return;
         }
 
-        $context = stream_context_create(['http' => ['method' => 'POST', 'header' => "Title: {$title}\r\nContent-Type: text/plain", 'content' => $message, 'timeout' => 15, 'ignore_errors' => true]]);
-        @file_get_contents($url, false, $context);
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'header'        => "Title: {$title}\r\nContent-Type: text/plain",
+                'content'       => $message,
+                'timeout'       => 15,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $this->download($url, $context);
     }
 
     private function onPackagist(string $name, string $version): bool
     {
-        $json = @file_get_contents("https://repo.packagist.org/p2/{$name}.json");
+        $json = $this->download("https://repo.packagist.org/p2/{$name}.json");
 
         if (false === $json) {
             return false;
@@ -543,8 +907,13 @@ final class Updater
         return false;
     }
 
-    private function openMergeRequest(string $source, string $target, string $description, bool $removeSource, string $title = self::COMMIT_SUBJECT): void
-    {
+    private function openMergeRequest(
+        string $source,
+        string $target,
+        string $description,
+        bool $removeSource,
+        string $title = self::COMMIT_SUBJECT,
+    ): void {
         $request = $this->api('POST', '/projects/' . getenv('CI_PROJECT_ID') . '/merge_requests', [
             'source_branch'        => $source,
             'target_branch'        => $target,
@@ -555,7 +924,9 @@ final class Updater
         ]);
 
         if (! $request['ok']) {
-            throw new RuntimeException('The merge request could not be created: ' . $this->mask((string) json_encode($request['data'])));
+            throw new RuntimeException(
+                'The merge request could not be created: ' . $this->mask((string) json_encode($request['data'])),
+            );
         }
 
         /** @var array{iid: int} $data */
@@ -569,7 +940,10 @@ final class Updater
      */
     private function openMergeRequests(string $query = ''): array
     {
-        $result = $this->api('GET', '/projects/' . getenv('CI_PROJECT_ID') . '/merge_requests?state=opened&per_page=100' . $query);
+        $result = $this->api(
+            'GET',
+            '/projects/' . getenv('CI_PROJECT_ID') . '/merge_requests?state=opened&per_page=100' . $query,
+        );
 
         return Json::rows($result['data']);
     }
@@ -581,7 +955,11 @@ final class Updater
      */
     private function packagistReleases(string $name): array
     {
-        $json = @file_get_contents("https://repo.packagist.org/p2/{$name}.json", false, stream_context_create(['http' => ['timeout' => 20]]));
+        $json = $this->download("https://repo.packagist.org/p2/{$name}.json", stream_context_create([
+            'http' => [
+                'timeout' => 20,
+            ],
+        ]));
 
         if (false === $json) {
             return [];
@@ -599,17 +977,26 @@ final class Updater
      */
     private function policy(): array
     {
-        $base = rtrim((string) (getenv('DEPENDENCY_POLICY_URL') ?: self::POLICY_URL), '/');
+        $base = rtrim($this->env('DEPENDENCY_POLICY_URL', self::POLICY_URL), '/');
         $url  = "{$base}/php.json";
 
         try {
-            $text = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 20]]));
+            $text = $this->download($url, stream_context_create([
+                'http' => [
+                    'timeout' => 20,
+                ],
+            ]));
 
             if (false === $text) {
                 throw new RuntimeException('no answer');
             }
 
-            $doc    = Json::map(json_decode($text, true, 512, JSON_THROW_ON_ERROR));
+            $doc = Json::map(json_decode(
+                $text,
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            ));
             $errors = Planner::validatePolicy($doc);
 
             if ([] !== $errors) {
@@ -620,10 +1007,20 @@ final class Updater
             $message = "The dependency policy could not be read ({$url}): " . $throwable->getMessage();
             $this->notify('Dependency policy unreachable', getenv('CI_PROJECT_PATH') . ': ' . $message);
 
-            throw new RuntimeException($message, 0, $throwable);
+            throw new RuntimeException(
+                $message,
+                0,
+                $throwable,
+            );
         }
 
-        $this->log('Dependency policy: ' . (implode(', ', Planner::policyPackages($doc)) ?: 'nothing is held back') . '.');
+        $held = Planner::policyPackages($doc);
+
+        $list = [] === $held
+            ? 'nothing is held back'
+            : implode(', ', $held);
+
+        $this->log('Dependency policy: ' . $list . '.');
 
         return $doc;
     }
@@ -637,9 +1034,23 @@ final class Updater
             throw new RuntimeException('Usage: update-dependencies policy-check <ref>');
         }
 
-        $blocked  = Planner::policyPackages($this->policy());
-        $before   = Planner::lockVersions(Json::map(json_decode($this->exec(['git', 'show', "{$base}:composer.lock"], null, [0, 128]) ?: '{}', true)));
-        $problems = Planner::policyViolations($blocked, $this->manifest($base), $this->manifest(), $before, $this->lockVersions());
+        $blocked = Planner::policyPackages($this->policy());
+        $lock    = $this->exec([
+            'git',
+            'show',
+            "{$base}:composer.lock",
+        ], null, [
+            0,
+            128,
+        ]);
+        $before   = Planner::lockVersions(Json::map(json_decode('' === $lock ? '{}' : $lock, true)));
+        $problems = Planner::policyViolations(
+            $blocked,
+            $this->manifest($base),
+            $this->manifest(),
+            $before,
+            $this->lockVersions(),
+        );
 
         if ([] !== $problems) {
             foreach ($problems as $problem) {
@@ -660,10 +1071,17 @@ final class Updater
         $file = $this->directory . '/' . self::POLICY_FILE;
 
         if (! is_file($file)) {
-            throw new RuntimeException(self::POLICY_FILE . ' is not in the current directory: run this in the repository dependency-policy.');
+            throw new RuntimeException(
+                self::POLICY_FILE . ' is not in the current directory: run this in the repository dependency-policy.',
+            );
         }
 
-        $doc    = Json::map(json_decode((string) file_get_contents($file), true, 512, JSON_THROW_ON_ERROR));
+        $doc = Json::map(json_decode(
+            (string) file_get_contents($file),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        ));
         $errors = Planner::validatePolicy($doc);
 
         if ([] !== $errors) {
@@ -691,7 +1109,13 @@ final class Updater
             return;
         }
 
-        if ([] !== array_filter($this->openMergeRequests(), static fn (array $request): bool => str_starts_with(Json::text($request, 'source_branch'), self::POLICY_BRANCH_PREFIX))) {
+        if (array_filter(
+            $this->openMergeRequests(),
+            static fn (array $request): bool => str_starts_with(
+                Json::text($request, 'source_branch'),
+                self::POLICY_BRANCH_PREFIX,
+            ),
+        ) !== []) {
             $this->log('A merge request that lifts an entry is already open.');
 
             return;
@@ -701,16 +1125,55 @@ final class Updater
         $list    = implode(', ', $names);
         $branch  = self::POLICY_BRANCH_PREFIX . '-' . date('Ymd');
         $subject = "chore(policy): unblock {$list}";
-        $details = implode('; ', array_map(static fn (array $entry): string => Json::text($entry, 'package') . ' ' . Json::text(Json::map($entry['unblock'] ?? null), 'version') . ' (' . implode(', ', Json::strings(Json::map($entry['unblock'] ?? null)['peers'] ?? null)) . ')', $lifted));
+        $details = implode(
+            '; ',
+            array_map(
+                static fn (array $entry): string => Json::text($entry, 'package') . ' ' . Json::text(
+                    Json::map($entry['unblock'] ?? null),
+                    'version',
+                ) . ' (' . implode(
+                    ', ',
+                    Json::strings(Json::map($entry['unblock'] ?? null)['peers'] ?? null),
+                ) . ')',
+                $lifted,
+            ),
+        );
 
         $this->configureSigning();
-        $this->exec(['git', 'switch', '-C', $branch]);
+        $this->exec([
+            'git',
+            'switch',
+            '-C',
+            $branch,
+        ]);
         file_put_contents($file, Planner::encodePolicy(Planner::withoutEntries($doc, $names)));
-        $this->exec(['git', 'add', self::POLICY_FILE]);
-        $this->exec(['git', 'commit', '-m', $subject, '-m', 'The ranges of the packages that held it back now accept it.']);
-        $this->exec(['git', 'push', $this->remoteUrl(), "HEAD:refs/heads/{$branch}"]);
+        $this->exec([
+            'git',
+            'add',
+            self::POLICY_FILE,
+        ]);
+        $this->exec([
+            'git',
+            'commit',
+            '-m',
+            $subject,
+            '-m',
+            'The ranges of the packages that held it back now accept it.',
+        ]);
+        $this->exec([
+            'git',
+            'push',
+            $this->remoteUrl(),
+            "HEAD:refs/heads/{$branch}",
+        ]);
 
-        $this->openMergeRequest($branch, 'main', "The condition of the entry is met: {$details}. It is merged when its pipeline succeeds, and the update tools take the package at their next run.", true, $subject);
+        $this->openMergeRequest(
+            $branch,
+            'main',
+            "The condition of the entry is met: {$details}. It is merged when its pipeline succeeds, and the update tools take the package at their next run.",
+            true,
+            $subject,
+        );
         $this->notify('Dependency policy: block lifted', "{$list}: {$details}");
     }
 
@@ -727,28 +1190,61 @@ final class Updater
             return;
         }
 
-        $this->openMergeRequest('develop', 'main', 'Brings the automatic update of the dependencies into main. It is merged when its pipeline succeeds.', false);
+        $this->openMergeRequest(
+            'develop',
+            'main',
+            'Brings the automatic update of the dependencies into main. It is merged when its pipeline succeeds.',
+            false,
+        );
     }
 
     private function remoteUrl(): string
     {
-        return sprintf('https://oauth2:%s@%s/%s.git', getenv('GITLAB_TOKEN'), getenv('CI_SERVER_HOST'), getenv('CI_PROJECT_PATH'));
+        return sprintf(
+            'https://oauth2:%s@%s/%s.git',
+            getenv('GITLAB_TOKEN'),
+            getenv('CI_SERVER_HOST'),
+            getenv('CI_PROJECT_PATH'),
+        );
     }
 
     private function tag(): void
     {
-        $this->exec(['git', 'fetch', '--tags', '--quiet']);
-        $last    = Planner::latestTag(array_values(array_filter(explode("\n", $this->exec(['git', 'tag', '--list'])))));
+        $this->exec([
+            'git',
+            'fetch',
+            '--tags',
+            '--quiet',
+        ]);
+        $last = Planner::latestTag(array_values(array_filter(explode("\n", $this->exec([
+            'git',
+            'tag',
+            '--list',
+        ])))));
         $commits = [];
 
         if (null !== $last) {
             // git reads a basic regular expression: the parentheses of the subject are literal.
             $subject = self::COMMIT_SUBJECT;
-            $commits = array_values(array_filter(explode("\n", $this->exec(['git', 'log', "{$last}..HEAD", '--format=%s', "--grep=^{$subject}"]))));
+            $commits = array_values(array_filter(explode("\n", $this->exec([
+                'git',
+                'log',
+                "{$last}..HEAD",
+                '--format=%s',
+                "--grep=^{$subject}",
+            ]))));
         }
 
-        $before = null !== $last ? $this->manifest($last) : null;
-        $plan   = Planner::planTag($this->config, $last, $commits, $before, $this->manifest());
+        $before = null !== $last
+            ? $this->manifest($last)
+            : null;
+        $plan   = Planner::planTag(
+            $this->config,
+            $last,
+            $commits,
+            $before,
+            $this->manifest(),
+        );
 
         if (null === $plan['version']) {
             $this->log("No tag: {$plan['reason']}.");
@@ -757,10 +1253,25 @@ final class Updater
         }
 
         $this->configureSigning();
-        $this->exec(['git', 'tag', '-s', $plan['version'], '-m', $plan['version'], (string) getenv('CI_COMMIT_SHA')]);
-        $this->exec(['git', 'push', $this->remoteUrl(), "refs/tags/{$plan['version']}"]);
+        $this->exec([
+            'git',
+            'tag',
+            '-s',
+            $plan['version'],
+            '-m',
+            $plan['version'],
+            (string) getenv('CI_COMMIT_SHA'),
+        ]);
+        $this->exec([
+            'git',
+            'push',
+            $this->remoteUrl(),
+            "refs/tags/{$plan['version']}",
+        ]);
 
-        $this->log("Tag {$plan['version']} signed and pushed (last tag {$last}): {$plan['reason']}. Its pipeline publishes the package.");
+        $this->log(
+            "Tag {$plan['version']} signed and pushed (last tag {$last}): {$plan['reason']}. Its pipeline publishes the package.",
+        );
     }
 
     private function update(): void
@@ -774,7 +1285,12 @@ final class Updater
         $this->configureSigning();
         $before = $this->manifest('HEAD');
         $branch = self::BRANCH_PREFIX . '-' . date('Ymd');
-        $this->exec(['git', 'switch', '-C', $branch]);
+        $this->exec([
+            'git',
+            'switch',
+            '-C',
+            $branch,
+        ]);
 
         $blocked = Planner::policyPackages($this->policy());
         $locked  = $this->lockVersions();
@@ -782,19 +1298,37 @@ final class Updater
         $all     = array_values(array_diff(array_keys($locked), $held));
 
         // A package of the policy keeps its locked version, also when another package requires it: the others are updated by name, with their dependencies.
-        $this->exec(['composer', 'update', '-W', '--no-interaction', '--no-progress', ...Planner::heldConstraints($held, $locked), ...([] === $held ? [] : $all)]);
+        $this->exec([
+            'composer',
+            'update',
+            '-W',
+            '--no-interaction',
+            '--no-progress',
+            ...Planner::heldConstraints($held, $locked),
+            ...([] === $held ? [] : $all),
+        ]);
 
         foreach ($held as $name) {
             if (($this->lockVersions()[$name] ?? '') !== $locked[$name]) {
-                throw new RuntimeException("{$name} is held back by the dependency policy but the update changed it: nothing is merged.");
+                throw new RuntimeException(
+                    "{$name} is held back by the dependency policy but the update changed it: nothing is merged.",
+                );
             }
         }
 
-        $this->exec(['composer', 'bump', '--no-interaction']);
+        $this->exec([
+            'composer',
+            'bump',
+            '--no-interaction',
+        ]);
 
         // The normalization is optional: not every project has the plugin.
         try {
-            $this->exec(['composer', 'normalize', '--no-interaction']);
+            $this->exec([
+                'composer',
+                'normalize',
+                '--no-interaction',
+            ]);
         }
         catch (RuntimeException) {
             $this->log('composer normalize is not available: skipped.');
@@ -804,11 +1338,26 @@ final class Updater
         $files = self::FILES;
 
         // The one exception: the ref of the shared pipeline follows the installed version of the tools.
-        if (is_file($this->directory . '/' . self::PIPELINE_FILE) && Planner::isRefOnlyChange($this->exec(['git', 'diff', '-U0', '--', self::PIPELINE_FILE]))) {
+        if (
+            is_file($this->directory . '/' . self::PIPELINE_FILE)
+            && Planner::isRefOnlyChange($this->exec([
+                'git',
+                'diff',
+                '-U0',
+                '--',
+                self::PIPELINE_FILE,
+            ]))
+        ) {
             $files[] = self::PIPELINE_FILE;
         }
 
-        if ('' === $this->exec(['git', 'status', '--porcelain', '--', ...$files])) {
+        if ($this->exec([
+            'git',
+            'status',
+            '--porcelain',
+            '--',
+            ...$files,
+        ]) === '') {
             $this->log('Everything is up to date.');
 
             return;
@@ -816,10 +1365,31 @@ final class Updater
 
         $table = Planner::formatChanges($rows);
         // Only the manifest and the lock file: the plugin of laravel-dev-tools republishes other files during composer update, and the cache of Composer on the runner is not ignored by git.
-        $this->exec(['git', 'add', ...$files]);
-        $this->exec(['git', 'commit', '-m', self::COMMIT_SUBJECT, '-m', "Minor and patch updates.\n\n{$table}"]);
-        $this->exec(['git', 'push', $this->remoteUrl(), "HEAD:refs/heads/{$branch}"]);
+        $this->exec([
+            'git',
+            'add',
+            ...$files,
+        ]);
+        $this->exec([
+            'git',
+            'commit',
+            '-m',
+            self::COMMIT_SUBJECT,
+            '-m',
+            "Minor and patch updates.\n\n{$table}",
+        ]);
+        $this->exec([
+            'git',
+            'push',
+            $this->remoteUrl(),
+            "HEAD:refs/heads/{$branch}",
+        ]);
 
-        $this->openMergeRequest($branch, 'develop', "Automatic update. The pipeline of this merge request is the gate: it is merged when it succeeds, and stays open otherwise. Major versions are never applied here.\n\n{$table}", true);
+        $this->openMergeRequest(
+            $branch,
+            'develop',
+            "Automatic update. The pipeline of this merge request is the gate: it is merged when it succeeds, and stays open otherwise. Major versions are never applied here.\n\n{$table}",
+            true,
+        );
     }
 }

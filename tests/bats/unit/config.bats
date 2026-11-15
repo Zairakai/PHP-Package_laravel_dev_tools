@@ -14,9 +14,8 @@ teardown() {
     teardown_test_env
 }
 
-# ============================================================================
 # Pattern 1: Error Counter Tests
-# ============================================================================
+# ================
 
 @test "init_error_counter initializes counter to 0" {
     init_error_counter
@@ -74,9 +73,8 @@ teardown() {
     [ "$result" -eq 0 ]
 }
 
-# ============================================================================
 # Pattern 2: file_hash Tests
-# ============================================================================
+# ================
 
 @test "file_hash returns non-empty hash for existing file" {
     local file="${TEST_TEMP_DIR}/hashme.txt"
@@ -111,9 +109,8 @@ teardown() {
     [ "$hash1" != "$hash2" ]
 }
 
-# ============================================================================
 # Helper Function Tests
-# ============================================================================
+# ================
 
 @test "command_exists returns 0 for existing command" {
     run command_exists "bash"
@@ -155,9 +152,8 @@ teardown() {
     [ -z "$output" ]
 }
 
-# ============================================================================
 # Config Resolution Tests (4-level cascade)
-# ============================================================================
+# ================
 
 @test "resolve_config returns project root override (level 1)" {
     local OLD_PROJECT_ROOT="$PROJECT_ROOT"
@@ -224,4 +220,33 @@ teardown() {
     export PROJECT_ROOT="$OLD_PROJECT_ROOT"
 
     [ -z "$result" ]
+}
+
+# Hooks path
+# ================
+
+@test "HOOKS_PATH is the stubs of the package when this package is developed" {
+    run bash -c "source '${SCRIPT_DIR}/config.sh' >/dev/null 2>&1; echo \"\$HOOKS_PATH\""
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "stubs/githooks" ]
+}
+
+@test "HOOKS_PATH is the stubs of vendor/ when the package is installed" {
+    local vendor="${TEST_TEMP_DIR}/vendor/zairakai/laravel-dev-tools/scripts"
+
+    mkdir -p "$vendor"
+    cp "${SCRIPT_DIR}/config.sh" "$vendor/"
+
+    run bash -c "source '${vendor}/config.sh' >/dev/null 2>&1; echo \"\$HOOKS_PATH\""
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "vendor/zairakai/laravel-dev-tools/stubs/githooks" ]
+}
+
+@test "PINT_CONFIG is the pint.json of the root of the project" {
+    run bash -c "source '${SCRIPT_DIR}/config.sh' >/dev/null 2>&1; echo \"\$PINT_CONFIG\""
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "${PROJECT_ROOT}/pint.json" ]
 }

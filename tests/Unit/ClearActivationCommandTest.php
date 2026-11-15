@@ -209,7 +209,11 @@ final class ClearActivationCommandTest extends TestCase
         $reflectionClass  = new ReflectionClass($clearActivationCommand);
         $reflectionMethod = $reflectionClass->getMethod('hasColumn');
 
-        $result = $reflectionMethod->invoke($clearActivationCommand, 'activations', 'nonexistent_column');
+        $result = $reflectionMethod->invoke(
+            $clearActivationCommand,
+            'activations',
+            'nonexistent_column',
+        );
 
         $this->assertFalse($result);
     }
@@ -222,7 +226,11 @@ final class ClearActivationCommandTest extends TestCase
         $reflectionClass  = new ReflectionClass($clearActivationCommand);
         $reflectionMethod = $reflectionClass->getMethod('hasColumn');
 
-        $result = $reflectionMethod->invoke($clearActivationCommand, 'activations', 'email');
+        $result = $reflectionMethod->invoke(
+            $clearActivationCommand,
+            'activations',
+            'email',
+        );
 
         $this->assertTrue($result);
     }
