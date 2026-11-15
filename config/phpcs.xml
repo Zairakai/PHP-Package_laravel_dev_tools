@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<ruleset name="laravel-dev-tools">
+  <description>What phpcbf applies: the layout that PHPInsights alerts on and that Pint cannot write.</description>
+
+  <arg name="extensions" value="php"/>
+  <arg name="colors"/>
+
+  <!-- A ternary is always written on several lines: the condition, then `? ...` and `: ...`. -->
+  <rule ref="SlevomatCodingStandard.ControlStructures.RequireMultiLineTernaryOperator">
+    <properties>
+      <property name="lineLengthLimit" value="0"/>
+    </properties>
+  </rule>
+</ruleset>

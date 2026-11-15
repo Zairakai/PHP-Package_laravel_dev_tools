@@ -12,49 +12,50 @@ log_header "PHPInsights Code Quality Analysis"
 # Check if PHPInsights is installed (optional package - exit gracefully if not)
 PHPINSIGHTS_BIN="$PROJECT_ROOT/vendor/bin/phpinsights"
 if ! check_optional_package "nunomaduro/phpinsights" "$PHPINSIGHTS_BIN" "PHPInsights code quality analysis"; then
-    exit 0
+  exit 0
 fi
 
 # Detect context: Laravel app vs Package
 IS_LARAVEL_APP=false
 if [[ -f "$PROJECT_ROOT/artisan" ]] && grep -q '"laravel/framework"' "$PROJECT_ROOT/composer.json" 2>/dev/null; then
-    IS_LARAVEL_APP=true
-    log_step "Detected Laravel application context"
+  IS_LARAVEL_APP=true
+  log_step "Detected Laravel application context"
 else
-    log_step "Detected package context (non-Laravel app)"
+  log_step "Detected package context (non-Laravel app)"
 fi
 
 # Parse arguments
 # NOTE: --fix is intentionally NOT supported.
-# PHP Insights uses PhpCsFixer internally and would overwrite Pint's formatting.
-# Pint is the sole code formatter in this project. Run `make pint-fix` instead.
+# PHP Insights uses PhpCsFixer internally and would overwrite Pint's formatting, and the split of a long condition that it
+# writes is not the form of the handbook (standards/php.md, "Conditions"). Its sniffs are alerts: fix them by hand, then
+# run `make pint-fix`.
 EXTRA_ARGS=()
 
 for arg in "$@"; do
-    case $arg in
-        --fix)
-            log_error "--fix is not supported for PHPInsights in this project."
-            echo ""
-            echo "  PHP Insights uses PhpCsFixer internally which conflicts with Pint."
-            echo "  Use 'make pint-fix' to fix code style."
-            echo "  Use 'make rector-fix' to fix code modernization."
-            echo ""
-            exit 1
-            ;;
-        *)
-            EXTRA_ARGS+=("$arg")
-            ;;
-    esac
+  case $arg in
+    --fix)
+      log_error "--fix is not supported for PHPInsights in this project."
+      echo ""
+      echo "  PHP Insights reports; it does not rewrite the code."
+      echo "  Use 'make pint-fix' to fix code style."
+      echo "  Use 'make rector-fix' to fix code modernization."
+      echo ""
+      exit 1
+      ;;
+    *)
+      EXTRA_ARGS+=("$arg")
+      ;;
+  esac
 done
 
-# Build PHPInsights command (analysis only — no --fix)
+# Build PHPInsights command (analysis only)
 INSIGHTS_ARGS=()
 
 # Pass resolved config path when available.
-# Overrides the artisan default (config/insights.php) so that config/dev-tools/insights.php
-# is used when published there — consistent with the package path behaviour.
+# Overrides the artisan default (config/phpinsights.php) so that config/dev-tools/phpinsights.php
+# is used when published there - consistent with the package path behaviour.
 if [[ -n "$INSIGHTS_CONFIG" ]]; then
-    INSIGHTS_ARGS+=(--config-path="$INSIGHTS_CONFIG")
+  INSIGHTS_ARGS+=(--config-path="$INSIGHTS_CONFIG")
 fi
 
 # Run PHPInsights
@@ -62,32 +63,32 @@ cd "$PROJECT_ROOT"
 
 # Execute PHPInsights based on context
 if [[ "$IS_LARAVEL_APP" == "true" ]]; then
-    # Laravel app: use artisan command
-    if php artisan insights --no-interaction "${INSIGHTS_ARGS[@]}"; then
-        log_success "PHPInsights analysis passed"
-        exit 0
-    else
-        log_error "PHPInsights found quality issues"
-        echo ""
-        echo "Run 'make insights-fix' to apply automatic fixes"
-        exit 1
-    fi
+  # Laravel app: use artisan command
+  if php artisan insights --no-interaction "${INSIGHTS_ARGS[@]}"; then
+    log_success "PHPInsights analysis passed"
+    exit 0
+  else
+    log_error "PHPInsights found quality issues"
+    echo ""
+    echo "PHPInsights reports only: fix the lines above by hand (see the handbook), then run 'make pint-fix'"
+    exit 1
+  fi
 else
-    # Package: use direct binary with src/ directory
-    PACKAGE_ARGS=("analyse" "src/" "--no-interaction" "--config-path=$INSIGHTS_CONFIG")
+  # Package: use direct binary with src/ directory
+  PACKAGE_ARGS=("analyse" "src/" "--no-interaction" "--config-path=$INSIGHTS_CONFIG")
 
-    # Add extra arguments
-    if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
-        PACKAGE_ARGS+=("${EXTRA_ARGS[@]}")
-    fi
+  # Add extra arguments
+  if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
+    PACKAGE_ARGS+=("${EXTRA_ARGS[@]}")
+  fi
 
-    if "$PHPINSIGHTS_BIN" "${PACKAGE_ARGS[@]}"; then
-        log_success "PHPInsights analysis passed"
-        exit 0
-    else
-        log_error "PHPInsights found quality issues"
-        echo ""
-        echo "Run 'make insights-fix' to apply automatic fixes"
-        exit 1
-    fi
+  if "$PHPINSIGHTS_BIN" "${PACKAGE_ARGS[@]}"; then
+    log_success "PHPInsights analysis passed"
+    exit 0
+  else
+    log_error "PHPInsights found quality issues"
+    echo ""
+    echo "PHPInsights reports only: fix the lines above by hand (see the handbook), then run 'make pint-fix'"
+    exit 1
+  fi
 fi

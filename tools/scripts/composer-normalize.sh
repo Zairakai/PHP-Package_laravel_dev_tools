@@ -9,16 +9,18 @@ source "$SCRIPT_DIR/config.sh"
 log_header "Composer Normalize"
 
 if [ -d vendor/ergebnis/composer-normalize ]; then
-    echo "→ Checking composer.json normalization…"
-    composer normalize
+  echo "→ Normalizing composer.json…"
+  composer normalize
+elif [ "${1:-}" = "--if-installed" ]; then
+  echo "→ ergebnis/composer-normalize is not installed: composer.json is left as it is"
 else
-    echo ""
-    echo "❌ ergebnis/composer-normalize is not installed"
-    echo ""
-    echo "This package requires composer-normalize for composer.json validation."
-    echo ""
-    echo "Install with:"
-    echo "  composer require --dev ergebnis/composer-normalize"
-    echo ""
-    exit 1
+  echo ""
+  echo "❌ ergebnis/composer-normalize is not installed"
+  echo ""
+  echo "This package requires composer-normalize for composer.json validation."
+  echo ""
+  echo "Install with:"
+  echo "  composer require --dev ergebnis/composer-normalize"
+  echo ""
+  exit 1
 fi
