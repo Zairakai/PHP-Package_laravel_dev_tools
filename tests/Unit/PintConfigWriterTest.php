@@ -24,11 +24,7 @@ final class PintConfigWriterTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->directory . '/*') ?: [] as $file) {
-            File::delete($file);
-        }
-
-        rmdir($this->directory);
+        File::deleteDirectory($this->directory);
 
         parent::tearDown();
     }
@@ -113,11 +109,11 @@ final class PintConfigWriterTest extends TestCase
     }
 
     #[Test]
-    public function it_writes_the_pint_json_of_the_root_from_the_rules_of_php_dev_tools(): void
+    public function it_writes_the_pint_json_of_config_dev_tools_from_the_rules_of_php_dev_tools(): void
     {
         $file = PintConfigWriter::write($this->directory, []);
 
-        self::assertSame($this->directory . '/pint.json', $file);
+        self::assertSame($this->directory . '/config/dev-tools/pint.json', $file);
 
         $config = $this->read($file);
 

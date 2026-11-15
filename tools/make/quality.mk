@@ -2,8 +2,12 @@
 
 ## —— ✅ Quality Gates ——
 .PHONY: quality
-quality:: markdownlint shellcheck rector pint phpstan insights ## Run all quality checks
+quality:: markdownlint shellcheck rector pint phpstan insights config-check ## Run all quality checks
 	@echo "✅ All quality checks passed"
+
+.PHONY: config-check
+config-check:: ## Check that the files of the root agree with config/dev-tools (SYNC=true writes the copies again)
+	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/check-config-copies.sh
 
 .PHONY: quality-fast
 quality-fast:: ## Run fast quality checks only (Pint + PHPStan + Markdownlint)

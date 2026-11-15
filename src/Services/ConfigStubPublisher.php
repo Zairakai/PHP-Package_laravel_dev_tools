@@ -108,6 +108,7 @@ final readonly class ConfigStubPublisher
     public function publishBaseline(string $vendorPath, string $basePath): bool
     {
         return $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/baseline.neon',
             targetFile: $basePath . '/config/dev-tools/baseline.neon',
             // Baseline is NEVER overwritten even with --force - it contains accepted errors
@@ -148,7 +149,11 @@ final readonly class ConfigStubPublisher
                 $force,
             ),
             'baseline'           => $this->publishBaseline($vendorPath, $basePath),
-            'pint'               => $this->publishPint($vendorPath, $basePath),
+            'pint'               => $this->publishPint(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
             'markdownlint'       => $this->publishMarkdownlint(
                 $vendorPath,
                 $basePath,
@@ -196,6 +201,7 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): void {
         $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/enlightn.php',
             targetFile: $basePath . '/config/enlightn.php',
             force: $force,
@@ -221,6 +227,7 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): bool {
         return $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/gitlab-ci.yml',
             targetFile: $basePath . '/.gitlab-ci.yml',
             force: $force,
@@ -240,6 +247,7 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): bool {
         return $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
             targetFile: $basePath . '/.gitlab-ci.yml',
             force: $force,
@@ -285,6 +293,7 @@ final readonly class ConfigStubPublisher
                 label: $filename,
                 issuesUrl: $issuesUrl,
                 force: $force,
+                basePath: $basePath,
             );
         }
 
@@ -343,7 +352,8 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Publish the PHP Insights configuration stub.
+     * Publish the PHP Insights configuration of the project into config/dev-tools/. No file at the root: no extension of
+     * an editor reads it, the commands do.
      * User is expected to customize this file - protected against force overwrite.
      */
     public function publishInsights(
@@ -352,71 +362,107 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): bool {
         return $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/phpinsights.php',
-            targetFile: $basePath . '/phpinsights.php',
+            targetFile: $basePath . '/config/dev-tools/phpinsights.php',
             force: $force,
-            label: 'phpinsights.php',
+            label: 'config/dev-tools/phpinsights.php',
             protectUserChanges: true,
         );
     }
 
     /**
-     * Publish the Markdownlint configuration into config/dev-tools/.
+     * Publish the Markdownlint configuration of the project into config/dev-tools/, and the thin file of the root that
+     * extends it, where the extension of the editor reads it.
      */
     public function publishMarkdownlint(
         string $vendorPath,
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        $published = $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/.markdownlint.json',
-            targetFile: $basePath . '/.markdownlint.json',
+            targetFile: $basePath . '/config/dev-tools/.markdownlint.json',
             force: $force,
-            label: '.markdownlint.json',
+            label: 'config/dev-tools/.markdownlint.json',
             protectUserChanges: true,
         );
+
+        $this->publishRootThin(
+            $vendorPath,
+            $basePath,
+            '.markdownlint.json',
+            $force,
+        );
+
+        return $published;
     }
 
     /**
-     * Publish the Markdownlint ignore file into config/dev-tools/.
+     * Publish the Markdownlint ignore file into config/dev-tools/, and its copy at the root: an ignore file cannot
+     * extend another file.
      */
     public function publishMarkdownlintIgnore(
         string $vendorPath,
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        $published = $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/.markdownlintignore',
-            targetFile: $basePath . '/.markdownlintignore',
+            targetFile: $basePath . '/config/dev-tools/.markdownlintignore',
             force: $force,
-            label: '.markdownlintignore',
+            label: 'config/dev-tools/.markdownlintignore',
             protectUserChanges: true,
         );
+
+        $this->publishRootCopy(
+            $basePath,
+            '.markdownlintignore',
+            $force,
+        );
+
+        return $published;
     }
 
     // Individual publishers
     // ================
 
     /**
-     * Publish the thin PHPStan config into the project root, where the editor reads it: it extends the one of this package.
+     * Publish the PHPStan configuration of the project into config/dev-tools/, where it extends the one of this package,
+     * and the thin file of the root that includes it, where the editor reads it.
      */
     public function publishPhpstan(
         string $vendorPath,
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        $published = $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/phpstan.neon',
-            targetFile: $basePath . '/phpstan.neon',
+            targetFile: $basePath . '/config/dev-tools/phpstan.neon',
             force: $force,
-            label: 'phpstan.neon',
+            label: 'config/dev-tools/phpstan.neon',
             protectUserChanges: true,
         );
+
+        $this->publishRootThin(
+            $vendorPath,
+            $basePath,
+            'phpstan.neon',
+            $force,
+        );
+
+        return $published;
     }
 
     /**
-     * Publish the PHPUnit configuration stub.
+     * Publish the PHPUnit configuration into config/dev-tools/, and its copy at the root, where the editor reads it.
      * Detects project type to choose between app and package config.
+     *
+     * PHPUnit reads the paths of its file from the folder of that file: the one of config/dev-tools/ goes up two folders,
+     * the copy of the root does not (ConfigCopies).
      */
     public function publishPhpunit(
         string $vendorPath,
@@ -432,43 +478,74 @@ final readonly class ConfigStubPublisher
             ? $vendorPath . '/config/phpunit-app.xml'
             : $vendorPath . '/config/phpunit.xml';
 
-        return $this->publishStub(
-            stubFile: $stubFile,
+        $converted = (string) tempnam(sys_get_temp_dir(), 'phpunit');
+
+        file_put_contents($converted, ConfigCopies::phpunitForConfig((string) file_get_contents($stubFile)));
+
+        $published = $this->publishStub(
+            basePath: $basePath,
+            stubFile: $converted,
             targetFile: $basePath . '/config/dev-tools/phpunit.xml',
             force: $force,
             label: 'config/dev-tools/phpunit.xml',
             protectUserChanges: true,
         );
+
+        File::delete($converted);
+
+        $this->publishRootCopy(
+            $basePath,
+            'phpunit.xml',
+            $force,
+        );
+
+        return $published;
     }
 
     /**
-     * Generate the pint.json of the project root.
+     * Generate the pint.json of config/dev-tools/, and its copy at the root, where the editor reads it.
      *
-     * Pint cannot extend a file and the editor reads only this one: it is a copy of the rules of php-dev-tools, the Laravel
-     * layer of this package and the changes of the project (config/dev-tools/pint.json). A generated file is written
-     * again each time, whatever $force says.
+     * Pint cannot extend a file. The file of config/dev-tools/ is the complete one that the project edits: it is
+     * generated from the rules of php-dev-tools and the Laravel layer of this package, and written again over the
+     * changes of the project only with $force.
      */
-    public function publishPint(string $vendorPath, string $basePath): bool
-    {
-        try {
-            PintConfigWriter::write($basePath, [
-                $vendorPath . '/config/pint.json',
-                $basePath . '/config/dev-tools/pint.json',
-            ]);
+    public function publishPint(
+        string $vendorPath,
+        string $basePath,
+        bool $force = false,
+    ): bool {
+        if (is_file($basePath . '/config/dev-tools/pint.json') && ! $force) {
+            $this->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
         }
-        catch (RuntimeException $runtimeException) {
-            $this->componentsFactory->error($runtimeException->getMessage());
+        else {
+            $this->saveBeforeOverwriting($basePath, $basePath . '/config/dev-tools/pint.json');
 
-            return false;
+            try {
+                PintConfigWriter::write($basePath, [
+                    $vendorPath . '/config/pint.json',
+                ]);
+            }
+            catch (RuntimeException $runtimeException) {
+                $this->componentsFactory->error($runtimeException->getMessage());
+
+                return false;
+            }
+
+            $this->componentsFactory->task('Generated: config/dev-tools/pint.json');
         }
 
-        $this->componentsFactory->task('Generated: pint.json');
+        $this->publishRootCopy(
+            $basePath,
+            'pint.json',
+            $force,
+        );
 
         return true;
     }
 
     /**
-     * Publish the Rector configuration stub.
+     * Publish the Rector configuration of the project into config/dev-tools/. No file at the root: no extension of an
+     * editor reads it, the commands do.
      * User is expected to customize this file - protected against force overwrite.
      */
     public function publishRector(
@@ -477,10 +554,11 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): bool {
         return $this->publishStub(
+            basePath: $basePath,
             stubFile: $vendorPath . '/stubs/rector.php',
-            targetFile: $basePath . '/rector.php',
+            targetFile: $basePath . '/config/dev-tools/rector.php',
             force: $force,
-            label: 'rector.php',
+            label: 'config/dev-tools/rector.php',
             protectUserChanges: true,
         );
     }
@@ -557,6 +635,7 @@ final readonly class ConfigStubPublisher
         string $label,
         string $issuesUrl,
         bool $force,
+        string $basePath,
     ): bool {
         if (! File::exists($stubFile)) {
             $this->componentsFactory->warn('Stub not found, skipping: ' . $label);
@@ -607,7 +686,8 @@ final readonly class ConfigStubPublisher
                 return false;
             }
 
-            // Force - overwrite unconditionally
+            // Force - overwrite unconditionally, after a copy of the file
+            $this->saveBeforeOverwriting($basePath, $targetFile);
             File::copy($tempFile, $targetFile);
             $this->componentsFactory->task('Copied: ' . $label);
 
@@ -616,6 +696,51 @@ final readonly class ConfigStubPublisher
         finally {
             File::delete($tempFile);
         }
+    }
+
+    /**
+     * The copy of a file of config/dev-tools/ at the root, for the editor. Written when the project has none, or with
+     * $force; left alone otherwise (ConfigCopies tells when it differs).
+     */
+    private function publishRootCopy(
+        string $basePath,
+        string $name,
+        bool $force,
+    ): void {
+        if (File::exists($basePath . '/' . $name) && ! $force) {
+            return;
+        }
+
+        $written = ConfigCopies::sync(
+            $basePath,
+            [
+                $name,
+            ],
+            fn (string $file): bool => $this->saveBeforeOverwriting($basePath, $file),
+        );
+
+        if ([] !== $written) {
+            $this->componentsFactory->task('Copied: ' . $name . ' (root)');
+        }
+    }
+
+    /**
+     * The thin file of the root, for the editor: it points at the one of config/dev-tools/.
+     */
+    private function publishRootThin(
+        string $vendorPath,
+        string $basePath,
+        string $name,
+        bool $force,
+    ): void {
+        $this->publishStub(
+            basePath: $basePath,
+            stubFile: $vendorPath . '/stubs/root/' . $name,
+            targetFile: $basePath . '/' . $name,
+            force: $force,
+            label: $name . ' (root)',
+            protectUserChanges: false,
+        );
     }
 
     // Core publishing logic
@@ -631,6 +756,7 @@ final readonly class ConfigStubPublisher
      * @param bool   $protectUserChanges Skip overwrite if file differs from stub
      */
     private function publishStub(
+        string $basePath,
         string $stubFile,
         string $targetFile,
         bool $force,
@@ -653,6 +779,10 @@ final readonly class ConfigStubPublisher
             $label,
         )) {
             return false;
+        }
+
+        if ($force) {
+            $this->saveBeforeOverwriting($basePath, $targetFile);
         }
 
         return $this->copyStub(
@@ -693,6 +823,31 @@ final readonly class ConfigStubPublisher
             : $name;
 
         return 'https://gitlab.com/zairakai/php-packages/' . $shortName . '/-/issues';
+    }
+
+    /**
+     * Keeps a copy of a file that a forced publication is about to write over, in .dev-tools-backup/ (the same folder as
+     * the shell scripts use). Nothing is kept when the file does not exist.
+     */
+    private function saveBeforeOverwriting(string $basePath, string $file): bool
+    {
+        if (! File::exists($file)) {
+            return false;
+        }
+
+        // One folder per run and per project: the copies of a publication stay together
+        /** @var array<string, ConfigBackup> $backups */
+        static $backups = [];
+
+        $backups[$basePath] ??= new ConfigBackup($basePath);
+
+        if (! $backups[$basePath]->save($file)) {
+            return false;
+        }
+
+        $this->componentsFactory->task('Backed up: ' . ltrim(substr($file, strlen($basePath)), '/'));
+
+        return true;
     }
 
     /**

@@ -8,6 +8,7 @@ use Illuminate\Console\View\Components\Factory;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Zairakai\LaravelDevTools\Services\ConfigCopies;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\GitHooksActivator;
 use Zairakai\LaravelDevTools\Tests\TestCase;
@@ -45,6 +46,71 @@ final class ConfigStubPublisherTest extends TestCase
         $this->cleanDevToolsDir();
 
         parent::tearDown();
+    }
+
+    #[Test]
+    public function a_forced_publication_keeps_a_copy_of_the_generated_pint_file_and_of_its_copy_at_the_root(): void
+    {
+        File::makeDirectory(
+            $this->basePath . '/config/dev-tools',
+            0755,
+            true,
+            true,
+        );
+        File::put($this->basePath . '/config/dev-tools/pint.json', '{"mine": 1}');
+        File::put($this->basePath . '/pint.json', '{"root": 1}');
+
+        $this->configStubPublisher->publishPint(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $this->assertSame(
+            '{"mine": 1}',
+            File::get((glob($this->basePath . '/.dev-tools-backup/*/config/dev-tools/pint.json') ?: [
+                '',
+            ])[0]),
+        );
+        $this->assertSame(
+            '{"root": 1}',
+            File::get((glob($this->basePath . '/.dev-tools-backup/*/pint.json') ?: [
+                '',
+            ])[0]),
+        );
+    }
+
+    #[Test]
+    public function a_forced_publication_keeps_a_copy_of_the_thin_file_of_the_root_that_it_writes_over(): void
+    {
+        File::put($this->basePath . '/phpstan.neon', "includes:\n  - vendor/old.neon\n");
+
+        $this->configStubPublisher->publishPhpstan(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $copies = glob($this->basePath . '/.dev-tools-backup/*/phpstan.neon') ?: [];
+
+        $this->assertCount(1, $copies);
+        $this->assertStringContainsString('vendor/old.neon', File::get($copies[0]));
+        $this->assertStringContainsString('config/dev-tools/phpstan.neon', File::get($this->basePath . '/phpstan.neon'));
+    }
+
+    #[Test]
+    public function a_publication_without_force_keeps_no_copy(): void
+    {
+        File::put($this->basePath . '/phpstan.neon', "includes:\n  - vendor/old.neon\n");
+
+        $this->configStubPublisher->publishPhpstan(
+            $this->vendorPath,
+            $this->basePath,
+            false,
+        );
+
+        $this->assertStringContainsString('vendor/old.neon', File::get($this->basePath . '/phpstan.neon'));
+        $this->assertSame([], glob($this->basePath . '/.dev-tools-backup/*') ?: []);
     }
 
     #[Test]
@@ -240,7 +306,7 @@ final class ConfigStubPublisherTest extends TestCase
         );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/phpinsights.php');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/phpinsights.php');
     }
 
     #[Test]
@@ -327,7 +393,7 @@ final class ConfigStubPublisherTest extends TestCase
         );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/rector.php');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
     }
 
     #[Test]
@@ -591,12 +657,16 @@ variables:
 
         foreach ([
             '/phpstan.neon',
-            '/rector.php',
-            '/phpinsights.php',
+            '/config/dev-tools/phpstan.neon',
+            '/config/dev-tools/rector.php',
+            '/config/dev-tools/phpinsights.php',
             '/config/dev-tools/baseline.neon',
+            '/config/dev-tools/pint.json',
             '/pint.json',
+            '/config/dev-tools/.markdownlint.json',
             '/.markdownlint.json',
             '/config/dev-tools/phpunit.xml',
+            '/phpunit.xml',
         ] as $file) {
             $this->assertFileExists($this->basePath . $file, "Missing: {$file}");
         }
@@ -638,8 +708,9 @@ variables:
 
         foreach ([
             '/phpstan.neon',
-            '/rector.php',
-            '/phpinsights.php',
+            '/config/dev-tools/phpstan.neon',
+            '/config/dev-tools/rector.php',
+            '/config/dev-tools/phpinsights.php',
             '/config/dev-tools/baseline.neon',
         ] as $file) {
             $this->assertFileExists($this->basePath . $file, "Missing: {$file}");
@@ -826,37 +897,13 @@ variables:
     }
 
     #[Test]
-    public function publish_pint_adds_the_changes_kept_apart_by_the_project(): void
-    {
-        File::makeDirectory(
-            $this->basePath . '/config/dev-tools',
-            0755,
-            true,
-            true,
-        );
-        File::put(
-            $this->basePath . '/config/dev-tools/pint.json',
-            '{"rules": {"single_quote": false}, "finder": {"exclude": ["generated"]}}',
-        );
-
-        $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
-
-        $config = json_decode(File::get($this->basePath . '/pint.json'), true);
-
-        $this->assertIsArray($config);
-        $this->assertFalse($config['rules']['single_quote']);
-        $this->assertContains('generated', $config['finder']['exclude']);
-        $this->assertContains('storage', $config['finder']['exclude']);
-    }
-
-    #[Test]
-    public function publish_pint_generates_the_file_of_the_root_from_the_rules_of_php_dev_tools(): void
+    public function publish_pint_generates_the_complete_file_from_the_rules_of_php_dev_tools_and_copies_it(): void
     {
         $result = $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
 
         $this->assertTrue($result);
 
-        $config = json_decode(File::get($this->basePath . '/pint.json'), true);
+        $config = json_decode(File::get($this->basePath . '/config/dev-tools/pint.json'), true);
 
         $this->assertIsArray($config);
         $this->assertSame('laravel', $config['preset']);
@@ -866,15 +913,103 @@ variables:
             $config['finder']['exclude'],
             'the exclusions of Laravel are added',
         );
+        $this->assertSame(
+            File::get($this->basePath . '/config/dev-tools/pint.json'),
+            File::get($this->basePath . '/pint.json'),
+        );
     }
 
     #[Test]
-    public function publish_pint_writes_the_file_again_each_time(): void
+    public function publish_pint_generates_the_file_again_only_with_force(): void
     {
-        File::put($this->basePath . '/pint.json', '{"stale": true}');
+        File::makeDirectory(
+            $this->basePath . '/config/dev-tools',
+            0755,
+            true,
+            true,
+        );
+        File::put($this->basePath . '/config/dev-tools/pint.json', '{"stale": true}');
 
-        $this->assertTrue($this->configStubPublisher->publishPint($this->vendorPath, $this->basePath));
+        $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
+        $this->assertStringContainsString('stale', File::get($this->basePath . '/config/dev-tools/pint.json'));
+
+        $this->configStubPublisher->publishPint(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+        $this->assertStringNotContainsString('stale', File::get($this->basePath . '/config/dev-tools/pint.json'));
         $this->assertStringNotContainsString('stale', File::get($this->basePath . '/pint.json'));
+    }
+
+    #[Test]
+    public function publish_pint_keeps_the_file_of_the_project_and_copies_it_at_the_root(): void
+    {
+        File::makeDirectory(
+            $this->basePath . '/config/dev-tools',
+            0755,
+            true,
+            true,
+        );
+        File::put(
+            $this->basePath . '/config/dev-tools/pint.json',
+            '{"rules": {"single_quote": false}}',
+        );
+
+        $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
+
+        $this->assertSame(
+            '{"rules": {"single_quote": false}}',
+            File::get($this->basePath . '/config/dev-tools/pint.json'),
+            'the changes of the project are kept',
+        );
+        $this->assertSame(
+            File::get($this->basePath . '/config/dev-tools/pint.json'),
+            File::get($this->basePath . '/pint.json'),
+            'the root holds a copy',
+        );
+    }
+
+    #[Test]
+    public function publishing_everything_leaves_the_root_and_config_dev_tools_in_agreement(): void
+    {
+        $this->configStubPublisher->publishGroup(
+            'all',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $this->assertSame([], ConfigCopies::problems($this->basePath));
+    }
+
+    #[Test]
+    public function the_phpunit_file_of_config_dev_tools_goes_up_two_folders_and_the_copy_of_the_root_does_not(): void
+    {
+        $this->configStubPublisher->publishPhpunit(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $this->assertStringContainsString('bootstrap="../../vendor/autoload.php"', File::get($this->basePath . '/config/dev-tools/phpunit.xml'));
+        $this->assertStringContainsString('bootstrap="vendor/autoload.php"', File::get($this->basePath . '/phpunit.xml'));
+    }
+
+    #[Test]
+    public function the_thin_files_of_the_root_point_at_config_dev_tools(): void
+    {
+        $this->configStubPublisher->publishGroup(
+            'all',
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $this->assertStringContainsString('config/dev-tools/phpstan.neon', File::get($this->basePath . '/phpstan.neon'));
+        $this->assertStringContainsString('./config/dev-tools/.markdownlint.json', File::get($this->basePath . '/.markdownlint.json'));
+        $this->assertFileDoesNotExist($this->basePath . '/rector.php', 'no editor reads it');
+        $this->assertFileDoesNotExist($this->basePath . '/phpinsights.php', 'no editor reads it');
     }
 
     // Helpers
@@ -890,9 +1025,13 @@ variables:
             'pint.json',
             '.markdownlint.json',
             '.markdownlintignore',
+            'phpunit.xml',
         ] as $file) {
             File::delete($this->basePath . '/' . $file);
         }
+
+        // The copies that a forced publication keeps
+        File::deleteDirectory($this->basePath . '/.dev-tools-backup');
 
         $devToolsDir = $this->basePath . '/config/dev-tools';
 

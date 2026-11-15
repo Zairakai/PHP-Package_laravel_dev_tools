@@ -511,10 +511,11 @@ final class PublishCommandTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $file = trim((string) shell_exec(sprintf(
-            '%s %s %s %s',
+            '%s %s %s %s %s',
             escapeshellarg(PHP_BINARY),
             escapeshellarg($root . '/scripts/pint-config.php'),
             escapeshellarg($root),
+            escapeshellarg('build/pint-config-test.json'),
             escapeshellarg($root . '/config/pint.json'),
         )));
 

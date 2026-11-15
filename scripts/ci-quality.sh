@@ -21,6 +21,9 @@ echo ""
 run_check "Documentation Linting (Markdownlint)" "bash '$SCRIPT_DIR/markdownlint.sh'" || true
 echo ""
 
+run_check "Editor configuration (root and config/dev-tools)" "bash '$SCRIPT_DIR/check-config-copies.sh'" || true
+echo ""
+
 # Exit with final result
 if exit_with_error_count "Quality Checks"; then
   exit 0
