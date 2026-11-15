@@ -5,7 +5,7 @@
 .PHONY: bats
 bats:: ## Run shell script tests (BATS)
 	@if [ ! -d tests/bats/unit ] && [ ! -d tests/bats/integration ]; then \
-		echo "ℹ️  No BATS tests found — skipping"; \
+		echo "ℹ️  No BATS tests found - skipping"; \
 		exit 0; \
 	fi
 	@if ! command -v bats &>/dev/null; then \
@@ -17,7 +17,7 @@ bats:: ## Run shell script tests (BATS)
 .PHONY: bats-unit
 bats-unit:: ## Run BATS unit tests
 	@if [ ! -d tests/bats/unit ]; then \
-		echo "ℹ️  No BATS unit tests found — skipping"; \
+		echo "ℹ️  No BATS unit tests found - skipping"; \
 		exit 0; \
 	fi
 	@if ! command -v bats &>/dev/null; then \
@@ -29,7 +29,7 @@ bats-unit:: ## Run BATS unit tests
 .PHONY: bats-integration
 bats-integration:: ## Run BATS integration tests
 	@if [ ! -d tests/bats/integration ]; then \
-		echo "ℹ️  No BATS integration tests found — skipping"; \
+		echo "ℹ️  No BATS integration tests found - skipping"; \
 		exit 0; \
 	fi
 	@if ! command -v bats &>/dev/null; then \

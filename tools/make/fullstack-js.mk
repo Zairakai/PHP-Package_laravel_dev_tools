@@ -1,6 +1,6 @@
 # Full-Stack JS Extensions
 # Included by fullstack.mk ONLY when @zairakai/js-dev-tools is detected in node_modules.
-# DO NOT include this file directly — use fullstack.mk instead.
+# DO NOT include this file directly - use fullstack.mk instead.
 
 ## —— 🧪 JS Testing ——
 
