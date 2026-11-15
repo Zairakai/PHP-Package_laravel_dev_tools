@@ -231,6 +231,12 @@ publish_file() {
   fi
 }
 
+# The name of the package: the first "name" of composer.json. sed reads the file itself and stops after the first match:
+# a pipe to head would fail under pipefail, because head closes it while grep still writes.
+package_name() {
+  sed -n '/"name"/{s/.*"name":[[:space:]]*"\([^"]*\)".*/\1/p;q;}' "${PROJECT_ROOT}/composer.json" 2>/dev/null || true
+}
+
 # Governance Files Publisher
 # ================
 # Publishes SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md to project root.
@@ -283,9 +289,7 @@ publish_governance_file() {
 
 publish_governance_files() {
   local pkg_name
-  pkg_name=$(grep '"name"' "${PROJECT_ROOT}/composer.json" 2>/dev/null \
-    | head -1 \
-    | sed 's/.*"name":[[:space:]]*"\([^"]*\)".*/\1/')
+  pkg_name=$(package_name)
 
   local pkg_short="${pkg_name##*/}"
   local issues_url="https://gitlab.com/zairakai/php-packages/${pkg_short}/-/issues"
@@ -336,9 +340,7 @@ publish_gitlab_ci_file() {
 
   # Replace placeholders with actual package name from composer.json
   local pkg_name
-  pkg_name=$(grep '"name"' "${PROJECT_ROOT}/composer.json" 2>/dev/null \
-    | head -1 \
-    | sed 's/.*"name":[[:space:]]*"\([^"]*\)".*/\1/')
+  pkg_name=$(package_name)
 
   if [[ -n "$pkg_name" ]]; then
     local cache_key="${pkg_name##*/}"
@@ -424,8 +426,7 @@ do_publish() {
 
     # PHPUnit auto-detection: app vs package
     if [[ "$key" == "phpunit" ]]; then
-      if [[ -f "${PROJECT_ROOT}/artisan" ]] || \
-        ([[ -d "${PROJECT_ROOT}/app" ]] && [[ ! -d "${PROJECT_ROOT}/src" ]]); then
+      if [[ -f "${PROJECT_ROOT}/artisan" || (-d "${PROJECT_ROOT}/app" && ! -d "${PROJECT_ROOT}/src") ]]; then
         source_rel="config/phpunit-app.xml"
       fi
     fi
@@ -545,14 +546,14 @@ update_gitignore() {
 
   local changed=false
 
-  if ! grep -qF "# Dev Tools - Generated temporary files" "$gitignore" 2>/dev/null; then
+  # A project that already has the block, with this title or with the one of the older versions, is left as it is.
+  if ! grep -qF -e "# Dev Tools temporary files" -e "# Dev Tools - Generated temporary files" "$gitignore" 2>/dev/null; then
     cat >> "$gitignore" << 'EOF'
 
-# Dev Tools - Generated temporary files
+# Dev Tools temporary files
+# ----------------
 .*.tmp.*
-
-# Dev Tools - Published configs (optional, uncomment to ignore)
-# config/dev-tools/
+.dev-tools-backup/
 EOF
     changed=true
   fi
