@@ -15,7 +15,7 @@ if [[ ! -f "$PHPUNIT_CONFIG" ]]; then
   log_warning "Expected one of:"
   log_warning "  - phpunit.xml (local project)"
   log_warning "  - phpunit.xml.dist (package)"
-  log_warning "  - vendor/zairakai/laravel-dev-tools/phpunit.xml (fallback)"
+  log_warning "  - vendor/zairakai/laravel-dev-tools/config/phpunit.xml (fallback)"
   exit 1
 fi
 
