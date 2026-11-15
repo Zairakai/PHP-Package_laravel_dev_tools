@@ -1,252 +1,222 @@
 #!/usr/bin/env bash
 #
-# Generate release notes from Git commits following git-rules conventions
-# Usage: bash .gitlab/scripts/generate-release-notes.sh [to_tag] [from_tag]
-#
+# Generate the release notes of a tag from the commits since the previous tag,
+# following the git-rules conventions.
+# Usage: bash .gitlab/scripts/generate-release-notes.sh [from_tag] [to_tag]
+#   from_tag  the previous tag (default: the version tag before to_tag, none
+#             for a first release)
+#   to_tag    the tag to describe (default: the tag of HEAD)
+# Writes release_notes.md in the current directory, and never leaves it empty.
 set -euo pipefail
 
-# Tags are listed newest first, whether they have the old "v" prefix or not (v2.2.0 then 2.3.0)
-sorted_tags() {
-    git tag | sed -E 's/^v?(.*)$/\1 &/' | sort -k1,1 -Vr | cut -d' ' -f2
+# The CI clones with a small depth and fetches only the tag of the pipeline:
+# without the history and the other tags the
+# previous tag is unknown, and the range between the tag and itself is empty.
+fetch_history() {
+  if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+    git fetch --quiet --unshallow --tags \
+      || echo "⚠️  Could not fetch the history: the notes may be incomplete"
+  else
+    git fetch --quiet --tags 2>/dev/null || true
+  fi
 }
 
-TO_TAG="${2:-$(git describe --tags --abbrev=0 HEAD)}"
-FROM_TAG="${1:-$(sorted_tags | grep -A1 -Fx "${TO_TAG}" | tail -n1)}"
+# The version tags, newest first, with or without the old "v" prefix (v2.2.0
+# then 2.3.0). A pre-release (1.0.0-rc.1)
+# comes before its release: sort reads the "~" before anything else.
+version_tags() {
+  git tag \
+    | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+(-.+)?$' \
+    | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+)-(.+)$/\1~\2 &/; t; s/^v?(.*)$/\1 &/' \
+    | sort -k1,1 -Vr \
+    | cut -d' ' -f2 \
+    || true
+}
 
-# Output files
+fetch_history
+
+TO_TAG="${2:-$(git describe --tags --abbrev=0 HEAD)}"
+FROM_TAG="${1:-$(version_tags | grep -A1 -Fx "${TO_TAG}" | sed -n 2p || true)}"
+
+if [ -n "${FROM_TAG}" ]; then
+  RANGE="${FROM_TAG}..${TO_TAG}"
+else
+  # A first release: all its commits
+  RANGE="${TO_TAG}"
+fi
+
 RELEASE_NOTES="release_notes.md"
-CHANGELOG_ENTRY="changelog_entry.md"
 
 echo "━━━━━━━━━━━━━━━━"
 echo "📝 Generating Release Notes"
 echo "━━━━━━━━━━━━━━━━"
 echo ""
-echo "→ From: ${FROM_TAG}"
+echo "→ From: ${FROM_TAG:-(first release)}"
 echo "→ To: ${TO_TAG}"
 echo "→ Output: ${RELEASE_NOTES}"
 echo ""
 
-# Function to write to both stdout and file
-output() {
-    echo "$@" | tee -a "${RELEASE_NOTES}"
-}
-
-# Initialize files
-touch "${RELEASE_NOTES}" "${CHANGELOG_ENTRY}"
 : > "${RELEASE_NOTES}"
-: > "${CHANGELOG_ENTRY}"
 
-# Get commits between tags (exclude merge commits)
-COMMITS=$(git log "${FROM_TAG}..${TO_TAG}" --pretty=format:"%s" --no-merges)
-
-if [ -z "${COMMITS}" ]; then
-    echo "⚠️  No commits found between ${FROM_TAG} and ${TO_TAG}"
-    exit 0
-fi
-
-# Categorize commits by type (following git-rules)
-FEATURES=$(echo "${COMMITS}" | grep "^feat" || true)
-FIXES=$(echo "${COMMITS}" | grep "^fix" || true)
-HOTFIXES=$(echo "${COMMITS}" | grep "^hotfix" || true)
-DOCS=$(echo "${COMMITS}" | grep "^docs" || true)
-STYLE=$(echo "${COMMITS}" | grep "^style" || true)
-REFACTOR=$(echo "${COMMITS}" | grep "^refactor" || true)
-PERF=$(echo "${COMMITS}" | grep "^perf" || true)
-TESTS=$(echo "${COMMITS}" | grep "^test" || true)
-BUILD=$(echo "${COMMITS}" | grep "^build" || true)
-CI=$(echo "${COMMITS}" | grep "^ci" || true)
-CHORE=$(echo "${COMMITS}" | grep "^chore" || true)
-
-# Detect breaking changes
-BREAKING_CHANGES=$(git log "${FROM_TAG}..${TO_TAG}" --pretty=format:"%b" --no-merges | grep -A 10 "^BREAKING CHANGE:" || true)
-
-# Other commits (not following convention)
-OTHER=$(echo "${COMMITS}" | grep -vE "^(feat|fix|hotfix|docs|style|refactor|perf|test|build|ci|chore)" || true)
-
-# Function to format commit message
-format_commit() {
-    local commit="$1"
-    local type_pattern="$2"
-
-    # Remove type prefix and optional scope: "feat(scope): " or "feat: "
-    MESSAGE=$(echo "${commit}" | sed -E "s/^${type_pattern}(\([^)]*\))?: //")
-
-    # Extract ticket ID if present
-    TICKET=$(echo "${MESSAGE}" | grep -oE "#[0-9]+" | head -n1 || echo "")
-
-    if [ -n "${TICKET}" ]; then
-        # Remove ticket ID from message for cleaner output
-        MESSAGE=$(echo "${MESSAGE}" | sed "s/${TICKET} //")
-        echo "- ${MESSAGE} (${TICKET})"
-    else
-        echo "- ${MESSAGE}"
-    fi
+# Write to both stdout and the file
+output() {
+  echo "$@" | tee -a "${RELEASE_NOTES}"
 }
 
-# Generate release notes
+footer() {
+  output "---"
+  output ""
+  if [ -n "${FROM_TAG}" ]; then
+    output "**Full Changelog**: ${FROM_TAG}...${TO_TAG}"
+  else
+    output "**First release**: ${TO_TAG}"
+  fi
+}
+
+# Commits of the range, without the merge commits
+COMMITS=$(git log "${RANGE}" --pretty=format:"%s" --no-merges)
+
 output "## What's Changed"
 output ""
 
-# Breaking Changes (highest priority)
+if [ -z "${COMMITS}" ]; then
+  output "No commit${FROM_TAG:+ since ${FROM_TAG}}."
+  output ""
+  footer
+  exit 0
+fi
+
+# The breaking changes: the paragraph that starts with "BREAKING CHANGE:", up to
+# the next blank line, as one bullet. The
+# paragraph "Migration:" that follows it is added under it.
+breaking_changes() {
+  local commit
+  for commit in $(git log "${RANGE}" --pretty=format:"%H" --no-merges); do
+    git show --no-patch --pretty=format:"%b" "${commit}" | awk '
+      function end_paragraph() {
+        if (kind == "b") { print "- " text; after = "b" }
+        else if (kind == "m") { print "  " text; after = "" }
+        else { after = "" }
+        kind = ""; text = ""
+      }
+      /^[[:space:]]*$/ { end_paragraph(); next }
+      kind == "" {
+        if ($0 ~ /^BREAKING CHANGE:/) {
+          kind = "b"; text = $0
+          sub(/^BREAKING CHANGE:[[:space:]]*/, "", text)
+        }
+        else if (after == "b" && $0 ~ /^Migration:/) { kind = "m"; text = $0 }
+        else { kind = "x" }
+        next
+      }
+      kind == "b" || kind == "m" { text = text " " $0 }
+      END { end_paragraph() }
+    '
+  done
+}
+
+# Format a commit message: without the type and the scope, with its ticket at
+# the end
+format_commit() {
+  local commit="$1"
+  local type_pattern="$2"
+  local message ticket
+
+  message=$(echo "${commit}" | sed -E "s/^${type_pattern}(\([^)]*\))?: //")
+  ticket=$(echo "${message}" | grep -oE "#[0-9]+" | head -n1 || true)
+
+  if [ -n "${ticket}" ]; then
+    # The pattern is quoted: a "#" at its start would anchor it at the start of
+    # the message
+    message="${message/"${ticket} "/}"
+    echo "- ${message} (${ticket})"
+  else
+    echo "- ${message}"
+  fi
+}
+
+# A section of the notes: section <title> <commits> <type>
+section() {
+  local title="$1"
+  local commits="$2"
+  local type="$3"
+
+  [ -n "${commits}" ] || return 0
+
+  output "### ${title}"
+  output ""
+
+  while read -r commit; do
+    output "$(format_commit "${commit}" "${type}")"
+  done <<< "${commits}"
+
+  output ""
+}
+
+# Categorize the commits by type (following git-rules)
+commits_of() {
+  echo "${COMMITS}" | grep "^$1" || true
+}
+
+BREAKING_CHANGES=$(breaking_changes)
+
 if [ -n "${BREAKING_CHANGES}" ]; then
-    output "### ⚠️ BREAKING CHANGES"
-    output ""
-    echo "${BREAKING_CHANGES}" | sed '/^$/d' | sed 's/^BREAKING CHANGE://' | while read -r line; do
-        if [ -n "${line}" ]; then
-            output "- ${line}"
-        fi
-    done
-    output ""
+  output "### ⚠️ BREAKING CHANGES"
+  output ""
+  echo "${BREAKING_CHANGES}" | while IFS= read -r line; do
+    output "${line}"
+  done
+  output ""
 fi
 
-# Features
-if [ -n "${FEATURES}" ]; then
-    output "### ✨ Features"
-    output ""
-    echo "${FEATURES}" | while read -r commit; do
-        format_commit "${commit}" "feat" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Bug Fixes
-if [ -n "${FIXES}" ]; then
-    output "### 🐛 Bug Fixes"
-    output ""
-    echo "${FIXES}" | while read -r commit; do
-        format_commit "${commit}" "fix" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Hotfixes
-if [ -n "${HOTFIXES}" ]; then
-    output "### 🚨 Hotfixes"
-    output ""
-    echo "${HOTFIXES}" | while read -r commit; do
-        format_commit "${commit}" "hotfix" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Performance Improvements
-if [ -n "${PERF}" ]; then
-    output "### ⚡ Performance"
-    output ""
-    echo "${PERF}" | while read -r commit; do
-        format_commit "${commit}" "perf" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Refactoring
-if [ -n "${REFACTOR}" ]; then
-    output "### ♻️ Refactoring"
-    output ""
-    echo "${REFACTOR}" | while read -r commit; do
-        format_commit "${commit}" "refactor" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Documentation
-if [ -n "${DOCS}" ]; then
-    output "### 📝 Documentation"
-    output ""
-    echo "${DOCS}" | while read -r commit; do
-        format_commit "${commit}" "docs" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Tests
-if [ -n "${TESTS}" ]; then
-    output "### 🧪 Tests"
-    output ""
-    echo "${TESTS}" | while read -r commit; do
-        format_commit "${commit}" "test" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Build System
-if [ -n "${BUILD}" ]; then
-    output "### 🏗️ Build System"
-    output ""
-    echo "${BUILD}" | while read -r commit; do
-        format_commit "${commit}" "build" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# CI/CD
-if [ -n "${CI}" ]; then
-    output "### 👷 CI/CD"
-    output ""
-    echo "${CI}" | while read -r commit; do
-        format_commit "${commit}" "ci" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Code Style
-if [ -n "${STYLE}" ]; then
-    output "### 💄 Code Style"
-    output ""
-    echo "${STYLE}" | while read -r commit; do
-        format_commit "${commit}" "style" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
-
-# Maintenance
-if [ -n "${CHORE}" ]; then
-    output "### 🔧 Maintenance"
-    output ""
-    echo "${CHORE}" | while read -r commit; do
-        format_commit "${commit}" "chore" | tee -a "${RELEASE_NOTES}"
-    done
-    output ""
-fi
+section "✨ Features" "$(commits_of feat)" "feat"
+section "🐛 Bug Fixes" "$(commits_of fix)" "fix"
+section "🚨 Hotfixes" "$(commits_of hotfix)" "hotfix"
+section "⚡ Performance" "$(commits_of perf)" "perf"
+section "♻️ Refactoring" "$(commits_of refactor)" "refactor"
+section "📝 Documentation" "$(commits_of docs)" "docs"
+section "🧪 Tests" "$(commits_of test)" "test"
+section "🏗️ Build System" "$(commits_of build)" "build"
+section "👷 CI/CD" "$(commits_of ci)" "ci"
+section "💄 Code Style" "$(commits_of style)" "style"
+section "🔧 Maintenance" "$(commits_of chore)" "chore"
 
 # Other commits (not following convention)
+TYPES="feat|fix|hotfix|docs|style|refactor|perf|test|build|ci|chore"
+OTHER=$(echo "${COMMITS}" | grep -vE "^(${TYPES})" || true)
+
 if [ -n "${OTHER}" ]; then
-    output "### 📦 Other Changes"
-    output ""
-    echo "${OTHER}" | while read -r commit; do
-        output "- ${commit}"
-    done
-    output ""
+  output "### 📦 Other Changes"
+  output ""
+  while read -r commit; do
+    output "- ${commit}"
+  done <<< "${OTHER}"
+  output ""
 fi
 
-# Collect all referenced issues
+# The issues of the release: the tickets of the subjects, and the issues that
+# the footers close
 output "### 🎫 Issues"
 output ""
-ISSUES=$(git log "${FROM_TAG}..${TO_TAG}" --pretty=format:"%b" --no-merges | \
-    grep -oE "(Closes|Fixes|Resolves) #[0-9]+(, #[0-9]+)*" | \
-    grep -oE "#[0-9]+" | sort -u || true)
+ISSUES=$({
+  echo "${COMMITS}" | grep -oE "#[0-9]+" || true
+  git log "${RANGE}" --pretty=format:"%b" --no-merges \
+    | grep -oE "(Closes|Fixes|Resolves) #[0-9]+(, #[0-9]+)*" \
+    | grep -oE "#[0-9]+" || true
+} | sort -uV)
 
 if [ -n "${ISSUES}" ]; then
-    output "This release closes the following issues:"
-    output ""
-    echo "${ISSUES}" | while read -r issue; do
-        output "- ${issue}"
-    done
+  output "The issues of this release:"
+  output ""
+  while read -r issue; do
+    output "- ${issue}"
+  done <<< "${ISSUES}"
 else
-    output "No issues referenced in commits."
+  output "No issues referenced in commits."
 fi
 
 output ""
-
-# Footer
-output "---"
-output ""
-output "**Full Changelog**: ${FROM_TAG}...${TO_TAG}"
-
-# Create changelog entry (same content but without header)
-cp "${RELEASE_NOTES}" "${CHANGELOG_ENTRY}"
+footer
 
 echo ""
-echo "✅ Release notes generated:"
-echo "   - ${RELEASE_NOTES}"
-echo "   - ${CHANGELOG_ENTRY}"
+echo "✅ Release notes generated: ${RELEASE_NOTES}"

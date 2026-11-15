@@ -369,6 +369,9 @@ php:release:
   <<: [*base_job, *cache_composer]
   stage: release
   image: ${RELEASE_CLI_IMAGE}
+  variables:
+    # All the history and all the tags: the notes cover the range since the previous tag
+    GIT_DEPTH: 0
   rules:
     - if: $UPDATE_DEPENDENCIES == "true"
       when: never
@@ -383,8 +386,8 @@ php:release:
   script:
     - |
       bash "$DEV_TOOLS_GITLAB_SCRIPTS/generate-release-notes.sh"
-      if [ ! -f release_notes.md ]; then
-        echo "❌ ERROR: release_notes.md not created"
+      if [ ! -s release_notes.md ]; then
+        echo "❌ ERROR: release_notes.md is missing or empty"
         exit 1
       fi
       release-cli create \
