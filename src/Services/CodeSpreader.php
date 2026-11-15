@@ -225,7 +225,13 @@ final readonly class CodeSpreader
         $calls = [];
 
         foreach (new NodeFinder()->find($nodes, $this->isCall(...)) as $call) {
-            if (! $this->isCall($call) || ($call instanceof New_ && ! $call->class instanceof Name)) {
+            if (
+                ! $this->isCall($call)
+                || (
+                    $call instanceof New_
+                    && ! $call->class instanceof Name
+                )
+            ) {
                 continue;
             }
 
@@ -317,7 +323,10 @@ final readonly class CodeSpreader
             return false;
         }
 
-        if (isset($destructure[spl_object_id($array)]) || Array_::KIND_SHORT !== $array->getAttribute('kind')) {
+        if (
+            isset($destructure[spl_object_id($array)])
+            || Array_::KIND_SHORT !== $array->getAttribute('kind')
+        ) {
             return false;
         }
 
@@ -380,7 +389,11 @@ final readonly class CodeSpreader
             $first  = $params[0]                       ?? null;
             $last   = $params[array_key_last($params)] ?? null;
 
-            if (count($params) < self::MIN_SPREAD || null === $first || null === $last) {
+            if (
+                count($params) < self::MIN_SPREAD
+                || null === $first
+                || null === $last
+            ) {
                 continue;
             }
 
