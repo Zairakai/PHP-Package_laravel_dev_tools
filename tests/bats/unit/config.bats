@@ -155,7 +155,7 @@ teardown() {
 # Config Resolution Tests (4-level cascade)
 # ================
 
-@test "resolve_config returns project root override (level 1)" {
+@test "resolve_config returns the file of config/dev-tools/, the configuration of the project (level 1)" {
   local OLD_PROJECT_ROOT="$PROJECT_ROOT"
   export PROJECT_ROOT="$TEST_TEMP_DIR"
 
@@ -167,21 +167,20 @@ teardown() {
 
   export PROJECT_ROOT="$OLD_PROJECT_ROOT"
 
-  [ "$result" = "${TEST_TEMP_DIR}/tool.json" ]
+  [ "$result" = "${TEST_TEMP_DIR}/config/dev-tools/tool.json" ]
 }
 
-@test "resolve_config returns config/dev-tools/ override (level 2)" {
+@test "resolve_config returns the file of the root when the project has not moved it to config/dev-tools/ (level 2)" {
   local OLD_PROJECT_ROOT="$PROJECT_ROOT"
   export PROJECT_ROOT="$TEST_TEMP_DIR"
 
-  mkdir -p "${TEST_TEMP_DIR}/config/dev-tools"
-  create_test_file "${TEST_TEMP_DIR}/config/dev-tools/tool.json" "{}"
+  create_test_file "${TEST_TEMP_DIR}/tool.json" "{}"
 
   result=$(resolve_config "tool.json")
 
   export PROJECT_ROOT="$OLD_PROJECT_ROOT"
 
-  [ "$result" = "${TEST_TEMP_DIR}/config/dev-tools/tool.json" ]
+  [ "$result" = "${TEST_TEMP_DIR}/tool.json" ]
 }
 
 @test "resolve_config returns config/ fallback (level 3)" {
@@ -244,9 +243,9 @@ teardown() {
   [ "$output" = "vendor/zairakai/laravel-dev-tools/stubs/githooks" ]
 }
 
-@test "PINT_CONFIG is the pint.json of the root of the project" {
+@test "PINT_CONFIG is the pint.json of config/dev-tools, which the root copies" {
   run bash -c "source '${SCRIPT_DIR}/config.sh' >/dev/null 2>&1; echo \"\$PINT_CONFIG\""
 
   [ "$status" -eq 0 ]
-  [ "$output" = "${PROJECT_ROOT}/pint.json" ]
+  [ "$output" = "${PROJECT_ROOT}/config/dev-tools/pint.json" ]
 }

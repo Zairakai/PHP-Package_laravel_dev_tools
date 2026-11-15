@@ -79,7 +79,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/phpinsights.php');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/phpinsights.php');
     }
 
     #[Test]
@@ -147,7 +147,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/rector.php');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
     }
 
     // --publish=quality
@@ -165,8 +165,8 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertEquals(0, $exitCode);
 
         $this->assertFileExists($this->basePath . '/phpstan.neon');
-        $this->assertFileExists($this->basePath . '/rector.php');
-        $this->assertFileExists($this->basePath . '/phpinsights.php');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/phpinsights.php');
         $this->assertFileExists($this->basePath . '/config/dev-tools/baseline.neon');
     }
 
@@ -252,8 +252,8 @@ final class PublishCommandPublishModeTest extends TestCase
 
         $expectedFiles = [
             '/phpstan.neon',
-            '/rector.php',
-            '/phpinsights.php',
+            '/config/dev-tools/rector.php',
+            '/config/dev-tools/phpinsights.php',
             '/config/dev-tools/baseline.neon',
             '/pint.json',
             '/.markdownlint.json',
@@ -286,8 +286,8 @@ final class PublishCommandPublishModeTest extends TestCase
         // The thin files that the tests publish to the root of the skeleton
         foreach ([
             'phpstan.neon',
-            'rector.php',
-            'phpinsights.php',
+            'config/dev-tools/rector.php',
+            'config/dev-tools/phpinsights.php',
             'pint.json',
             '.markdownlint.json',
             '.markdownlintignore',

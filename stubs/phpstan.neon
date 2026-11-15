@@ -1,7 +1,8 @@
 includes:
-  - vendor/zairakai/laravel-dev-tools/config/library.neon
+  - ../../vendor/zairakai/laravel-dev-tools/config/library.neon
+  - baseline.neon
 
 parameters:
   paths:
-    - src
-    - tests
+    - ../../src
+    - ../../tests

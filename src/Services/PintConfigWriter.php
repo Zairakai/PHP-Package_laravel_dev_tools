@@ -12,23 +12,27 @@ use StanislasPoisson\DevTools\Pint;
 /**
  * Writes the pint.json of a project.
  *
- * Pint cannot extend another file, and the editor reads only the pint.json of the root: that file is a copy. It is
- * generated from the rules of stanislas-poisson/php-dev-tools, then from each layer given (the Laravel layer of this
- * package, then the changes of the project), a later layer replacing the rules of an earlier one and adding its
- * exclusions. The copy is never edited by hand: it is written again each time the tools run.
+ * Pint cannot extend another file. The file of config/dev-tools/ is the complete one that the project edits: it is
+ * generated once from the rules of stanislas-poisson/php-dev-tools, then from each layer given (the Laravel layer of
+ * this package), a later layer replacing the rules of an earlier one and adding its exclusions. The editor reads the
+ * pint.json of the root, which is a copy of it (ConfigCopies).
  */
 final class PintConfigWriter
 {
     /**
      * @param string       $root   absolute path to the root of the project
      * @param list<string> $layers absolute paths of the layers, in order; a file that does not exist is skipped
+     * @param string       $target path of the file to write, from the root of the project
      *
      * @return string the path of the file written
      *
      * @throws RuntimeException when a file cannot be read or written
      */
-    public static function write(string $root, array $layers): string
-    {
+    public static function write(
+        string $root,
+        array $layers,
+        string $target = 'config/dev-tools/pint.json',
+    ): string {
         $pintFile = (string) new ReflectionClass(Pint::class)->getFileName();
         $config   = self::read(dirname($pintFile, 2) . '/config/pint.json');
 
@@ -38,7 +42,15 @@ final class PintConfigWriter
             }
         }
 
-        $file = $root . '/pint.json';
+        $file = $root . '/' . $target;
+
+        if (! is_dir(dirname($file))) {
+            mkdir(
+                dirname($file),
+                0755,
+                true,
+            );
+        }
 
         if (false === file_put_contents($file, self::encode($config))) {
             throw new RuntimeException(sprintf('The file "%s" cannot be written.', $file));
