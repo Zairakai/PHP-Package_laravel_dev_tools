@@ -1,40 +1,77 @@
-# ======================
-# DEPENDENCIES
-# ======================
+# JetBrains (PhpStorm, WebStorm)
+# ----------------
+.idea/
+.idea_modules/
+*.iml
+*.ipr
+*.iws
+
+# Visual Studio Code and derivatives
+# ----------------
+.vscode/
+.history/
+
+# Other editors
+# ----------------
+.fleet/
+.zed/
+.vs/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+nbproject/
+*.swp
+*.swo
+*~
+
+# AI assistants
+# ----------------
+# Personal instruction files: not published (the KB repositories force them with exceptions)
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+*.local.md
+.claude/settings.local.json
+.aider*
+.cursor/
+.windsurf/
+.continue/
+.codex/
+.gemini/
+
+# Editor and IDE files of the project
+# ----------------
+.phpstorm.meta.php
+.phpactor.json
+
+# Dependencies
+# ----------------
 /vendor
 /node_modules
+.npm/
 
-# ======================
-# BUILD & ARTIFACTS
-# ======================
+# Build output
+# ----------------
 /build
+/public/
+
+# Laravel runtime
+# ----------------
 /storage
 
-# ======================
-# TEST / CACHE
-# ======================
+# Tests and coverage
+# ----------------
 .phpunit.cache
 .phpunit.result.cache
 /coverage
 
-# ======================
-# IDE / EDITORS
-# ======================
-.idea/
-.vscode/
-.phpstorm.meta.php
-.phpactor.json
-
-# ======================
-# OS FILES
-# ======================
-.DS_Store
-Thumbs.db
-
-# ======================
-# TEMP / LOGS
-# ======================
+# Logs
+# ----------------
 *.log
 
-/public/
-.npm/
+# Operating system
+# ----------------
+.DS_Store
+Thumbs.db

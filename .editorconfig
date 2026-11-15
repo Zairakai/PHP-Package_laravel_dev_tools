@@ -1,3 +1,4 @@
+# EditorConfig: https://editorconfig.org
 root = true
 
 [*]
@@ -8,17 +9,21 @@ indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+# PHP: PER Coding Style (4 spaces, soft limit of 120 columns)
 [*.php]
 indent_size = 4
 max_line_length = 120
 
-[*.{sh,bash}]
+# Shell and Bats: Google Shell Style Guide (2 spaces, 80 columns)
+[*.{bash,bats,sh}]
 indent_size = 2
 max_line_length = 80
 
+# Markdown: two trailing spaces are a line break
 [*.md]
 trim_trailing_whitespace = false
-max_line_length = 120
+indent_size = unset
 
+# Make requires tabs
 [{Makefile,*.mk}]
 indent_style = tab
