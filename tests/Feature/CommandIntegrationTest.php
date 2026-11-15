@@ -39,7 +39,9 @@ final class CommandIntegrationTest extends TestCase
     #[Test]
     public function command_output_is_well_formatted(): void
     {
-        $exitCode = Artisan::call('dev-tools:publish', ['--help' => true]);
+        $exitCode = Artisan::call('dev-tools:publish', [
+            '--help' => true,
+        ]);
 
         $this->assertEquals(0, $exitCode);
 
@@ -67,7 +69,9 @@ final class CommandIntegrationTest extends TestCase
         ];
 
         foreach ($commands as $command) {
-            $exitCode = Artisan::call($command, ['--help' => true]);
+            $exitCode = Artisan::call($command, [
+                '--help' => true,
+            ]);
 
             $this->assertEquals(
                 0,
@@ -90,7 +94,9 @@ final class CommandIntegrationTest extends TestCase
         $this->assertEquals('testing', $this->app->environment());
 
         // Commands should still work
-        $exitCode = Artisan::call('dev-tools:publish', ['--help' => true]);
+        $exitCode = Artisan::call('dev-tools:publish', [
+            '--help' => true,
+        ]);
         $this->assertEquals(0, $exitCode);
 
         // Service provider should be loaded

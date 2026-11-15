@@ -54,7 +54,11 @@ final class RemoveTrailingSlashesCommand extends Command
 
         [$filesCount, $modifiedCount] = $this->processBladeFiles($finder, $dryRun);
 
-        $this->displaySummary($filesCount, $modifiedCount, $dryRun);
+        $this->displaySummary(
+            $filesCount,
+            $modifiedCount,
+            $dryRun,
+        );
     }
 
     /**
@@ -85,10 +89,20 @@ final class RemoveTrailingSlashesCommand extends Command
     /**
      * Display summary after processing files.
      */
-    private function displaySummary(int $filesCount, int $modifiedCount, bool $dryRun): void
-    {
-        $action = $dryRun ? 'Would fix' : 'Fixed';
-        $this->info(sprintf('%s %d of %d files.', $action, $modifiedCount, $filesCount));
+    private function displaySummary(
+        int $filesCount,
+        int $modifiedCount,
+        bool $dryRun,
+    ): void {
+        $action = $dryRun
+            ? 'Would fix'
+            : 'Fixed';
+        $this->info(sprintf(
+            '%s %d of %d files.',
+            $action,
+            $modifiedCount,
+            $filesCount,
+        ));
     }
 
     /**
@@ -98,7 +112,9 @@ final class RemoveTrailingSlashesCommand extends Command
     {
         $pathArg = $this->argument('path');
 
-        return is_string($pathArg) ? $pathArg : $this->laravel->resourcePath();
+        return is_string($pathArg)
+            ? $pathArg
+            : $this->laravel->resourcePath();
     }
 
     /**
@@ -116,7 +132,11 @@ final class RemoveTrailingSlashesCommand extends Command
             return false;
         }
 
-        $relativePath = str_replace($this->laravel->basePath() . '/', '', $filePath);
+        $relativePath = str_replace(
+            $this->laravel->basePath() . '/',
+            '',
+            $filePath,
+        );
 
         if ($dryRun) {
             $this->line('Would modify: ' . $relativePath);
@@ -147,7 +167,10 @@ final class RemoveTrailingSlashesCommand extends Command
             }
         }
 
-        return [$filesCount, $modifiedCount];
+        return [
+            $filesCount,
+            $modifiedCount,
+        ];
     }
 
     /**

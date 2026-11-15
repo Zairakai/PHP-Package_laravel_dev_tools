@@ -16,7 +16,9 @@ final class ServiceProviderTest extends TestCase
     public function package_can_publish_assets(): void
     {
         // Test that our custom publish command works
-        $exitCode = Artisan::call('dev-tools:publish', ['--help' => true]);
+        $exitCode = Artisan::call('dev-tools:publish', [
+            '--help' => true,
+        ]);
 
         $this->assertEquals(
             0,

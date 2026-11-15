@@ -17,7 +17,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
         $cachePath = $this->app->bootstrapPath('cache');
 
         if (! File::isDirectory($cachePath)) {
-            File::makeDirectory($cachePath, 0755, true);
+            File::makeDirectory(
+                $cachePath,
+                0755,
+                true,
+            );
         }
 
         File::put($cachePath . '/packages.php', '<?php return [];');
@@ -37,7 +41,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
         $cachePath = $this->app->bootstrapPath('cache');
 
         if (! File::isDirectory($cachePath)) {
-            File::makeDirectory($cachePath, 0755, true);
+            File::makeDirectory(
+                $cachePath,
+                0755,
+                true,
+            );
         }
 
         File::put($cachePath . '/packages.php', '<?php return [];');
@@ -60,7 +68,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
         $cachePath = $this->app->bootstrapPath('cache');
 
         if (! File::isDirectory($cachePath)) {
-            File::makeDirectory($cachePath, 0755, true);
+            File::makeDirectory(
+                $cachePath,
+                0755,
+                true,
+            );
         }
 
         File::put($cachePath . '/packages.php', '<?php return [];');
@@ -81,7 +93,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
         $viewCachePath = $this->app->storagePath('framework/views');
 
         if (! File::isDirectory($viewCachePath)) {
-            File::makeDirectory($viewCachePath, 0755, true);
+            File::makeDirectory(
+                $viewCachePath,
+                0755,
+                true,
+            );
         }
 
         File::put($viewCachePath . '/compiled_view.php', '<?php // Compiled View');
@@ -201,7 +217,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
         $cachePath = $this->app->bootstrapPath('cache');
 
         if (! File::isDirectory($cachePath)) {
-            File::makeDirectory($cachePath, 0755, true);
+            File::makeDirectory(
+                $cachePath,
+                0755,
+                true,
+            );
         }
 
         File::put($cachePath . '/packages.php', '<?php return [];');
@@ -232,7 +252,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
         $viewCachePath = $this->app->storagePath('framework/views');
 
         if (! File::isDirectory($viewCachePath)) {
-            File::makeDirectory($viewCachePath, 0755, true);
+            File::makeDirectory(
+                $viewCachePath,
+                0755,
+                true,
+            );
         }
 
         File::put($viewCachePath . '/view1.php', '<?php // View 1');
@@ -340,7 +364,11 @@ final class CleanAfterIdeHelperCommandTest extends TestCase
     {
         // Ensure no IDE helper files exist
         $basePath = $this->app->basePath();
-        $files    = ['_ide_helper.php', '_ide_helper_models.php', '.phpstorm.meta.php'];
+        $files    = [
+            '_ide_helper.php',
+            '_ide_helper_models.php',
+            '.phpstorm.meta.php',
+        ];
 
         foreach ($files as $file) {
             if (File::exists($basePath . '/' . $file)) {

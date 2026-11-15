@@ -18,7 +18,11 @@ final class RemoveTrailingSlashesCommandTest extends TestCase
         parent::setUp();
 
         $this->testDir = sys_get_temp_dir() . '/laravel-dev-tools-test-' . uniqid();
-        File::makeDirectory($this->testDir, 0755, true);
+        File::makeDirectory(
+            $this->testDir,
+            0755,
+            true,
+        );
     }
 
     protected function tearDown(): void

@@ -25,7 +25,9 @@ final class CommandsTest extends TestCase
         // Test first command only to avoid timeout
         $firstCommand = reset($packageCommands);
 
-        $exitCode = Artisan::call($firstCommand, ['--help' => true]);
+        $exitCode = Artisan::call($firstCommand, [
+            '--help' => true,
+        ]);
 
         $this->assertEquals(
             0,
@@ -57,7 +59,11 @@ final class CommandsTest extends TestCase
                 );
             }
             catch (Exception $e) {
-                $this->fail(sprintf('Command %s failed to load: %s', $packageCommand, $e->getMessage()));
+                $this->fail(sprintf(
+                    'Command %s failed to load: %s',
+                    $packageCommand,
+                    $e->getMessage(),
+                ));
             }
         }
     }

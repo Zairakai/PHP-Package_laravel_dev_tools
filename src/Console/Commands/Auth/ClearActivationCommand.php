@@ -42,7 +42,7 @@ final class ClearActivationCommand extends Command
     }
 
     /**
-     * @codeCoverageIgnore Simple proxy — tested via handle()
+     * @codeCoverageIgnore Simple proxy - tested via handle()
      */
     public function __invoke(): void
     {
@@ -67,7 +67,11 @@ final class ClearActivationCommand extends Command
         $builder = $this->expiredActivationsQuery($table, $days);
         $count   = $builder->count();
 
-        if (! $this->confirmDeletion($count, $days, $force)) {
+        if (! $this->confirmDeletion(
+            $count,
+            $days,
+            $force,
+        )) {
             return;
         }
 
@@ -88,8 +92,11 @@ final class ClearActivationCommand extends Command
     /**
      * Confirm deletion with user or force.
      */
-    private function confirmDeletion(int $count, int $days, bool $force): bool
-    {
+    private function confirmDeletion(
+        int $count,
+        int $days,
+        bool $force,
+    ): bool {
         if (0 === $count) {
             $this->info('No activation codes to clear.');
 
@@ -122,7 +129,11 @@ final class ClearActivationCommand extends Command
     {
         $deleted = $builder->delete();
 
-        $this->info(sprintf('Deleted %d activation codes from table %s.', $deleted, $table));
+        $this->info(sprintf(
+            'Deleted %d activation codes from table %s.',
+            $deleted,
+            $table,
+        ));
     }
 
     /**
@@ -137,7 +148,11 @@ final class ClearActivationCommand extends Command
         $cutoff  = $this->now->copy()->subMonths(3);
         $deleted = DB::table($table)
             ->whereNotNull('deleted_at')
-            ->where('deleted_at', '<', $cutoff)
+            ->where(
+                'deleted_at',
+                '<',
+                $cutoff,
+            )
             ->delete();
 
         if (0 < $deleted) {
@@ -155,7 +170,11 @@ final class ClearActivationCommand extends Command
             ->subDays($days);
 
         return DB::table($table)
-            ->whereDate('created_at', '<', $cutoff);
+            ->whereDate(
+                'created_at',
+                '<',
+                $cutoff,
+            );
     }
 
     private function getTableName(): string

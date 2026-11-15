@@ -28,7 +28,11 @@ final class PublishToolingComposerNormalizeTest extends TestCase
         $vendorBinPath = $basePath . '/vendor/bin';
 
         if (! File::isDirectory($vendorBinPath)) {
-            File::makeDirectory($vendorBinPath, 0755, true);
+            File::makeDirectory(
+                $vendorBinPath,
+                0755,
+                true,
+            );
         }
 
         File::put($vendorBinPath . '/composer-normalize', '#!/usr/bin/env php');

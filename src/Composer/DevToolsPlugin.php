@@ -23,14 +23,14 @@ use Zairakai\LaravelDevTools\Services\GitlabCiSynchronizer;
  * Only runs in dev mode (composer install/update without --no-dev).
  */
 /**
- * @codeCoverageIgnore Composer plugin — executes in Composer process, not testable via PHPUnit.
+ * @codeCoverageIgnore Composer plugin - executes in Composer process, not testable via PHPUnit.
  */
 final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
 {
     private const string PLUGIN_NAME = 'zairakai/laravel-dev-tools';
 
     /**
-     * Script event name for post-update — used to decide warn vs auto-fix.
+     * Script event name for post-update - used to decide warn vs auto-fix.
      */
     private const string POST_UPDATE_EVENT = 'post-update-cmd';
 
@@ -55,8 +55,14 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            ScriptEvents::POST_INSTALL_CMD => ['onPostInstallOrUpdate', 10],
-            ScriptEvents::POST_UPDATE_CMD  => ['onPostInstallOrUpdate', 10],
+            ScriptEvents::POST_INSTALL_CMD => [
+                'onPostInstallOrUpdate',
+                10,
+            ],
+            ScriptEvents::POST_UPDATE_CMD  => [
+                'onPostInstallOrUpdate',
+                10,
+            ],
         ];
     }
 
@@ -96,9 +102,8 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
         // Nothing to do
     }
 
-    // =========================================================================
-    // Private — composer.json mutation helpers
-    // =========================================================================
+    // Private - composer.json mutation helpers
+    // ================
 
     /**
      * Ensure the plugin is declared in config.allow-plugins.
@@ -143,10 +148,16 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
         $current = $scripts['post-update-cmd'] ?? [];
 
         if (is_string($current)) {
-            $current = [$current];
+            $current = [
+                $current,
+            ];
         }
 
-        if (in_array(self::POST_UPDATE_SCRIPT, $current, true)) {
+        if (in_array(
+            self::POST_UPDATE_SCRIPT,
+            $current,
+            true,
+        )) {
             return false;
         }
 
@@ -261,9 +272,8 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
         return $json;
     }
 
-    // =========================================================================
-    // Private — GitLab CI synchronization
-    // =========================================================================
+    // Private - GitLab CI synchronization
+    // ================
 
     /**
      * Delegate GitLab CI ref synchronization to GitlabCiSynchronizer.
@@ -298,7 +308,7 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
      * Encode and write the mutated composer.json back to disk.
      *
      * Uses JSON_PRETTY_PRINT which outputs 4-space indentation (PHP 7.1+).
-     * No post-processing is applied — the output is stable and deterministic.
+     * No post-processing is applied - the output is stable and deterministic.
      *
      * @param array<string, mixed> $json
      */
