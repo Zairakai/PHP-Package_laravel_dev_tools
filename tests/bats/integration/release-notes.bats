@@ -146,6 +146,32 @@ notes() {
   [[ "$output" == *"From: 0.9.0"* ]]
 }
 
+@test "the numbers of a version are compared as numbers" {
+  commit "feat: #1 add the first thing"
+  tag 2.9.0
+  commit "feat: #2 add the second thing"
+  tag 9.0.0
+  commit "feat: #3 add the third thing"
+  tag 10.0.0
+
+  generate
+
+  [[ "$output" == *"From: 9.0.0"* ]]
+}
+
+@test "a pre-release is after the release that comes before it, in the order of the tags" {
+  commit "feat: #1 add the first thing"
+  tag 1.0.0
+  commit "feat: #2 add the second thing"
+  tag 1.1.0-rc.1
+  commit "feat: #3 add the third thing"
+  tag 1.1.0-rc.2
+
+  generate "''" 1.1.0-rc.2
+
+  [[ "$output" == *"From: 1.1.0-rc.1"* ]]
+}
+
 @test "a first release lists all its commits" {
   commit "feat: #1 add the first thing"
   commit "fix: #2 repair the second thing"
