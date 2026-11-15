@@ -6,6 +6,7 @@ namespace Zairakai\LaravelDevTools\Services;
 
 use Illuminate\Console\View\Components\Factory;
 use Illuminate\Support\Facades\File;
+use RuntimeException;
 
 /**
  * Publishes configuration stubs from the vendor package into the project.
@@ -15,14 +16,14 @@ use Illuminate\Support\Facades\File;
  *
  * Publishing groups:
  *   - quality    : phpstan, rector, insights, baseline
- *   - style      : pint, markdownlint
+ *   - style      : pint, markdownlint, markdownlintignore
  *   - testing    : phpunit
- *   - hooks      : git hooks of php-dev-tools (core.hooksPath)
+ *   - hooks      : git hooks of laravel-dev-tools (core.hooksPath)
  *   - gitlab-ci  : .gitlab-ci.yml (opt-in, not in 'all')
  *   - governance : CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md (opt-in, not in 'all')
  *   - all        : all groups above except gitlab-ci and governance
  *
- * Each public method corresponds to one publishable asset — intentional by design.
+ * Each public method corresponds to one publishable asset - intentional by design.
  * Splitting into sub-publishers would add indirection without benefit.
  */
 final readonly class ConfigStubPublisher
@@ -33,13 +34,40 @@ final readonly class ConfigStubPublisher
      * @var array<string, list<string>>
      */
     private const array GROUPS = [
-        'quality'    => ['phpstan', 'rector', 'insights', 'baseline'],
-        'style'      => ['pint', 'markdownlint'],
-        'testing'    => ['phpunit'],
-        'hooks'      => ['hooks'],
-        'gitlab-ci'  => ['gitlab-ci'],
-        'governance' => ['governance'],
-        'all'        => ['phpstan', 'rector', 'insights', 'baseline', 'pint', 'markdownlint', 'phpunit', 'hooks'],
+        'quality'    => [
+            'phpstan',
+            'rector',
+            'insights',
+            'baseline',
+        ],
+        'style'      => [
+            'pint',
+            'markdownlint',
+            'markdownlintignore',
+        ],
+        'testing'    => [
+            'phpunit',
+        ],
+        'hooks'      => [
+            'hooks',
+        ],
+        'gitlab-ci'  => [
+            'gitlab-ci',
+        ],
+        'governance' => [
+            'governance',
+        ],
+        'all'        => [
+            'phpstan',
+            'rector',
+            'insights',
+            'baseline',
+            'pint',
+            'markdownlint',
+            'markdownlintignore',
+            'phpunit',
+            'hooks',
+        ],
     ];
 
     public function __construct(
@@ -65,20 +93,24 @@ final readonly class ConfigStubPublisher
     {
         // All unique keys across all groups except 'all' (which is a meta-group)
         return array_values(array_unique(array_merge(...array_values(
-            array_filter(self::GROUPS, fn (string $k): bool => 'all' !== $k, ARRAY_FILTER_USE_KEY),
+            array_filter(
+                self::GROUPS,
+                fn (string $k): bool => 'all' !== $k,
+                ARRAY_FILTER_USE_KEY,
+            ),
         ))));
     }
 
     /**
      * Publish the PHPStan baseline stub.
-     * Never force-overwritten — it accumulates user-accepted errors.
+     * Never force-overwritten - it accumulates user-accepted errors.
      */
     public function publishBaseline(string $vendorPath, string $basePath): bool
     {
         return $this->publishStub(
-            stubFile: $vendorPath . '/stubs/baseline.neon.stub',
+            stubFile: $vendorPath . '/stubs/baseline.neon',
             targetFile: $basePath . '/config/dev-tools/baseline.neon',
-            // Baseline is NEVER overwritten even with --force — it contains accepted errors
+            // Baseline is NEVER overwritten even with --force - it contains accepted errors
             force: false,
             label: 'config/dev-tools/baseline.neon',
             protectUserChanges: false,
@@ -88,40 +120,83 @@ final readonly class ConfigStubPublisher
     /**
      * Publish a single file by its key name.
      *
-     * @param string $key        One of: phpstan, rector, insights, baseline, pint, markdownlint, phpunit, hooks
+     * @param string $key        One of: phpstan, rector, insights, baseline, pint, markdownlint, markdownlintignore, phpunit, hooks
      * @param string $vendorPath Absolute path to the vendor package root
      * @param string $basePath   Absolute path to the project root
      * @param bool   $force      Overwrite existing files if true
      */
-    public function publishByKey(string $key, string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishByKey(
+        string $key,
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return match ($key) {
-            'phpstan'      => $this->publishPhpstan($vendorPath, $basePath, $force),
-            'rector'       => $this->publishRector($vendorPath, $basePath, $force),
-            'insights'     => $this->publishInsights($vendorPath, $basePath, $force),
-            'baseline'     => $this->publishBaseline($vendorPath, $basePath),
-            'pint'         => $this->publishPint($vendorPath, $basePath, $force),
-            'markdownlint' => $this->publishMarkdownlint($vendorPath, $basePath, $force),
-            'phpunit'      => $this->publishPhpunit($vendorPath, $basePath, $force),
-            'hooks'        => $this->publishHooks($vendorPath, $basePath, $force),
-            'gitlab-ci'    => $this->publishGitlabCi($vendorPath, $basePath, $force),
-            'governance'   => $this->publishGovernanceFiles($vendorPath, $basePath, $force),
-            default        => $this->unknownKey($key),
+            'phpstan'            => $this->publishPhpstan(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'rector'             => $this->publishRector(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'insights'           => $this->publishInsights(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'baseline'           => $this->publishBaseline($vendorPath, $basePath),
+            'pint'               => $this->publishPint($vendorPath, $basePath),
+            'markdownlint'       => $this->publishMarkdownlint(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'markdownlintignore' => $this->publishMarkdownlintIgnore(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'phpunit'            => $this->publishPhpunit(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'hooks'              => $this->publishHooks(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'gitlab-ci'          => $this->publishGitlabCi(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            'governance'         => $this->publishGovernanceFiles(
+                $vendorPath,
+                $basePath,
+                $force,
+            ),
+            default              => $this->unknownKey($key),
         };
     }
 
-    // =========================================================================
-    // Public API — individual file publishers
-    // =========================================================================
+    // Public API - individual file publishers
+    // ================
 
     /**
      * Publish the Enlightn configuration stub.
-     * Not part of any group — installed automatically on first setup.
+     * Not part of any group - installed automatically on first setup.
      */
-    public function publishEnlightn(string $vendorPath, string $basePath, bool $force): void
-    {
+    public function publishEnlightn(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): void {
         $this->publishStub(
-            stubFile: $vendorPath . '/stubs/enlightn.php.stub',
+            stubFile: $vendorPath . '/stubs/enlightn.php',
             targetFile: $basePath . '/config/enlightn.php',
             force: $force,
             label: 'config/enlightn.php',
@@ -137,13 +212,16 @@ final readonly class ConfigStubPublisher
      * (0.0.0) is replaced with the currently installed package version by
      * GitlabCiSynchronizer on the next composer install/update.
      *
-     * Not included in the 'all' group — the CI file sits at the project root,
+     * Not included in the 'all' group - the CI file sits at the project root,
      * not in config/dev-tools/, and requires intentional opt-in.
      */
-    public function publishGitlabCi(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishGitlabCi(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return $this->publishStub(
-            stubFile: $vendorPath . '/stubs/gitlab-ci.yml.stub',
+            stubFile: $vendorPath . '/stubs/gitlab-ci.yml',
             targetFile: $basePath . '/.gitlab-ci.yml',
             force: $force,
             label: '.gitlab-ci.yml',
@@ -156,10 +234,13 @@ final readonly class ConfigStubPublisher
      *
      * Includes both PHP and JS pipelines with unified stages.
      */
-    public function publishGitlabCiFullstack(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishGitlabCiFullstack(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return $this->publishStub(
-            stubFile: $vendorPath . '/stubs/gitlab-ci.fullstack.yml.stub',
+            stubFile: $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
             targetFile: $basePath . '/.gitlab-ci.yml',
             force: $force,
             label: '.gitlab-ci.yml',
@@ -172,10 +253,13 @@ final readonly class ConfigStubPublisher
      *
      * Replaces PACKAGE_GITLAB_ISSUES placeholder with a URL derived from composer.json name.
      * Hash-protected: skips files modified by the user (use --force to overwrite).
-     * Not included in 'all' — requires explicit opt-in (--publish=governance).
+     * Not included in 'all' - requires explicit opt-in (--publish=governance).
      */
-    public function publishGovernanceFiles(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishGovernanceFiles(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         $stubsDir = $vendorPath . '/stubs/governance';
 
         if (! File::isDirectory($stubsDir)) {
@@ -196,7 +280,7 @@ final readonly class ConfigStubPublisher
 
         foreach ($files as $filename => $targetFile) {
             $results[] = $this->publishGovernanceFile(
-                stubFile: $stubsDir . '/' . $filename . '.stub',
+                stubFile: $stubsDir . '/' . $filename,
                 targetFile: $targetFile,
                 label: $filename,
                 issuesUrl: $issuesUrl,
@@ -204,7 +288,11 @@ final readonly class ConfigStubPublisher
             );
         }
 
-        return ! in_array(false, $results, true);
+        return ! in_array(
+            false,
+            $results,
+            true,
+        );
     }
 
     /**
@@ -215,8 +303,12 @@ final readonly class ConfigStubPublisher
      * @param string $basePath   Absolute path to the project root
      * @param bool   $force      Overwrite existing files if true
      */
-    public function publishGroup(string $group, string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishGroup(
+        string $group,
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         if (! array_key_exists($group, self::GROUPS)) {
             $this->componentsFactory->error(sprintf(
                 'Unknown group "%s". Valid groups: %s',
@@ -228,31 +320,42 @@ final readonly class ConfigStubPublisher
         }
 
         foreach (self::GROUPS[$group] as $key) {
-            $this->publishByKey($key, $vendorPath, $basePath, $force);
+            $this->publishByKey(
+                $key,
+                $vendorPath,
+                $basePath,
+                $force,
+            );
         }
 
         return true;
     }
 
     /**
-     * Activate the git hooks of php-dev-tools (core.hooksPath): they are read in place, nothing is published.
+     * Activate the git hooks of laravel-dev-tools (core.hooksPath): they are read in place, nothing is published.
      */
-    public function publishHooks(string $vendorPath, string $basePath, bool $force): bool
-    {
-        return (new GitHooksActivator($this->componentsFactory))->activate($basePath);
+    public function publishHooks(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
+        return new GitHooksActivator($this->componentsFactory)->activate($basePath);
     }
 
     /**
      * Publish the PHP Insights configuration stub.
-     * User is expected to customize this file — protected against force overwrite.
+     * User is expected to customize this file - protected against force overwrite.
      */
-    public function publishInsights(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishInsights(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return $this->publishStub(
-            stubFile: $vendorPath . '/stubs/insights.php.stub',
-            targetFile: $basePath . '/config/dev-tools/insights.php',
+            stubFile: $vendorPath . '/stubs/phpinsights.php',
+            targetFile: $basePath . '/phpinsights.php',
             force: $force,
-            label: 'config/dev-tools/insights.php',
+            label: 'phpinsights.php',
             protectUserChanges: true,
         );
     }
@@ -260,31 +363,53 @@ final readonly class ConfigStubPublisher
     /**
      * Publish the Markdownlint configuration into config/dev-tools/.
      */
-    public function publishMarkdownlint(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishMarkdownlint(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return $this->publishStub(
-            stubFile: $vendorPath . '/stubs/markdownlint.json.stub',
-            targetFile: $basePath . '/config/dev-tools/markdownlint.json',
+            stubFile: $vendorPath . '/stubs/.markdownlint.json',
+            targetFile: $basePath . '/.markdownlint.json',
             force: $force,
-            label: 'config/dev-tools/markdownlint.json',
+            label: '.markdownlint.json',
             protectUserChanges: true,
         );
     }
 
-    // =========================================================================
+    /**
+     * Publish the Markdownlint ignore file into config/dev-tools/.
+     */
+    public function publishMarkdownlintIgnore(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
+        return $this->publishStub(
+            stubFile: $vendorPath . '/stubs/.markdownlintignore',
+            targetFile: $basePath . '/.markdownlintignore',
+            force: $force,
+            label: '.markdownlintignore',
+            protectUserChanges: true,
+        );
+    }
+
     // Individual publishers
-    // =========================================================================
+    // ================
 
     /**
-     * Publish the PHPStan config (library.neon) into config/dev-tools/.
+     * Publish the thin PHPStan config into the project root, where the editor reads it: it extends the one of this package.
      */
-    public function publishPhpstan(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishPhpstan(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return $this->publishStub(
-            stubFile: $vendorPath . '/config/library.neon',
-            targetFile: $basePath . '/config/dev-tools/phpstan.neon',
+            stubFile: $vendorPath . '/stubs/phpstan.neon',
+            targetFile: $basePath . '/phpstan.neon',
             force: $force,
-            label: 'config/dev-tools/phpstan.neon',
+            label: 'phpstan.neon',
             protectUserChanges: true,
         );
     }
@@ -293,8 +418,11 @@ final readonly class ConfigStubPublisher
      * Publish the PHPUnit configuration stub.
      * Detects project type to choose between app and package config.
      */
-    public function publishPhpunit(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishPhpunit(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         // Use app config for Laravel applications, library config for packages
         $isLaravelApp = file_exists($basePath . '/artisan')
             && file_exists($basePath . '/composer.json')
@@ -314,30 +442,45 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Publish the Pint configuration into config/dev-tools/.
+     * Generate the pint.json of the project root.
+     *
+     * Pint cannot extend a file and the editor reads only this one: it is a copy of the rules of php-dev-tools, the Laravel
+     * layer of this package and the changes of the project (config/dev-tools/pint.json). A generated file is written
+     * again each time, whatever $force says.
      */
-    public function publishPint(string $vendorPath, string $basePath, bool $force): bool
+    public function publishPint(string $vendorPath, string $basePath): bool
     {
-        return $this->publishStub(
-            stubFile: $vendorPath . '/config/pint.json',
-            targetFile: $basePath . '/config/dev-tools/pint.json',
-            force: $force,
-            label: 'config/dev-tools/pint.json',
-            protectUserChanges: true,
-        );
+        try {
+            PintConfigWriter::write($basePath, [
+                $vendorPath . '/config/pint.json',
+                $basePath . '/config/dev-tools/pint.json',
+            ]);
+        }
+        catch (RuntimeException $runtimeException) {
+            $this->componentsFactory->error($runtimeException->getMessage());
+
+            return false;
+        }
+
+        $this->componentsFactory->task('Generated: pint.json');
+
+        return true;
     }
 
     /**
      * Publish the Rector configuration stub.
-     * User is expected to customize this file — protected against force overwrite.
+     * User is expected to customize this file - protected against force overwrite.
      */
-    public function publishRector(string $vendorPath, string $basePath, bool $force): bool
-    {
+    public function publishRector(
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+    ): bool {
         return $this->publishStub(
-            stubFile: $vendorPath . '/stubs/rector.php.stub',
-            targetFile: $basePath . '/config/dev-tools/rector.php',
+            stubFile: $vendorPath . '/stubs/rector.php',
+            targetFile: $basePath . '/rector.php',
             force: $force,
-            label: 'config/dev-tools/rector.php',
+            label: 'rector.php',
             protectUserChanges: true,
         );
     }
@@ -345,8 +488,11 @@ final readonly class ConfigStubPublisher
     /**
      * Copy the stub file to the target location.
      */
-    private function copyStub(string $stubFile, string $targetFile, string $label): bool
-    {
+    private function copyStub(
+        string $stubFile,
+        string $targetFile,
+        string $label,
+    ): bool {
         if (File::copy($stubFile, $targetFile)) {
             $this->componentsFactory->task('Copied: ' . $label);
 
@@ -366,7 +512,11 @@ final readonly class ConfigStubPublisher
     private function ensureDirectoryExists(string $directory): void
     {
         if (! File::isDirectory($directory)) {
-            File::makeDirectory($directory, 0755, true);
+            File::makeDirectory(
+                $directory,
+                0755,
+                true,
+            );
         }
     }
 
@@ -415,14 +565,18 @@ final readonly class ConfigStubPublisher
         }
 
         // Replace placeholder in a temporary buffer for hash comparison
-        $processed = str_replace('PACKAGE_GITLAB_ISSUES', $issuesUrl, (string) File::get($stubFile));
+        $processed = str_replace(
+            'PACKAGE_GITLAB_ISSUES',
+            $issuesUrl,
+            (string) File::get($stubFile),
+        );
         $tempFile  = sys_get_temp_dir() . '/ldt_governance_' . md5($label);
         File::put($tempFile, $processed);
 
         $this->ensureDirectoryExists(dirname($targetFile));
 
         try {
-            // Target does not exist yet — just copy
+            // Target does not exist yet - just copy
             if (! File::exists($targetFile)) {
                 File::copy($tempFile, $targetFile);
                 $this->componentsFactory->task('Copied: ' . $label);
@@ -430,26 +584,30 @@ final readonly class ConfigStubPublisher
                 return true;
             }
 
-            // Target exists, no force — compare processed content with target
+            // Target exists, no force - compare processed content with target
             if (! $force) {
                 $srcHash = hash_file('sha256', $tempFile);
                 $tgtHash = hash_file('sha256', $targetFile);
 
                 if ($srcHash === $tgtHash) {
-                    // Identical — silently refresh
+                    // Identical - silently refresh
                     File::copy($tempFile, $targetFile);
                     $this->componentsFactory->task('Refreshed: ' . $label);
 
                     return true;
                 }
 
-                // User has modified the file — protect it
-                $this->skip($label, 'contains user modifications (use --force to overwrite)', 'yellow');
+                // User has modified the file - protect it
+                $this->skip(
+                    $label,
+                    'contains user modifications (use --force to overwrite)',
+                    'yellow',
+                );
 
                 return false;
             }
 
-            // Force — overwrite unconditionally
+            // Force - overwrite unconditionally
             File::copy($tempFile, $targetFile);
             $this->componentsFactory->task('Copied: ' . $label);
 
@@ -460,9 +618,8 @@ final readonly class ConfigStubPublisher
         }
     }
 
-    // =========================================================================
     // Core publishing logic
-    // =========================================================================
+    // ================
 
     /**
      * Core workflow for copying a stub file to its target location.
@@ -488,11 +645,21 @@ final readonly class ConfigStubPublisher
 
         $this->ensureDirectoryExists(dirname($targetFile));
 
-        if ($this->shouldSkip($stubFile, $targetFile, $force, $protectUserChanges, $label)) {
+        if ($this->shouldSkip(
+            $stubFile,
+            $targetFile,
+            $force,
+            $protectUserChanges,
+            $label,
+        )) {
             return false;
         }
 
-        return $this->copyStub($stubFile, $targetFile, $label);
+        return $this->copyStub(
+            $stubFile,
+            $targetFile,
+            $label,
+        );
     }
 
     /**
@@ -509,15 +676,21 @@ final readonly class ConfigStubPublisher
         }
 
         $composer = json_decode((string) File::get($composerPath), true);
-        $raw      = is_array($composer) ? ($composer['name'] ?? '') : '';
-        $name     = is_string($raw) ? $raw : '';
+        $raw      = is_array($composer)
+            ? ($composer['name'] ?? '')
+            : '';
+        $name     = is_string($raw)
+            ? $raw
+            : '';
 
         if ('' === $name) {
             return 'TODO: add GitLab issues URL';
         }
 
         // Strip vendor prefix: zairakai/laravel-dev-tools → laravel-dev-tools
-        $shortName = str_contains($name, '/') ? substr($name, strpos($name, '/') + 1) : $name;
+        $shortName = str_contains($name, '/')
+            ? substr($name, strpos($name, '/') + 1)
+            : $name;
 
         return 'https://gitlab.com/zairakai/php-packages/' . $shortName . '/-/issues';
     }
@@ -532,16 +705,25 @@ final readonly class ConfigStubPublisher
         bool $protectUserChanges,
         string $label,
     ): bool {
-        // File exists and no force flag — skip with a notice
+        // File exists and no force flag - skip with a notice
         if (File::exists($targetFile) && ! $force) {
             $this->skip($label, 'already exists (use --force to overwrite)');
 
             return true;
         }
 
-        // File exists, force is set, but user has modified it — refuse overwrite
-        if ($this->isProtectedUserFile($stubFile, $targetFile, $force, $protectUserChanges)) {
-            $this->skip($label, 'contains user modifications (refusing to overwrite)', 'red');
+        // File exists, force is set, but user has modified it - refuse overwrite
+        if ($this->isProtectedUserFile(
+            $stubFile,
+            $targetFile,
+            $force,
+            $protectUserChanges,
+        )) {
+            $this->skip(
+                $label,
+                'contains user modifications (refusing to overwrite)',
+                'red',
+            );
 
             return true;
         }
@@ -552,11 +734,18 @@ final readonly class ConfigStubPublisher
     /**
      * Display a skipped-file message in the console.
      */
-    private function skip(string $label, string $reason, string $color = 'yellow'): void
-    {
+    private function skip(
+        string $label,
+        string $reason,
+        string $color = 'yellow',
+    ): void {
         $this->componentsFactory->twoColumnDetail(
             'Skipped: ' . $label,
-            sprintf('<fg=%s>%s</>', $color, $reason),
+            sprintf(
+                '<fg=%s>%s</>',
+                $color,
+                $reason,
+            ),
         );
     }
 

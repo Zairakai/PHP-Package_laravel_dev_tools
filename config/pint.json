@@ -1,4 +1,10 @@
 {
+  "rules": {
+    "operator_linebreak": {
+      "only_booleans": true,
+      "position": "beginning"
+    }
+  },
   "finder": {
     "exclude": [
       ".docker",

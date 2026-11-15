@@ -3,12 +3,12 @@
 # Includes Larastan + bootstrap for full app analysis
 
 includes:
-    - vendor/larastan/larastan/extension.neon
-    - base.neon
+  - vendor/larastan/larastan/extension.neon
+  - phpstan.neon
 
 parameters:
-    paths:
-        - ../../../../app
-        - ../../../../tests
+  paths:
+    - ../../../../app
+    - ../../../../tests
 
-    tmpDir: ../../../../build/phpstan
+  tmpDir: ../../../../build/phpstan

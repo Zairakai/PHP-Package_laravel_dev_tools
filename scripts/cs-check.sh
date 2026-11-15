@@ -20,30 +20,30 @@ PINT_CONFIG=$(build_pint_config)
 PINT_ARGS=("--test")
 
 if [[ -n "$PINT_CONFIG" ]]; then
-    log_step "Using configuration: ${PINT_CONFIG#"$PROJECT_ROOT"/}"
-    PINT_ARGS+=("--config=$PINT_CONFIG")
+  log_step "Using configuration: ${PINT_CONFIG#"$PROJECT_ROOT"/}"
+  PINT_ARGS+=("--config=$PINT_CONFIG")
 else
-    log_step "Using default Pint configuration"
+  log_step "Using default Pint configuration"
 fi
 
 # Determine what to check
 if [[ "$HAS_GIT" == "true" ]] && [[ "$IS_CI" != "true" ]]; then
-    # Local development: check dirty files only
-    DIRTY_FILES=$(get_dirty_php_files)
+  # Local development: check dirty files only
+  DIRTY_FILES=$(get_dirty_php_files)
 
-    if [[ -n "$DIRTY_FILES" ]]; then
-        FILE_COUNT=$(echo "$DIRTY_FILES" | wc -l | tr -d ' ')
-        log_step "Checking $FILE_COUNT dirty file(s)"
+  if [[ -n "$DIRTY_FILES" ]]; then
+    FILE_COUNT=$(echo "$DIRTY_FILES" | wc -l | tr -d ' ')
+    log_step "Checking $FILE_COUNT dirty file(s)"
 
-        # Use --dirty flag (Pint handles git detection)
-        PINT_ARGS+=("--dirty")
-    else
-        log_warning "No dirty PHP files found"
-        log_step "Checking all files"
-    fi
+    # Use --dirty flag (Pint handles git detection)
+    PINT_ARGS+=("--dirty")
+  else
+    log_warning "No dirty PHP files found"
+    log_step "Checking all files"
+  fi
 else
-    # CI mode or no git: check everything
-    log_step "Checking all files (CI mode)"
+  # CI mode or no git: check everything
+  log_step "Checking all files (CI mode)"
 fi
 
 # Run Pint
