@@ -23,12 +23,17 @@ final class Planner
     /**
      * All the sections of composer.json that hold requirements.
      */
-    public const array ALL_SECTIONS = ['require', 'require-dev'];
+    public const array ALL_SECTIONS = [
+        'require',
+        'require-dev',
+    ];
 
     /**
      * The sections of composer.json that are published with the package.
      */
-    public const array RUNTIME_SECTIONS = ['require'];
+    public const array RUNTIME_SECTIONS = [
+        'require',
+    ];
 
     /**
      * Whether a Composer constraint accepts a version. A constraint that cannot be read accepts nothing.
@@ -38,7 +43,9 @@ final class Planner
         $versionParser = new VersionParser();
 
         try {
-            return $versionParser->parseConstraints($constraint)->matches($versionParser->parseConstraints('== ' . $version));
+            return $versionParser->parseConstraints($constraint)->matches(
+                $versionParser->parseConstraints('== ' . $version),
+            );
         }
         catch (UnexpectedValueException) {
             return false;
@@ -60,7 +67,11 @@ final class Planner
             foreach (Json::rows($advisories) as $advisory) {
                 $rows[] = [
                     'id'       => Json::text($advisory, 'advisoryId'),
-                    'package'  => Json::text($advisory, 'packageName') ?: $package,
+                    'package'  => Json::textOr(
+                        $advisory,
+                        'packageName',
+                        $package,
+                    ),
                     'title'    => Json::text($advisory, 'title'),
                     'link'     => Json::text($advisory, 'link'),
                     'cve'      => Json::text($advisory, 'cve'),
@@ -70,7 +81,13 @@ final class Planner
             }
         }
 
-        usort($rows, static fn (array $a, array $b): int => [$a['package'], $a['id']] <=> [$b['package'], $b['id']]);
+        usort($rows, static fn (array $a, array $b): int => [
+            $a['package'],
+            $a['id'],
+        ] <=> [
+            $b['package'],
+            $b['id'],
+        ]);
 
         return $rows;
     }
@@ -80,8 +97,11 @@ final class Planner
      *
      * @param array{id: string, package: string, title: string, link: string, cve: string, severity: string, range: string} $advisory
      */
-    public static function advisoryIssueBody(array $advisory, string $pipelineUrl, bool $autoFix): string
-    {
+    public static function advisoryIssueBody(
+        array $advisory,
+        string $pipelineUrl,
+        bool $autoFix,
+    ): string {
         $lines = [
             "{$advisory['title']}.",
             '',
@@ -95,7 +115,9 @@ final class Planner
             $lines[] = "- CVE: {$advisory['cve']}";
         }
 
-        $lines[] = '- Automatic fix: ' . ($autoFix && self::isUrgent($advisory['severity']) ? 'started (an update of the dependencies, taken without waiting)' : 'off for this advisory: update by hand');
+        $lines[] = '- Automatic fix: ' . ($autoFix && self::isUrgent(
+            $advisory['severity'],
+        ) ? 'started (an update of the dependencies, taken without waiting)' : 'off for this advisory: update by hand');
         $lines[] = '';
         $lines[] = "Pipeline: {$pipelineUrl}";
         $lines[] = '';
@@ -108,8 +130,9 @@ final class Planner
      * The labels of the issue of an advisory: kind and area, the priority from the severity, and Status::Ready.
      *
      * @param array{severity: string} $advisory
+     * @param list<string>            $base     the labels that every issue has
      */
-    public static function advisoryLabels(array $advisory, string $base): string
+    public static function advisoryLabels(array $advisory, array $base): string
     {
         $priority = match ($advisory['severity']) {
             'critical' => 'Priority::Critical',
@@ -117,7 +140,11 @@ final class Planner
             default    => 'Priority::Low',
         };
 
-        return "{$base},{$priority},Status::Ready";
+        return implode(',', [
+            ...$base,
+            $priority,
+            'Status::Ready',
+        ]);
     }
 
     /**
@@ -139,20 +166,28 @@ final class Planner
      */
     public static function auditAlert(array $opened, string $project): ?array
     {
-        $notable = array_values(array_filter($opened, static fn (array $item): bool => self::isNotable($item['advisory']['severity'])));
+        $notable = array_values(
+            array_filter($opened, static fn (array $item): bool => self::isNotable($item['advisory']['severity'])),
+        );
 
         if ([] === $notable) {
             return null;
         }
 
-        $lines  = array_map(static fn (array $item): string => "{$item['advisory']['package']} ({$item['advisory']['id']}, " . ('' === $item['advisory']['severity'] ? 'unknown' : $item['advisory']['severity']) . "): {$item['url']}", $notable);
+        $lines  = array_map(
+            static fn (array $item): string => "{$item['advisory']['package']} ({$item['advisory']['id']}, " . ('' === $item['advisory']['severity'] ? 'unknown' : $item['advisory']['severity']) . "): {$item['url']}",
+            $notable,
+        );
         $silent = count($opened) - count($notable);
 
         if (0 < $silent) {
             $lines[] = "{$silent} more of a low severity, issue only.";
         }
 
-        return ['title' => 'Security advisories: ' . count($notable) . " new in {$project}", 'message' => implode("\n", $lines)];
+        return [
+            'title'   => 'Security advisories: ' . count($notable) . " new in {$project}",
+            'message' => implode("\n", $lines),
+        ];
     }
 
     /**
@@ -169,9 +204,26 @@ final class Planner
 
         return [
             'reject'   => Json::strings($user['reject'] ?? []),
-            'cooldown' => Json::text($user, 'cooldown') ?: '3d',
-            'tag'      => ['when' => Json::text($tag, 'when') ?: 'runtime', 'level' => Json::text($tag, 'level') ?: 'patch'],
-            'cascade'  => null === $cascade ? null : ['groups' => Json::strings(Json::map($cascade)['groups'] ?? [])],
+            'cooldown' => Json::textOr(
+                $user,
+                'cooldown',
+                '3d',
+            ),
+            'tag'      => [
+                'when'  => Json::textOr(
+                    $tag,
+                    'when',
+                    'runtime',
+                ),
+                'level' => Json::textOr(
+                    $tag,
+                    'level',
+                    'patch',
+                ),
+            ],
+            'cascade'  => null === $cascade ? null : [
+                'groups' => Json::strings(Json::map($cascade)['groups'] ?? []),
+            ],
         ];
     }
 
@@ -184,24 +236,41 @@ final class Planner
      *
      * @return list<array{section: string, name: string, from: ?string, to: ?string}>
      */
-    public static function diffDependencies(?array $before, array $after, array $sections = self::ALL_SECTIONS): array
-    {
+    public static function diffDependencies(
+        ?array $before,
+        array $after,
+        array $sections = self::ALL_SECTIONS,
+    ): array {
         $rows = [];
 
         foreach ($sections as $section) {
             $old     = Json::requirements($before[$section] ?? []);
             $current = Json::requirements($after[$section] ?? []);
 
-            foreach (array_unique([...array_keys($old), ...array_keys($current)]) as $name) {
+            foreach (array_unique([
+                ...array_keys($old),
+                ...array_keys($current),
+            ]) as $name) {
                 $name = (string) $name;
 
                 if (($old[$name] ?? null) !== ($current[$name] ?? null)) {
-                    $rows[] = ['section' => $section, 'name' => $name, 'from' => $old[$name] ?? null, 'to' => $current[$name] ?? null];
+                    $rows[] = [
+                        'section' => $section,
+                        'name'    => $name,
+                        'from'    => $old[$name]     ?? null,
+                        'to'      => $current[$name] ?? null,
+                    ];
                 }
             }
         }
 
-        usort($rows, static fn (array $a, array $b): int => [$a['section'], $a['name']] <=> [$b['section'], $b['name']]);
+        usort($rows, static fn (array $a, array $b): int => [
+            $a['section'],
+            $a['name'],
+        ] <=> [
+            $b['section'],
+            $b['name'],
+        ]);
 
         return $rows;
     }
@@ -213,9 +282,16 @@ final class Planner
      */
     public static function encodePolicy(array $doc): string
     {
-        $json = json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $json = json_encode(
+            $doc,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        );
 
-        return preg_replace_callback('/^ +/m', static fn (array $match): string => str_repeat(' ', intdiv(strlen($match[0]), 2)), $json) . "\n";
+        return preg_replace_callback(
+            '/^ +/m',
+            static fn (array $match): string => str_repeat(' ', intdiv(strlen($match[0]), 2)),
+            $json,
+        ) . "\n";
     }
 
     /**
@@ -256,10 +332,19 @@ final class Planner
      */
     public static function formatChanges(array $rows): string
     {
-        $lines = ['| Section | Package | From | To |', '| --- | --- | --- | --- |'];
+        $lines = [
+            '| Section | Package | From | To |',
+            '| --- | --- | --- | --- |',
+        ];
 
         foreach ($rows as $row) {
-            $lines[] = sprintf('| %s | %s | %s | %s |', $row['section'], $row['name'], $row['from'] ?? '-', $row['to'] ?? '-');
+            $lines[] = sprintf(
+                '| %s | %s | %s | %s |',
+                $row['section'],
+                $row['name'],
+                $row['from'] ?? '-',
+                $row['to']   ?? '-',
+            );
         }
 
         return implode("\n", $lines);
@@ -296,22 +381,42 @@ final class Planner
      * @param array<string, mixed> $lock
      * @param array<string, mixed> $manifest
      */
-    public static function isInherited(array $lock, array $manifest, string $name, string $scope = 'zairakai/'): bool
-    {
+    public static function isInherited(
+        array $lock,
+        array $manifest,
+        string $name,
+        string $scope = 'zairakai/',
+    ): bool {
         /** @var Closure(mixed): list<string> $names */
         $names = static fn (mixed $requirements): array => array_map(strval(...), array_keys(Json::map($requirements)));
 
         /** @var array<string, list<string>> $edges */
         $edges = [];
 
-        foreach ([...Json::rows($lock['packages'] ?? []), ...Json::rows($lock['packages-dev'] ?? [])] as $package) {
+        foreach ([
+            ...Json::rows($lock['packages'] ?? []),
+            ...Json::rows($lock['packages-dev'] ?? []),
+        ] as $package) {
             $edges[Json::text($package, 'name')] = $names($package['require'] ?? []);
         }
 
-        $direct = [...$names($manifest['require'] ?? []), ...$names($manifest['require-dev'] ?? [])];
+        $direct = [
+            ...$names($manifest['require'] ?? []),
+            ...$names($manifest['require-dev'] ?? []),
+        ];
 
-        $ours   = self::reachable($edges, array_values(array_filter($direct, static fn (string $dependency): bool => ! str_starts_with($dependency, $scope))));
-        $theirs = self::reachable($edges, array_values(array_filter($direct, static fn (string $dependency): bool => str_starts_with($dependency, $scope))));
+        $ours   = self::reachable(
+            $edges,
+            array_values(
+                array_filter($direct, static fn (string $dependency): bool => ! str_starts_with($dependency, $scope)),
+            ),
+        );
+        $theirs = self::reachable(
+            $edges,
+            array_values(
+                array_filter($direct, static fn (string $dependency): bool => str_starts_with($dependency, $scope)),
+            ),
+        );
 
         return isset($theirs[$name]) && ! isset($ours[$name]);
     }
@@ -334,7 +439,10 @@ final class Planner
         foreach ($peers as $peer) {
             $range = $ranges[$peer] ?? null;
 
-            if (null === $range || ! self::acceptsVersion($range, Json::text($unblock, 'version'))) {
+            if (
+                null === $range
+                || ! self::acceptsVersion($range, Json::text($unblock, 'version'))
+            ) {
                 return false;
             }
         }
@@ -347,7 +455,13 @@ final class Planner
      */
     public static function isNotable(string $severity): bool
     {
-        return in_array($severity, ['', 'medium', 'moderate', 'high', 'critical'], true);
+        return in_array($severity, [
+            '',
+            'medium',
+            'moderate',
+            'high',
+            'critical',
+        ], true);
     }
 
     /**
@@ -358,20 +472,17 @@ final class Planner
     {
         $changed = array_values(array_filter(
             explode("\n", $diff),
-            static fn (string $line): bool => 1 === preg_match('/^[+-]/', $line) && 1 !== preg_match('/^(\+\+\+|---)/', $line),
+            static fn (string $line): bool => 1 === preg_match('/^[+-]/', $line) && 1 !== preg_match(
+                '/^(\+\+\+|---)/',
+                $line,
+            ),
         ));
 
         if (2 !== count($changed)) {
             return false;
         }
 
-        foreach ($changed as $line) {
-            if (1 !== preg_match('/^[+-]\s*ref:\s*\S+\s*$/', $line)) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all($changed, fn (string $line): bool => 1 === preg_match('/^[+-]\s*ref:\s*\S+\s*$/', $line));
     }
 
     /**
@@ -379,7 +490,11 @@ final class Planner
      */
     public static function isUrgent(string $severity): bool
     {
-        return in_array($severity, ['', 'high', 'critical'], true);
+        return in_array($severity, [
+            '',
+            'high',
+            'critical',
+        ], true);
     }
 
     /**
@@ -409,7 +524,10 @@ final class Planner
                 continue;
             }
 
-            if (null === $latestVersion || Comparator::greaterThan($normalized, $latestVersion)) {
+            if (
+                null === $latestVersion
+                || Comparator::greaterThan($normalized, $latestVersion)
+            ) {
                 $latest        = $release;
                 $latestVersion = $normalized;
             }
@@ -425,7 +543,9 @@ final class Planner
      */
     public static function latestTag(array $tags): ?string
     {
-        $versions = array_values(array_filter($tags, static fn (string $tag): bool => 1 === preg_match('/^\d+\.\d+\.\d+$/', $tag)));
+        $versions = array_values(
+            array_filter($tags, static fn (string $tag): bool => 1 === preg_match('/^\d+\.\d+\.\d+$/', $tag)),
+        );
 
         if ([] === $versions) {
             return null;
@@ -447,7 +567,10 @@ final class Planner
     {
         $versions = [];
 
-        foreach ([...Json::rows($lock['packages'] ?? []), ...Json::rows($lock['packages-dev'] ?? [])] as $package) {
+        foreach ([
+            ...Json::rows($lock['packages'] ?? []),
+            ...Json::rows($lock['packages-dev'] ?? []),
+        ] as $package) {
             $versions[Json::text($package, 'name')] = Json::text($package, 'version');
         }
 
@@ -484,7 +607,9 @@ final class Planner
 
         $range = Json::requirements($latest['require'] ?? [])[$name] ?? '';
 
-        return '' === $range ? null : $range;
+        return '' === $range
+            ? null
+            : $range;
     }
 
     /**
@@ -497,25 +622,48 @@ final class Planner
      *
      * @return array{version: ?string, reason: string}
      */
-    public static function planTag(array $config, ?string $last, array $commits, ?array $before, array $after): array
-    {
+    public static function planTag(
+        array $config,
+        ?string $last,
+        array $commits,
+        ?array $before,
+        array $after,
+    ): array {
         if ('never' === $config['tag']['when']) {
-            return ['version' => null, 'reason' => 'the project is never tagged by the update'];
+            return [
+                'version' => null,
+                'reason'  => 'the project is never tagged by the update',
+            ];
         }
 
         if (null === $last) {
-            return ['version' => null, 'reason' => 'there is no tag yet'];
+            return [
+                'version' => null,
+                'reason'  => 'there is no tag yet',
+            ];
         }
 
         if ([] === $commits) {
-            return ['version' => null, 'reason' => 'no update since the last tag'];
+            return [
+                'version' => null,
+                'reason'  => 'no update since the last tag',
+            ];
         }
 
-        if ('runtime' === $config['tag']['when'] && ! self::runtimeChanged($before, $after)) {
-            return ['version' => null, 'reason' => 'only the development requirements changed: the published archive is the same'];
+        if (
+            'runtime' === $config['tag']['when']
+            && ! self::runtimeChanged($before, $after)
+        ) {
+            return [
+                'version' => null,
+                'reason'  => 'only the development requirements changed: the published archive is the same',
+            ];
         }
 
-        return ['version' => self::nextVersion($last, $config['tag']['level']), 'reason' => 'a published range changed'];
+        return [
+            'version' => self::nextVersion($last, $config['tag']['level']),
+            'reason'  => 'a published range changed',
+        ];
     }
 
     /**
@@ -527,7 +675,15 @@ final class Planner
      */
     public static function policyPackages(array $doc): array
     {
-        return array_values(array_filter(array_map(static fn (array $entry): string => Json::text($entry, 'package'), Json::rows($doc['entries'] ?? [])), static fn (string $name): bool => '' !== $name));
+        return array_values(
+            array_filter(
+                array_map(
+                    static fn (array $entry): string => Json::text($entry, 'package'),
+                    Json::rows($doc['entries'] ?? []),
+                ),
+                static fn (string $name): bool => '' !== $name,
+            ),
+        );
     }
 
     /**
@@ -542,18 +698,34 @@ final class Planner
      *
      * @return list<string>
      */
-    public static function policyViolations(array $blocked, ?array $beforeManifest, array $afterManifest, array $beforeLock, array $afterLock): array
-    {
+    public static function policyViolations(
+        array $blocked,
+        ?array $beforeManifest,
+        array $afterManifest,
+        array $beforeLock,
+        array $afterLock,
+    ): array {
         $problems = [];
 
         foreach (self::diffDependencies($beforeManifest, $afterManifest) as $row) {
-            if (in_array($row['name'], $blocked, true) && null !== $row['from'] && null !== $row['to']) {
+            if (
+                in_array(
+                    $row['name'],
+                    $blocked,
+                    true,
+                )
+                && null !== $row['from']
+                && null !== $row['to']
+            ) {
                 $problems[] = "composer.json: {$row['name']} moves from {$row['from']} to {$row['to']}.";
             }
         }
 
         foreach ($blocked as $name) {
-            if (isset($beforeLock[$name], $afterLock[$name]) && $beforeLock[$name] !== $afterLock[$name]) {
+            if (
+                isset($beforeLock[$name], $afterLock[$name])
+                && $beforeLock[$name] !== $afterLock[$name]
+            ) {
                 $problems[] = "composer.lock: {$name} moves from {$beforeLock[$name]} to {$afterLock[$name]}.";
             }
         }
@@ -568,8 +740,11 @@ final class Planner
      * @param array<string, mixed>      $after
      * @param list<string>              $sections
      */
-    public static function runtimeChanged(?array $before, array $after, array $sections = self::RUNTIME_SECTIONS): bool
-    {
+    public static function runtimeChanged(
+        ?array $before,
+        array $after,
+        array $sections = self::RUNTIME_SECTIONS,
+    ): bool {
         foreach ($sections as $section) {
             $old = Json::requirements($before[$section] ?? []);
             $new = Json::requirements($after[$section] ?? []);
@@ -594,12 +769,21 @@ final class Planner
     public static function signerIdentity(array $env): array
     {
         $missing = array_values(array_filter(
-            ['GPG_PRIVATE_KEY_B64', 'RELEASE_SIGNER_NAME', 'RELEASE_SIGNER_EMAIL'],
-            static fn (string $name): bool => empty($env[$name]),
+            [
+                'GPG_PRIVATE_KEY_B64',
+                'RELEASE_SIGNER_NAME',
+                'RELEASE_SIGNER_EMAIL',
+            ],
+            static fn (string $name): bool => ! isset($env[$name]) || '' === $env[$name],
         ));
 
         if ([] !== $missing) {
-            throw new InvalidArgumentException(implode(', ', $missing) . ' not set: the commits and the tags are signed, see the handbook (versioning).');
+            throw new InvalidArgumentException(
+                implode(
+                    ', ',
+                    $missing,
+                ) . ' not set: the commits and the tags are signed, see the handbook (versioning).',
+            );
         }
 
         return [
@@ -615,20 +799,34 @@ final class Planner
      *
      * @param list<string> $names
      */
-    public static function syncDependabot(string $text, array $names, string $ecosystem): ?string
-    {
+    public static function syncDependabot(
+        string $text,
+        array $names,
+        string $ecosystem,
+    ): ?string {
         $begin   = "# BEGIN dependency-policy ({$ecosystem})";
         $end     = "# END dependency-policy ({$ecosystem})";
         $pattern = '/^([ \t]*)' . preg_quote($begin, '/') . '\n.*?^[ \t]*' . preg_quote($end, '/') . '$/ms';
 
-        if (1 !== preg_match($pattern, $text, $match)) {
+        if (1 !== preg_match(
+            $pattern,
+            $text,
+            $match,
+        )) {
             return null;
         }
 
         $indent = $match[1];
-        $rules  = [] === $names ? [] : ["{$indent}ignore:", ...array_map(static fn (string $name): string => "{$indent}  - dependency-name: \"{$name}\"", $names)];
+        $rules  = [] === $names ? [] : [
+            "{$indent}ignore:",
+            ...array_map(static fn (string $name): string => "{$indent}  - dependency-name: \"{$name}\"", $names),
+        ];
 
-        return (string) preg_replace_callback($pattern, static fn (): string => implode("\n", ["{$indent}{$begin}", ...$rules, "{$indent}{$end}"]), $text, 1);
+        return (string) preg_replace_callback($pattern, static fn (): string => implode("\n", [
+            "{$indent}{$begin}",
+            ...$rules,
+            "{$indent}{$end}",
+        ]), $text, 1);
     }
 
     /**
@@ -640,8 +838,13 @@ final class Planner
      */
     public static function validatePolicy(array $doc): array
     {
-        if (! isset($doc['entries']) || ! is_array($doc['entries'])) {
-            return ['"entries" must be a list.'];
+        if (
+            ! isset($doc['entries'])
+            || ! is_array($doc['entries'])
+        ) {
+            return [
+                '"entries" must be a list.',
+            ];
         }
 
         $errors = [];
@@ -655,7 +858,11 @@ final class Planner
             if ('' === $name) {
                 $errors[] = "{$where}: \"package\" is missing.";
             }
-            elseif (in_array($name, $seen, true)) {
+            elseif (in_array(
+                $name,
+                $seen,
+                true,
+            )) {
                 $errors[] = "{$where}: \"{$name}\" is listed twice.";
             }
 
@@ -678,7 +885,10 @@ final class Planner
 
                 $peers = Json::strings($unblock['peers'] ?? null);
 
-                if ([] === $peers || count($peers) !== count(Json::map($unblock['peers'] ?? null))) {
+                if (
+                    [] === $peers
+                    || count($peers) !== count(Json::map($unblock['peers'] ?? null))
+                ) {
                     $errors[] = "{$where}: \"unblock.peers\" must be a list of packages.";
                 }
             }
@@ -697,7 +907,16 @@ final class Planner
      */
     public static function withoutEntries(array $doc, array $names): array
     {
-        $doc['entries'] = array_values(array_filter(Json::rows($doc['entries'] ?? []), static fn (array $entry): bool => ! in_array(Json::text($entry, 'package'), $names, true)));
+        $doc['entries'] = array_values(
+            array_filter(
+                Json::rows($doc['entries'] ?? []),
+                static fn (array $entry): bool => ! in_array(
+                    Json::text($entry, 'package'),
+                    $names,
+                    true,
+                ),
+            ),
+        );
 
         return $doc;
     }

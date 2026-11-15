@@ -16,7 +16,9 @@ final class Json
     {
         $value = $row[$key] ?? 0;
 
-        return is_int($value) ? $value : 0;
+        return is_int($value)
+            ? $value
+            : 0;
     }
 
     /**
@@ -50,7 +52,9 @@ final class Json
      */
     public static function rows(mixed $value): array
     {
-        return is_array($value) ? array_values(array_map(self::map(...), $value)) : [];
+        return is_array($value)
+            ? array_values(array_map(self::map(...), $value))
+            : [];
     }
 
     /**
@@ -58,7 +62,9 @@ final class Json
      */
     public static function strings(mixed $value): array
     {
-        return is_array($value) ? array_values(array_filter($value, is_string(...))) : [];
+        return is_array($value)
+            ? array_values(array_filter($value, is_string(...)))
+            : [];
     }
 
     /**
@@ -68,6 +74,25 @@ final class Json
     {
         $value = $row[$key] ?? '';
 
-        return is_string($value) || is_int($value) ? (string) $value : '';
+        return is_string($value) || is_int($value)
+            ? (string) $value
+            : '';
+    }
+
+    /**
+     * The text of a key, or the default one when the key is missing or empty.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function textOr(
+        array $row,
+        string $key,
+        string $default,
+    ): string {
+        $value = self::text($row, $key);
+
+        return '' === $value
+            ? $default
+            : $value;
     }
 }
