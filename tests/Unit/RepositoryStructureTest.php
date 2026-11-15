@@ -303,6 +303,18 @@ final class RepositoryStructureTest extends TestCase
     }
 
     #[Test]
+    public function it_keeps_the_editorconfig_and_the_scripts_of_the_pipelines_in_the_archive(): void
+    {
+        foreach ([
+            '.editorconfig',
+            '.gitlab',
+            '.gitlab/scripts',
+        ] as $path) {
+            self::assertFalse($this->isLeftOutOfTheArchive($path), $path . ' must stay in the archive');
+        }
+    }
+
+    #[Test]
     public function it_keeps_the_markdownlintignore_stub_identical_to_the_one_of_php_dev_tools(): void
     {
         self::assertSame(
@@ -359,8 +371,8 @@ final class RepositoryStructureTest extends TestCase
         $attributes = (string) file_get_contents($this->root('.gitattributes'));
 
         foreach ([
-            '/.editorconfig', '/.gitattributes', '/.gitignore', '/.gitlab', '/.gitlab-ci.yml', '/.markdownlint.json',
-            '/SECURITY.md', '/assets', '/docs', '/tests', '/phpstan.neon', '/phpinsights.php', '/rector.php', '/pint.json',
+            '/.gitattributes', '/.gitignore', '/.gitlab-ci.yml', '/.markdownlint.json', '/SECURITY.md', '/assets', '/docs',
+            '/tests', '/phpstan.neon', '/phpinsights.php', '/rector.php', '/pint.json',
         ] as $entry) {
             self::assertStringContainsString($entry . ' export-ignore', $attributes);
         }
@@ -398,6 +410,37 @@ final class RepositoryStructureTest extends TestCase
 
         self::assertArrayHasKey('rules', $markdown);
         self::assertStringNotContainsString('max_line_length', $markdown['rules']);
+    }
+
+    // The archive of the package
+    // ================
+
+    #[Test]
+    public function it_ships_every_file_that_the_code_reads_in_vendor(): void
+    {
+        $missing = [];
+        $ignored = [];
+
+        foreach ($this->pathsReadInVendor() as $path) {
+            if (! file_exists($this->root($path))) {
+                $missing[] = $path;
+            }
+
+            if ($this->isLeftOutOfTheArchive($path)) {
+                $ignored[] = $path;
+            }
+        }
+
+        self::assertSame(
+            [],
+            $missing,
+            'a path that the code reads does not exist',
+        );
+        self::assertSame(
+            [],
+            $ignored,
+            'a path that the code reads is marked export-ignore',
+        );
     }
 
     // Git hooks
@@ -448,6 +491,21 @@ final class RepositoryStructureTest extends TestCase
     }
 
     /**
+     * @return list<string>
+     */
+    private function filesToScan(): array
+    {
+        $git   = 'git ls-files --cached --others --exclude-standard -- src scripts tools stubs config bin .gitlab Makefile 2>/dev/null';
+        $files = array_filter(explode("\n", (string) shell_exec('cd ' . escapeshellarg($this->root()) . ' && ' . $git)));
+
+        if ([] === $files) {
+            self::markTestSkipped('The list of the files needs git.');
+        }
+
+        return array_values(array_filter($files, fn (string $file): bool => is_file($this->root($file))));
+    }
+
+    /**
      * The only long dashes that are allowed: the titles of the sections of a Makefile (`## -- title --`, with two long
      * dashes on each side), which `make help` recognizes.
      *
@@ -467,6 +525,63 @@ final class RepositoryStructureTest extends TestCase
         $text = implode("\n", $lines);
 
         return str_contains($text, $dashes[0]) || str_contains($text, $dashes[1]);
+    }
+
+    /**
+     * A file is left out of the archive when it, or a folder above it, has the attribute export-ignore.
+     */
+    private function isLeftOutOfTheArchive(string $path): bool
+    {
+        $parts   = explode('/', $path);
+        $current = '';
+
+        foreach ($parts as $part) {
+            $current .= ('' === $current ? '' : '/') . $part;
+            $output = (string) shell_exec(
+                'cd ' . escapeshellarg($this->root()) . ' && git check-attr export-ignore -- ' . escapeshellarg($current) . ' 2>/dev/null',
+            );
+
+            if (str_contains($output, 'export-ignore: set')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The paths that the code of the package reads in vendor/zairakai/laravel-dev-tools: the Composer plugin, the Artisan
+     * commands, the scripts, the Makefile fragments and the pipeline templates name them.
+     *
+     * @return list<string>
+     */
+    private function pathsReadInVendor(): array
+    {
+        $patterns = [
+            '#vendor/zairakai/laravel-dev-tools/([A-Za-z0-9_./-]+)#',
+            '#\$\{?VENDOR_PATH\}?/([A-Za-z0-9_./-]+)#',
+            '#\$vendorPath\s*\.\s*\'/([A-Za-z0-9_./-]+)\'#',
+            '#\$\{?DEV_TOOLS_ROOT\}?/([A-Za-z0-9_./-]+)#',
+        ];
+        $paths = [];
+
+        foreach ($this->filesToScan() as $file) {
+            $content = (string) file_get_contents($this->root($file));
+
+            foreach ($patterns as $pattern) {
+                preg_match_all(
+                    $pattern,
+                    $content,
+                    $matches,
+                );
+
+                foreach ($matches[1] as $path) {
+                    $paths[rtrim($path, '.,:;)/')] = true;
+                }
+            }
+        }
+
+        return array_values(array_filter(array_keys($paths), static fn (string $path): bool => '' !== $path));
     }
 
     private function root(string $path = ''): string

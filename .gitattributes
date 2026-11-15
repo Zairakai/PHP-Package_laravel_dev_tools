@@ -19,16 +19,17 @@
 *.eot binary
 
 # Left out of the archive of the package (git archive)
+#
+# Not what the package reads from vendor/: the setup copies .editorconfig, and the pipeline templates run the scripts
+# of .gitlab/scripts. A test lists the paths that the code reads, and checks that none is left out.
 
 # Folders
-/.gitlab export-ignore
 /assets export-ignore
 /docs export-ignore
 /tests export-ignore
 
 # Files
 /.dependency-update.json export-ignore
-/.editorconfig export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
 /.gitlab-ci.yml export-ignore
