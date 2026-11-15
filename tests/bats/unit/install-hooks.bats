@@ -2,30 +2,30 @@
 #
 # Unit Tests for install-hooks.sh
 #
-# The script activates the hooks of stanislas-poisson/php-dev-tools through core.hooksPath:
+# The script activates the hooks of zairakai/laravel-dev-tools through core.hooksPath:
 # - Activation in a git repository
 # - Errors (not a git repository, hooks not installed)
-# - Deactivation (only of the hooks of php-dev-tools)
+# - Deactivation (only of the hooks of laravel-dev-tools)
 #
 
 # Load test helpers
 load '../helpers/test_helper'
 
-HOOKS_PATH="vendor/stanislas-poisson/php-dev-tools/hooks"
+EXPECTED_HOOKS_PATH="vendor/zairakai/laravel-dev-tools/stubs/githooks"
 
 setup() {
     setup_test_env
 
-    # A project: a git repository with the scripts of this package and the hooks of php-dev-tools in vendor/
+    # A project: a git repository with the scripts of this package and the hooks of laravel-dev-tools in vendor/
     export TEST_VENDOR_DIR="${TEST_TEMP_DIR}/vendor/zairakai/laravel-dev-tools"
-    mkdir -p "${TEST_VENDOR_DIR}/scripts" "${TEST_TEMP_DIR}/${HOOKS_PATH}"
+    mkdir -p "${TEST_VENDOR_DIR}/scripts" "${TEST_TEMP_DIR}/${EXPECTED_HOOKS_PATH}"
 
     cp "${PROJECT_ROOT}/scripts/config.sh" "${TEST_VENDOR_DIR}/scripts/"
     cp "${PROJECT_ROOT}/scripts/install-hooks.sh" "${TEST_VENDOR_DIR}/scripts/"
 
     for hook in commit-msg prepare-commit-msg pre-commit pre-push; do
-        printf '#!/usr/bin/env bash\nexit 0\n' > "${TEST_TEMP_DIR}/${HOOKS_PATH}/${hook}"
-        chmod +x "${TEST_TEMP_DIR}/${HOOKS_PATH}/${hook}"
+        printf '#!/usr/bin/env bash\nexit 0\n' > "${TEST_TEMP_DIR}/${EXPECTED_HOOKS_PATH}/${hook}"
+        chmod +x "${TEST_TEMP_DIR}/${EXPECTED_HOOKS_PATH}/${hook}"
     done
 
     cd "${TEST_TEMP_DIR}" || exit 1
@@ -36,9 +36,8 @@ teardown() {
     teardown_test_env
 }
 
-# ============================================================================
 # Activation Tests
-# ============================================================================
+# ================
 
 @test "install-hooks detects non-git repository" {
     rm -rf "${TEST_TEMP_DIR:?}/.git"
@@ -49,8 +48,8 @@ teardown() {
     [[ "$output" =~ "Not a git repository" ]]
 }
 
-@test "install-hooks fails when the hooks of php-dev-tools are not installed" {
-    rm -rf "${TEST_TEMP_DIR:?}/${HOOKS_PATH}"
+@test "install-hooks fails when the hooks of laravel-dev-tools are not installed" {
+    rm -rf "${TEST_TEMP_DIR:?}/${EXPECTED_HOOKS_PATH}"
 
     run bash "${TEST_VENDOR_DIR}/scripts/install-hooks.sh"
 
@@ -58,11 +57,11 @@ teardown() {
     [[ "$output" =~ "Hooks not found" ]]
 }
 
-@test "install-hooks points core.hooksPath at the hooks of php-dev-tools" {
+@test "install-hooks points core.hooksPath at the hooks of laravel-dev-tools" {
     run bash "${TEST_VENDOR_DIR}/scripts/install-hooks.sh"
 
     [ "$status" -eq 0 ]
-    [ "$(git config --get core.hooksPath)" = "${HOOKS_PATH}" ]
+    [ "$(git config --get core.hooksPath)" = "${EXPECTED_HOOKS_PATH}" ]
 }
 
 @test "install-hooks copies nothing into the project" {
@@ -83,12 +82,11 @@ teardown() {
     [[ "$output" =~ "pre-push" ]]
 }
 
-# ============================================================================
 # Deactivation Tests
-# ============================================================================
+# ================
 
-@test "install-hooks --remove unsets core.hooksPath when it is the one of php-dev-tools" {
-    git config core.hooksPath "${HOOKS_PATH}"
+@test "install-hooks --remove unsets core.hooksPath when it is the one of laravel-dev-tools" {
+    git config core.hooksPath "${EXPECTED_HOOKS_PATH}"
 
     run bash "${TEST_VENDOR_DIR}/scripts/install-hooks.sh" --remove
 
