@@ -1,0 +1,7 @@
+includes:
+  - vendor/zairakai/laravel-dev-tools/config/library.neon
+
+parameters:
+  paths:
+    - src
+    - tests

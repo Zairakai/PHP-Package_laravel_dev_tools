@@ -1,6 +1,5 @@
-# PHPStan configuration for PACKAGE DEVELOPMENT
-# This file is used locally and in CI/CD for analyzing the package itself
-# Add to .gitignore if you want devs to customize locally
+# PHPStan configuration of this package: the thin file that the editor and the CI read.
+# The rules are in config/phpstan.neon, which extends the ones of php-dev-tools.
 
 includes:
   - config/package.neon
@@ -14,8 +13,6 @@ parameters:
   # Strict rules of php-dev-tools that the code of this package does not follow yet. TEMPORARY: reduce this list.
   ignoreErrors:
     -
-      identifier: ternary.shortNotAllowed
-    -
       identifier: if.condNotBoolean
     -
       identifier: booleanNot.exprNotBoolean
@@ -23,5 +20,3 @@ parameters:
       identifier: arrayFilter.strict
     -
       identifier: plus.leftNonNumeric
-    -
-      identifier: empty.notAllowed

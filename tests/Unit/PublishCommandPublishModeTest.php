@@ -34,9 +34,8 @@ final class PublishCommandPublishModeTest extends TestCase
         parent::tearDown();
     }
 
-    // =========================================================================
     // --publish=governance
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_governance_creates_all_three_files(): void
@@ -80,7 +79,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/insights.php');
+        $this->assertFileExists($this->basePath . '/phpinsights.php');
     }
 
     #[Test]
@@ -93,7 +92,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/markdownlint.json');
+        $this->assertFileExists($this->basePath . '/.markdownlint.json');
     }
 
     #[Test]
@@ -106,7 +105,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/phpstan.neon');
+        $this->assertFileExists($this->basePath . '/phpstan.neon');
     }
 
     #[Test]
@@ -122,9 +121,8 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertFileExists($this->basePath . '/config/dev-tools/phpunit.xml');
     }
 
-    // =========================================================================
     // --publish=<individual key>
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_individual_key_pint_creates_file(): void
@@ -136,7 +134,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
+        $this->assertFileExists($this->basePath . '/pint.json');
     }
 
     #[Test]
@@ -149,12 +147,11 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
+        $this->assertFileExists($this->basePath . '/rector.php');
     }
 
-    // =========================================================================
     // --publish=quality
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_quality_group_creates_quality_files(): void
@@ -167,15 +164,14 @@ final class PublishCommandPublishModeTest extends TestCase
 
         $this->assertEquals(0, $exitCode);
 
-        $this->assertFileExists($this->basePath . '/config/dev-tools/phpstan.neon');
-        $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
-        $this->assertFileExists($this->basePath . '/config/dev-tools/insights.php');
+        $this->assertFileExists($this->basePath . '/phpstan.neon');
+        $this->assertFileExists($this->basePath . '/rector.php');
+        $this->assertFileExists($this->basePath . '/phpinsights.php');
         $this->assertFileExists($this->basePath . '/config/dev-tools/baseline.neon');
     }
 
-    // =========================================================================
     // --publish=style
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_style_group_creates_style_files(): void
@@ -188,13 +184,12 @@ final class PublishCommandPublishModeTest extends TestCase
 
         $this->assertEquals(0, $exitCode);
 
-        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
-        $this->assertFileExists($this->basePath . '/config/dev-tools/markdownlint.json');
+        $this->assertFileExists($this->basePath . '/pint.json');
+        $this->assertFileExists($this->basePath . '/.markdownlint.json');
     }
 
-    // =========================================================================
     // --publish=testing
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_testing_group_creates_phpunit_file(): void
@@ -209,9 +204,8 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertFileExists($this->basePath . '/config/dev-tools/phpunit.xml');
     }
 
-    // =========================================================================
     // --publish=unknown → error + FAILURE exit code
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_unknown_target_returns_failure(): void
@@ -222,7 +216,11 @@ final class PublishCommandPublishModeTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(1, $exitCode, 'Unknown publish target should return failure');
+        $this->assertEquals(
+            1,
+            $exitCode,
+            'Unknown publish target should return failure',
+        );
     }
 
     #[Test]
@@ -238,9 +236,8 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertStringContainsString('quality', $output);
     }
 
-    // =========================================================================
     // --publish without value → publish all
-    // =========================================================================
+    // ================
 
     #[Test]
     public function publish_mode_without_value_publishes_all_groups(): void
@@ -254,12 +251,12 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertEquals(0, $exitCode);
 
         $expectedFiles = [
-            '/config/dev-tools/phpstan.neon',
-            '/config/dev-tools/rector.php',
-            '/config/dev-tools/insights.php',
+            '/phpstan.neon',
+            '/rector.php',
+            '/phpinsights.php',
             '/config/dev-tools/baseline.neon',
-            '/config/dev-tools/pint.json',
-            '/config/dev-tools/markdownlint.json',
+            '/pint.json',
+            '/.markdownlint.json',
             '/config/dev-tools/phpunit.xml',
         ];
 
@@ -281,12 +278,23 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertStringContainsString('Done', $output);
     }
 
-    // =========================================================================
     // Helpers
-    // =========================================================================
+    // ================
 
     private function cleanDevToolsDir(): void
     {
+        // The thin files that the tests publish to the root of the skeleton
+        foreach ([
+            'phpstan.neon',
+            'rector.php',
+            'phpinsights.php',
+            'pint.json',
+            '.markdownlint.json',
+            '.markdownlintignore',
+        ] as $file) {
+            File::delete($this->basePath . '/' . $file);
+        }
+
         $devToolsDir = $this->basePath . '/config/dev-tools';
 
         if (File::isDirectory($devToolsDir)) {
@@ -305,7 +313,11 @@ final class PublishCommandPublishModeTest extends TestCase
             File::delete($makefilePath);
         }
 
-        foreach (['CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'SECURITY.md'] as $governanceFile) {
+        foreach ([
+            'CONTRIBUTING.md',
+            'CODE_OF_CONDUCT.md',
+            'SECURITY.md',
+        ] as $governanceFile) {
             $path = $this->basePath . '/' . $governanceFile;
 
             if (File::exists($path)) {

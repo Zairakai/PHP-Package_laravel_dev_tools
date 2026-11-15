@@ -34,6 +34,9 @@ include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)rector.mk
 # 5. Code style (pint - formatting after rector)
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)code-style.mk
 
+# Code layout (ternaries, arrays, calls)
+include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)spread.mk
+
 # 6. Static analysis (phpstan - type safety)
 include $(LARAVEL_DIRECTORY_TOOLS_MAKE_DIR)phpstan.mk
 

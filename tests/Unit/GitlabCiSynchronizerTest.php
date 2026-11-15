@@ -27,9 +27,13 @@ final class GitlabCiSynchronizerTest extends TestCase
     {
         parent::setUp();
 
-        // Isolated temp directory per test — cleaned in tearDown
+        // Isolated temp directory per test - cleaned in tearDown
         $this->tmpDir = sys_get_temp_dir() . '/ldt-ci-sync-test-' . uniqid('', true);
-        mkdir($this->tmpDir, 0755, true);
+        mkdir(
+            $this->tmpDir,
+            0755,
+            true,
+        );
 
         $this->bufferIO = new BufferIO();
     }
@@ -72,9 +76,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         ];
     }
 
-    // =========================================================================
     // Multiple include blocks
-    // =========================================================================
+    // ================
 
     #[DataProvider('provideMultiIncludeFiles')]
     #[Test]
@@ -92,15 +95,14 @@ final class GitlabCiSynchronizerTest extends TestCase
         }
     }
 
-    // =========================================================================
-    // containsDevToolsInclude — CI_TEMPLATE_FILE branch
-    // =========================================================================
+    // containsDevToolsInclude - CI_TEMPLATE_FILE branch
+    // ================
 
     #[Test]
     public function it_detects_self_hosted_pipeline_via_local_include(): void
     {
         // Simulates laravel-dev-tools itself, which uses include:local: instead
-        // of include:project: — covers the CI_TEMPLATE_FILE branch of containsDevToolsInclude()
+        // of include:project: - covers the CI_TEMPLATE_FILE branch of containsDevToolsInclude()
         $this->writeGitlabCi(
             "include:\n"
             . "  - local: '.gitlab/ci/pipeline-php-package.yml'\n"
@@ -112,32 +114,31 @@ final class GitlabCiSynchronizerTest extends TestCase
 
         $this->makeSynchronizer('1.3.0')->synchronize(autoFix: false);
 
-        // File matched via CI_TEMPLATE_FILE — ref is unparseable without project: block
+        // File matched via CI_TEMPLATE_FILE - ref is unparseable without project: block
         // so we expect the "Could not parse ref" warning
         $this->assertStringContainsString('Could not parse ref:', $this->bufferIO->getOutput());
     }
 
-    // =========================================================================
-    // fetchRawVersion — production path (no resolver injected)
-    // =========================================================================
+    // fetchRawVersion - production path (no resolver injected)
+    // ================
 
     #[Test]
     public function it_does_not_crash_when_no_version_resolver_is_injected(): void
     {
         // Instantiate without versionResolver to exercise the InstalledVersions path.
         // In the test environment, InstalledVersions may return null, 'dev-main', or
-        // throw OutOfBoundsException — all handled gracefully. The only assertion is
+        // throw OutOfBoundsException - all handled gracefully. The only assertion is
         // that synchronize() completes without error and does not modify any file.
         $gitlabCiSynchronizer = new GitlabCiSynchronizer(
             io: $this->bufferIO,
             projectRoot: $this->tmpDir,
-            // no versionResolver — forces the InstalledVersions branch in fetchRawVersion()
+            // no versionResolver - forces the InstalledVersions branch in fetchRawVersion()
         );
 
         // Does not throw regardless of what InstalledVersions returns
         $gitlabCiSynchronizer->synchronize(autoFix: false);
 
-        // No file created — version is null or non-tag → early return
+        // No file created - version is null or non-tag → early return
         $this->assertFileDoesNotExist($this->tmpDir . '/.gitlab-ci.yml');
     }
 
@@ -164,9 +165,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertSame('', $this->bufferIO->getOutput());
     }
 
-    // =========================================================================
     // File present, already in sync
-    // =========================================================================
+    // ================
 
     #[Test]
     public function it_does_nothing_when_ref_matches_installed_version(): void
@@ -199,7 +199,7 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_exits_include_block_on_top_level_key_and_ignores_further_content(): void
     {
-        // project: found but ref: is absent — parsing continues past the include block
+        // project: found but ref: is absent - parsing continues past the include block
         // into "variables:" (a top-level key with no leading whitespace).
         // This triggers shouldSkipLine() lines 265-266: $inIncludeBlock and
         // $foundProject are reset, then the method returns null → "Could not parse ref".
@@ -233,9 +233,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertStringContainsString('1.3.0', $this->readGitlabCi());
     }
 
-    // =========================================================================
-    // Edge cases — ref formats
-    // =========================================================================
+    // Edge cases - ref formats
+    // ================
 
     #[Test]
     public function it_handles_quoted_ref_with_single_quotes(): void
@@ -252,9 +251,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertStringContainsString('1.3.0', $this->readGitlabCi());
     }
 
-    // =========================================================================
     // File present but does not include our template
-    // =========================================================================
+    // ================
 
     #[Test]
     public function it_ignores_file_that_does_not_include_dev_tools_template(): void
@@ -290,9 +288,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertSame('', $this->bufferIO->getOutput());
     }
 
-    // =========================================================================
     // Missing .gitlab-ci.yml
-    // =========================================================================
+    // ================
 
     #[Test]
     public function it_logs_info_and_suggests_artisan_when_no_composer_json(): void
@@ -322,9 +319,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertStringContainsString('.gitlab-ci.yml', $output);
     }
 
-    // =========================================================================
     // Version normalization
-    // =========================================================================
+    // ================
 
     #[Test]
     public function it_normalizes_version_without_v_prefix_from_resolver(): void
@@ -358,15 +354,14 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertStringContainsString('pipeline-php-package.yml', $updated);
     }
 
-    // =========================================================================
-    // findRefInLines — edge cases
-    // =========================================================================
+    // findRefInLines - edge cases
+    // ================
 
     #[Test]
     public function it_returns_null_when_new_include_entry_starts_before_ref(): void
     {
         // project: found (foundProject=true) but a new include entry "- " appears
-        // before any ref: line — covers line 241 (return null inside findRefInLines)
+        // before any ref: line - covers line 241 (return null inside findRefInLines)
         $this->writeGitlabCi(
             "include:\n"
             . "  - project: 'zairakai/php-packages/laravel-dev-tools'\n"
@@ -382,7 +377,10 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_suggests_artisan_when_project_type_is_project(): void
     {
-        $this->writeComposerJson(['name' => 'acme/my-app', 'type' => 'project']);
+        $this->writeComposerJson([
+            'name' => 'acme/my-app',
+            'type' => 'project',
+        ]);
 
         $this->makeSynchronizer()->synchronize(autoFix: false);
 
@@ -396,7 +394,10 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_suggests_bash_script_when_project_type_is_composer_plugin(): void
     {
-        $this->writeComposerJson(['name' => 'acme/my-plugin', 'type' => 'composer-plugin']);
+        $this->writeComposerJson([
+            'name' => 'acme/my-plugin',
+            'type' => 'composer-plugin',
+        ]);
 
         $this->makeSynchronizer()->synchronize(autoFix: false);
 
@@ -410,7 +411,10 @@ final class GitlabCiSynchronizerTest extends TestCase
     #[Test]
     public function it_suggests_bash_script_when_project_type_is_library(): void
     {
-        $this->writeComposerJson(['name' => 'acme/my-package', 'type' => 'library']);
+        $this->writeComposerJson([
+            'name' => 'acme/my-package',
+            'type' => 'library',
+        ]);
 
         $this->makeSynchronizer()->synchronize(autoFix: false);
 
@@ -431,9 +435,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertStringContainsString('.gitlab-ci.yml not found', $this->bufferIO->getOutput());
     }
 
-    // =========================================================================
-    // Out of sync — auto-fix mode (post-update-cmd)
-    // =========================================================================
+    // Out of sync - auto-fix mode (post-update-cmd)
+    // ================
 
     #[Test]
     public function it_updates_ref_when_auto_fix_is_enabled(): void
@@ -446,9 +449,8 @@ final class GitlabCiSynchronizerTest extends TestCase
         $this->assertStringNotContainsString('ref: 1.2.0', $this->readGitlabCi());
     }
 
-    // =========================================================================
-    // Out of sync — warn mode (post-install-cmd)
-    // =========================================================================
+    // Out of sync - warn mode (post-install-cmd)
+    // ================
 
     #[Test]
     public function it_warns_when_ref_is_outdated_and_auto_fix_is_disabled(): void
@@ -485,7 +487,7 @@ final class GitlabCiSynchronizerTest extends TestCase
      */
     private function makeGitlabCiWithRef(string $ref): string
     {
-        // IMPORTANT: No leading indentation — the parser detects top-level keys
+        // IMPORTANT: No leading indentation - the parser detects top-level keys
         // (like "variables:") by checking for absence of leading whitespace.
         // An indented heredoc would prevent shouldSkipLine() from resetting the
         // include block state, leaving branches on lines 265-266 uncovered.
@@ -498,9 +500,8 @@ final class GitlabCiSynchronizerTest extends TestCase
             . '  CACHE_KEY: "my-package"' . "\n";
     }
 
-    // =========================================================================
     // Helpers
-    // =========================================================================
+    // ================
 
     /**
      * Build a GitlabCiSynchronizer with a fixed installed version.
@@ -538,7 +539,9 @@ final class GitlabCiSynchronizerTest extends TestCase
             }
 
             $full = $path . '/' . $item;
-            is_dir($full) ? $this->removeDirectory($full) : File::delete($full);
+            is_dir($full)
+                ? $this->removeDirectory($full)
+                : File::delete($full);
         }
 
         rmdir($path);

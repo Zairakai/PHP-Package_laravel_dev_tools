@@ -14,9 +14,8 @@ teardown() {
     teardown_test_env
 }
 
-# ============================================================================
 # CI Quality Script Tests
-# ============================================================================
+# ================
 
 @test "ci-quality.sh uses error counter pattern" {
     # Check that script sources config.sh
@@ -43,9 +42,8 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
-# ============================================================================
 # Setup Package Script Tests
-# ============================================================================
+# ================
 
 @test "setup-package.sh handles file installation" {
     run grep -qE "(cp |copy)" "${SCRIPT_DIR}/setup-package.sh"
@@ -59,9 +57,8 @@ teardown() {
     [[ "$output" =~ "#!/usr/bin/env bash" ]]
 }
 
-# ============================================================================
 # Rector Scripts Standardization Tests
-# ============================================================================
+# ================
 
 @test "rector-fix.sh uses require_package" {
     run grep -q "source.*config.sh" "${SCRIPT_DIR}/rector-fix.sh"

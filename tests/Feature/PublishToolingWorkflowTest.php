@@ -27,7 +27,11 @@ final class PublishToolingWorkflowTest extends TestCase
         ]);
 
         // Should succeed
-        $this->assertEquals(0, $exitCode, 'Publish command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Publish command should succeed',
+        );
 
         // Verify all expected files are created
         $this->assertFileExists($basePath . '/Makefile', 'Makefile should be created');
@@ -61,7 +65,11 @@ final class PublishToolingWorkflowTest extends TestCase
         ]);
 
         // Should succeed (not fail!) - command doesn't return error codes
-        $this->assertEquals(0, $exitCode, 'Command succeeds but skips existing files');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command succeeds but skips existing files',
+        );
 
         // Original file should be unchanged
         $content = File::get($makefilePath);

@@ -28,9 +28,8 @@ teardown() {
     teardown_test_env
 }
 
-# ============================================================================
 # commit-msg Hook Tests
-# ============================================================================
+# ================
 
 # Writes a message in a file and runs the commit-msg hook on it
 run_commit_msg() {
@@ -38,7 +37,7 @@ run_commit_msg() {
 
     printf '%b' "$1" > "$msg_file"
 
-    run bash "${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/commit-msg" "$msg_file"
+    run bash "${PROJECT_ROOT}/stubs/githooks/commit-msg" "$msg_file"
 }
 
 @test "commit-msg accepts the handbook format" {
@@ -114,11 +113,17 @@ run_commit_msg() {
     [ "$status" -eq 0 ]
 }
 
-@test "commit-msg rejects a first line over 72 characters" {
-    run_commit_msg "feat(auth): #1 this is a very long commit message that exceeds the maximum length\n"
+@test "commit-msg rejects a subject over 50 characters" {
+    run_commit_msg "feat(auth): #1 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
 
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "the limit is 72" ]]
+    [[ "$output" =~ "the limit is 50" ]]
+}
+
+@test "commit-msg counts the subject only, not the type, the scope and the ticket" {
+    run_commit_msg "refactor(a-long-scope-name): #123456 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+
+    [ "$status" -eq 0 ]
 }
 
 @test "commit-msg rejects a second line that is not blank" {
@@ -138,9 +143,8 @@ run_commit_msg() {
     done
 }
 
-# ============================================================================
 # prepare-commit-msg Hook Tests
-# ============================================================================
+# ================
 
 # Runs the prepare-commit-msg hook on a message, on a given branch, and prints the result
 prepare_message() {
@@ -153,7 +157,7 @@ prepare_message() {
 
     printf '%s\n' "$message" > "$msg_file"
 
-    bash "${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/prepare-commit-msg" "$msg_file" "$source" >/dev/null 2>&1
+    bash "${PROJECT_ROOT}/stubs/githooks/prepare-commit-msg" "$msg_file" "$source" >/dev/null 2>&1
 
     head -n1 "$msg_file"
 }
@@ -206,19 +210,18 @@ prepare_message() {
     [ "$output" = "feat(x): add login" ]
 }
 
-# ============================================================================
 # pre-commit Hook Tests
-# ============================================================================
+# ================
 
 @test "pre-commit hook exists and is executable" {
-    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-commit"
+    local hook="${PROJECT_ROOT}/stubs/githooks/pre-commit"
 
     [ -f "$hook" ]
     [ -x "$hook" ]
 }
 
 @test "pre-commit hook has correct shebang" {
-    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-commit"
+    local hook="${PROJECT_ROOT}/stubs/githooks/pre-commit"
 
     run head -n1 "$hook"
 
@@ -226,7 +229,7 @@ prepare_message() {
 }
 
 @test "pre-commit hook calls composer quality:fast, which runs make quality-fast" {
-    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-commit"
+    local hook="${PROJECT_ROOT}/stubs/githooks/pre-commit"
 
     run grep -q "composer quality:fast" "$hook"
     [ "$status" -eq 0 ]
@@ -235,19 +238,18 @@ prepare_message() {
     [ "$status" -eq 0 ]
 }
 
-# ============================================================================
 # pre-push Hook Tests
-# ============================================================================
+# ================
 
 @test "pre-push hook exists and is executable" {
-    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-push"
+    local hook="${PROJECT_ROOT}/stubs/githooks/pre-push"
 
     [ -f "$hook" ]
     [ -x "$hook" ]
 }
 
 @test "pre-push hook has correct shebang" {
-    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-push"
+    local hook="${PROJECT_ROOT}/stubs/githooks/pre-push"
 
     run head -n1 "$hook"
 
@@ -255,7 +257,7 @@ prepare_message() {
 }
 
 @test "pre-push hook runs composer quality, which runs make quality" {
-    local hook="${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/hooks/pre-push"
+    local hook="${PROJECT_ROOT}/stubs/githooks/pre-push"
 
     run grep -q "composer quality" "$hook"
     [ "$status" -eq 0 ]

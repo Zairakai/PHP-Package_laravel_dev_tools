@@ -66,7 +66,11 @@ final class PublishCommandTest extends TestCase
         $vendorBinDir = $this->basePath . '/vendor/bin';
 
         if (! File::isDirectory($vendorBinDir)) {
-            File::makeDirectory($vendorBinDir, 0755, true);
+            File::makeDirectory(
+                $vendorBinDir,
+                0755,
+                true,
+            );
         }
 
         $normalizeBin = $vendorBinDir . '/composer-normalize';
@@ -82,7 +86,11 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         // Command completes successfully whether or not normalize was already installed
         $output = Artisan::output();
@@ -121,7 +129,11 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         // In non-interactive mode without --with-normalize, no composer-normalize handling occurs
         // This is expected behavior - the method returns early
@@ -141,7 +153,11 @@ final class PublishCommandTest extends TestCase
         ]);
 
         // Should succeed regardless of installation result
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         $output = Artisan::output();
 
@@ -166,11 +182,19 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed even without --force');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed even without --force',
+        );
 
         // Verify content was NOT replaced
         $content = File::get($this->makefilePath);
-        $this->assertStringContainsString('Dummy content', $content, 'File should not be overwritten without --force');
+        $this->assertStringContainsString(
+            'Dummy content',
+            $content,
+            'File should not be overwritten without --force',
+        );
 
         // Run with force (should overwrite)
         $exitCode = Artisan::call('dev-tools:publish', [
@@ -178,15 +202,23 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Should succeed with --force');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Should succeed with --force',
+        );
 
         // Verify content was replaced
         $content = File::get($this->makefilePath);
-        $this->assertStringNotContainsString('Dummy content', $content, 'File should be overwritten with --force');
+        $this->assertStringNotContainsString(
+            'Dummy content',
+            $content,
+            'File should be overwritten with --force',
+        );
     }
 
     /**
-     * --with-hooks points core.hooksPath at the hooks of php-dev-tools and copies nothing into the project.
+     * --with-hooks points core.hooksPath at the hooks of laravel-dev-tools and copies nothing into the project.
      */
     #[Test]
     public function git_hooks_are_activated_with_the_hooks_of_php_dev_tools(): void
@@ -199,7 +231,11 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
         $this->assertSame(GitHooksActivator::HOOKS_PATH, $this->hooksPath());
         $this->assertDirectoryDoesNotExist($this->basePath . '/.githooks', 'Nothing should be copied into the project');
         $this->assertStringContainsString('Configured: git config core.hooksPath', Artisan::output());
@@ -217,7 +253,11 @@ final class PublishCommandTest extends TestCase
         $gitDir = $this->basePath . '/.git';
 
         if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
+            File::makeDirectory(
+                $gitDir,
+                0755,
+                true,
+            );
         }
 
         // Run WITHOUT --with-hooks
@@ -226,7 +266,11 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         // Verify .githooks directory was NOT created
         $hooksDir = $this->basePath . '/.githooks';
@@ -268,14 +312,22 @@ final class PublishCommandTest extends TestCase
         $gitDir = $this->basePath . '/.git';
 
         if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
+            File::makeDirectory(
+                $gitDir,
+                0755,
+                true,
+            );
         }
 
         // Create .githooks directory
         $hooksDir = $this->basePath . '/.githooks';
 
         if (! File::isDirectory($hooksDir)) {
-            File::makeDirectory($hooksDir, 0755, true);
+            File::makeDirectory(
+                $hooksDir,
+                0755,
+                true,
+            );
         }
 
         // Create existing hook file
@@ -288,11 +340,19 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         // Verify existing hook was not overwritten
         $content = File::get($existingHook);
-        $this->assertStringContainsString('existing', $content, 'Existing hook should not be overwritten');
+        $this->assertStringContainsString(
+            'existing',
+            $content,
+            'Existing hook should not be overwritten',
+        );
 
         // Cleanup
         if (File::isDirectory($hooksDir)) {
@@ -312,8 +372,8 @@ final class PublishCommandTest extends TestCase
     {
         // Temporarily rename stub to simulate missing file
         $vendorPath = dirname(__DIR__, 2);
-        $stubFile   = $vendorPath . '/stubs/Makefile.stub';
-        $backupFile = $vendorPath . '/stubs/Makefile.stub.backup';
+        $stubFile   = $vendorPath . '/stubs/Makefile';
+        $backupFile = $vendorPath . '/stubs/Makefile.backup';
 
         if (File::exists($stubFile)) {
             File::move($stubFile, $backupFile);
@@ -326,7 +386,11 @@ final class PublishCommandTest extends TestCase
                 '--no-interaction' => true,
             ]);
 
-            $this->assertEquals(0, $exitCode, 'Command should succeed even if Makefile stub is missing');
+            $this->assertEquals(
+                0,
+                $exitCode,
+                'Command should succeed even if Makefile stub is missing',
+            );
 
             $output = Artisan::output();
             $this->assertStringContainsString(
@@ -357,11 +421,15 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         $output = Artisan::output();
 
-        $this->assertStringContainsString('Git hooks of php-dev-tools active', $output);
+        $this->assertStringContainsString('Git hooks of laravel-dev-tools active', $output);
         $this->assertStringContainsString('composer quality:fast', $output);
 
         $this->removeGitRepository();
@@ -387,8 +455,15 @@ final class PublishCommandTest extends TestCase
 
         $this->assertIsArray($pintConfig, 'pint.json should be valid JSON');
         // The rules come from php-dev-tools: this file only extends them.
-        $this->assertArrayHasKey('finder', $pintConfig, 'pint.json should have the finder exclusions of Laravel');
-        $this->assertArrayNotHasKey('rules', $pintConfig, 'pint.json should not copy the rules of php-dev-tools');
+        $this->assertArrayHasKey(
+            'finder',
+            $pintConfig,
+            'pint.json should have the finder exclusions of Laravel',
+        );
+        // Only what is specific to this package: the rules of php-dev-tools are not copied here.
+        $this->assertSame([
+            'operator_linebreak',
+        ], array_keys($pintConfig['rules'] ?? []));
     }
 
     /**
@@ -408,20 +483,24 @@ final class PublishCommandTest extends TestCase
 
         // Verify key files exist
         $this->assertFileExists(
-            $stubsPath . '/Makefile.stub',
-            'Makefile.stub should exist',
+            $stubsPath . '/Makefile',
+            'Makefile stub should exist',
         );
 
         $this->assertFileExists(
-            $stubsPath . '/markdownlint.json.stub',
-            'markdownlint.json.stub should exist',
+            $stubsPath . '/.markdownlint.json',
+            '.markdownlint.json stub should exist',
         );
 
-        // The git hooks come from php-dev-tools: nothing is packaged here
-        $this->assertDirectoryDoesNotExist(
-            $stubsPath . '/githooks',
-            'the git hooks come from php-dev-tools',
-        );
+        // The git hooks are packaged here and read in place through core.hooksPath
+        foreach ([
+            'commit-msg',
+            'prepare-commit-msg',
+            'pre-commit',
+            'pre-push',
+        ] as $hook) {
+            $this->assertFileExists($stubsPath . '/githooks/' . $hook, $hook . ' hook should exist');
+        }
     }
 
     /**
@@ -446,7 +525,11 @@ final class PublishCommandTest extends TestCase
         $this->assertIsArray($config);
         $this->assertSame('laravel', $config['preset']);
         $this->assertNotEmpty($config['rules'], 'the rules come from php-dev-tools');
-        $this->assertContains('storage', $config['finder']['exclude'], 'the exclusions of Laravel are added');
+        $this->assertContains(
+            'storage',
+            $config['finder']['exclude'],
+            'the exclusions of Laravel are added',
+        );
     }
 
     /**
@@ -466,7 +549,7 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        // Command must succeed — .editorconfig presence depends on package having the file
+        // Command must succeed - .editorconfig presence depends on package having the file
         $output = Artisan::output();
         $this->assertStringContainsString('Configuration published successfully', $output);
 
@@ -488,13 +571,25 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
         $this->assertFileExists($this->makefilePath, 'Makefile should be created');
 
         // Verify content
         $content = File::get($this->makefilePath);
-        $this->assertStringContainsString('pint', $content, 'Makefile should contain pint target');
-        $this->assertStringContainsString('phpstan', $content, 'Makefile should contain phpstan target');
+        $this->assertStringContainsString(
+            'pint',
+            $content,
+            'Makefile should contain pint target',
+        );
+        $this->assertStringContainsString(
+            'phpstan',
+            $content,
+            'Makefile should contain phpstan target',
+        );
     }
 
     /**
@@ -518,7 +613,9 @@ final class PublishCommandTest extends TestCase
     #[Test]
     public function publish_command_signature(): void
     {
-        $exitCode = Artisan::call('dev-tools:publish', ['--help' => true]);
+        $exitCode = Artisan::call('dev-tools:publish', [
+            '--help' => true,
+        ]);
 
         $this->assertEquals(0, $exitCode);
 
@@ -560,7 +657,11 @@ final class PublishCommandTest extends TestCase
         $vendorBinDir = $this->basePath . '/vendor/bin';
 
         if (! File::isDirectory($vendorBinDir)) {
-            File::makeDirectory($vendorBinDir, 0755, true);
+            File::makeDirectory(
+                $vendorBinDir,
+                0755,
+                true,
+            );
         }
 
         $normalizeBin = $vendorBinDir . '/composer-normalize';
@@ -573,7 +674,11 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         $output = Artisan::output();
 
@@ -609,7 +714,11 @@ final class PublishCommandTest extends TestCase
         $gitDir = $this->basePath . '/.git';
 
         if (! File::isDirectory($gitDir)) {
-            File::makeDirectory($gitDir, 0755, true);
+            File::makeDirectory(
+                $gitDir,
+                0755,
+                true,
+            );
         }
 
         // Run with hooks
@@ -619,15 +728,35 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         $output = Artisan::output();
 
         // Verify hooks info is displayed
-        $this->assertStringContainsString('pre-commit', $output, 'Should mention pre-commit hook');
-        $this->assertStringContainsString('commit-msg', $output, 'Should mention commit-msg hook');
-        $this->assertStringContainsString('pre-push', $output, 'Should mention pre-push hook');
-        $this->assertStringContainsString('prepare-commit-msg', $output, 'Should mention prepare-commit-msg hook');
+        $this->assertStringContainsString(
+            'pre-commit',
+            $output,
+            'Should mention pre-commit hook',
+        );
+        $this->assertStringContainsString(
+            'commit-msg',
+            $output,
+            'Should mention commit-msg hook',
+        );
+        $this->assertStringContainsString(
+            'pre-push',
+            $output,
+            'Should mention pre-push hook',
+        );
+        $this->assertStringContainsString(
+            'prepare-commit-msg',
+            $output,
+            'Should mention prepare-commit-msg hook',
+        );
 
         // Cleanup
         $hooksDir = $this->basePath . '/.githooks';
@@ -653,7 +782,11 @@ final class PublishCommandTest extends TestCase
             '--no-interaction' => true,
         ]);
 
-        $this->assertEquals(0, $exitCode, 'Command should succeed');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed',
+        );
 
         $output = Artisan::output();
 
@@ -686,7 +819,11 @@ final class PublishCommandTest extends TestCase
         ]);
 
         // Command should succeed with warning
-        $this->assertEquals(0, $exitCode, 'Command should succeed even without Git');
+        $this->assertEquals(
+            0,
+            $exitCode,
+            'Command should succeed even without Git',
+        );
 
         $output = Artisan::output();
 
@@ -734,8 +871,8 @@ final class PublishCommandTest extends TestCase
             File::delete($rectorPath);
         }
 
-        // Remove config/insights.php (symlink or file)
-        $insightsPath = $this->basePath . '/config/insights.php';
+        // Remove phpinsights.php (symlink or file)
+        $insightsPath = $this->basePath . '/phpinsights.php';
 
         if (is_link($insightsPath)) {
             File::delete($insightsPath);
@@ -743,6 +880,10 @@ final class PublishCommandTest extends TestCase
         elseif (File::exists($insightsPath)) {
             File::delete($insightsPath);
         }
+
+        // Remove the markdownlint files
+        File::delete($this->basePath . '/.markdownlint.json');
+        File::delete($this->basePath . '/.markdownlintignore');
 
         // Remove config/enlightn.php
         $enlightnPath = $this->basePath . '/config/enlightn.php';

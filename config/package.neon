@@ -1,12 +1,12 @@
 # PHPStan configuration for Laravel-dev-tools development
 
 includes:
-    - base.neon
-    - baseline.neon
+  - phpstan.neon
+  - baseline.neon
 
 parameters:
-    paths:
-        - ../src
+  paths:
+    - ../src
 
-    excludePaths:
-        - ../src/stubs/*
+  excludePaths:
+    - ../src/stubs/*

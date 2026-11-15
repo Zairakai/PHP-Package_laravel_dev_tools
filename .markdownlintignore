@@ -1,6 +1,12 @@
 .cache/
 .git/
-.opencode/
+.phpunit.cache/
+build/
+coverage/
+dist/
 node_modules/
 vendor/
+
 *.min.md
+
+stubs/governance/

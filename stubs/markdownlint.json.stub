@@ -1,3 +1,0 @@
-{
-  "extends": "../../vendor/stanislas-poisson/php-dev-tools/config/markdownlint.json"
-}

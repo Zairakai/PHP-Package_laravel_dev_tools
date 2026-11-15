@@ -13,8 +13,12 @@ composer-update: ## Update Composer dependencies
 	@composer update --prefer-dist --no-interaction --optimize-autoloader
 
 .PHONY: composer-normalize
-composer-normalize: ## Check composer.json normalization
+composer-normalize: ## Normalize composer.json (rewrites the file)
 	@bash $(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/composer-normalize.sh
+
+.PHONY: composer-normalize-fix
+composer-normalize-fix: ## Normalize composer.json, skipped when composer-normalize is not installed
+	@bash $(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/composer-normalize.sh --if-installed
 
 .PHONY: composer-validate
 composer-validate: ## Validate composer.json
