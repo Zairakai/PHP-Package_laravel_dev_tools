@@ -22,17 +22,33 @@ source "${SCRIPT_DIR}/config.sh"
 
 # Publishable configs registry
 # ================
+# The configuration of the project is published in config/dev-tools/, where it extends the one of this package, and the
+# scripts read it there. The editor reads the root: see publish_root_file.
 # Format: [key]="source_relative_to_vendor|target_relative_to_project|group"
 
 declare -A PUBLISHABLE=(
-  ["phpstan"]="stubs/phpstan.neon|phpstan.neon|quality"
+  ["phpstan"]="stubs/phpstan.neon|config/dev-tools/phpstan.neon|quality"
   ["phpstan-baseline"]="stubs/baseline.neon|config/dev-tools/baseline.neon|quality"
-  ["rector"]="stubs/rector.php|rector.php|quality"
-  ["insights"]="stubs/phpinsights.php|phpinsights.php|quality"
-  ["pint"]="stubs/pint.json|pint.json|style"
-  ["markdownlint"]="stubs/.markdownlint.json|.markdownlint.json|style"
-  ["markdownlintignore"]="stubs/.markdownlintignore|.markdownlintignore|style"
+  ["rector"]="stubs/rector.php|config/dev-tools/rector.php|quality"
+  ["insights"]="stubs/phpinsights.php|config/dev-tools/phpinsights.php|quality"
+  ["pint"]="stubs/pint.json|config/dev-tools/pint.json|style"
+  ["markdownlint"]="stubs/.markdownlint.json|config/dev-tools/.markdownlint.json|style"
+  ["markdownlintignore"]="stubs/.markdownlintignore|config/dev-tools/.markdownlintignore|style"
   ["phpunit"]="config/phpunit.xml|config/dev-tools/phpunit.xml|testing"
+)
+
+# The files of the root that an IDE or an extension reads, by key. A thin file points at the one of config/dev-tools/; a
+# copy is the same file, because the tool cannot extend another one. Rector and PHP Insights have none: no extension of
+# an IDE reads them, the commands do.
+declare -A ROOT_THIN=(
+  ["phpstan"]="stubs/root/phpstan.neon|phpstan.neon"
+  ["markdownlint"]="stubs/root/.markdownlint.json|.markdownlint.json"
+)
+
+declare -A ROOT_COPY=(
+  ["pint"]="pint.json"
+  ["markdownlintignore"]=".markdownlintignore"
+  ["phpunit"]="phpunit.xml"
 )
 
 declare -A PUBLISH_GROUPS=(
@@ -81,7 +97,7 @@ for arg in "$@"; do
       echo "                       Installs: Makefile, .editorconfig, baseline.neon"
       echo "                       Uses full-stack Makefile when package.json is present"
       echo ""
-      echo "  --publish            Publish ALL configs to config/dev-tools/"
+      echo "  --publish            Publish ALL configs to config/dev-tools/ (and the files that the editor reads, at the root)"
       echo "  --publish=<group>    Publish a config group"
       echo "  --publish=<key>      Publish a specific config"
       echo "  --with-hooks         Also activate the git hooks of laravel-dev-tools"
@@ -103,14 +119,14 @@ for arg in "$@"; do
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       echo "  Specific configs (--publish=<key>)"
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      echo "  phpstan           → config/dev-tools/phpstan.neon"
+      echo "  phpstan           → config/dev-tools/phpstan.neon (+ phpstan.neon at the root, thin)"
       echo "  phpstan-baseline  → config/dev-tools/baseline.neon"
-      echo "  rector            → rector.php"
-      echo "  insights          → phpinsights.php"
-      echo "  pint              → config/dev-tools/pint.json"
-      echo "  markdownlint      → .markdownlint.json"
-      echo "  markdownlintignore → .markdownlintignore"
-      echo "  phpunit           → config/dev-tools/phpunit.xml"
+      echo "  rector            → config/dev-tools/rector.php"
+      echo "  insights          → config/dev-tools/phpinsights.php"
+      echo "  pint              → config/dev-tools/pint.json (+ pint.json at the root, a copy)"
+      echo "  markdownlint      → config/dev-tools/.markdownlint.json (+ .markdownlint.json at the root, thin)"
+      echo "  markdownlintignore → config/dev-tools/.markdownlintignore (+ .markdownlintignore at the root, a copy)"
+      echo "  phpunit           → config/dev-tools/phpunit.xml (+ phpunit.xml at the root, a copy)"
       echo "  hooks             → core.hooksPath"
       echo "  gitlab-ci         → .gitlab-ci.yml"
       echo "  governance        → SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md"
@@ -229,6 +245,53 @@ publish_file() {
     track_published "${name} → ${target#"$PROJECT_ROOT"/}"
     log_success "Published: ${name} → ${target#"$PROJECT_ROOT"/}"
   fi
+}
+
+# The file of the root for the editor, once the one of config/dev-tools/ is published. Created when the project has none,
+# written again with --force (after a backup), left alone otherwise: scripts/check-config-copies.sh tells when it differs.
+publish_root_file() {
+  local key="$1"
+  local entry source name target
+
+  if [[ -n "${ROOT_THIN[$key]:-}" ]]; then
+    entry="${ROOT_THIN[$key]}"
+    source="${VENDOR_PATH}/${entry%%|*}"
+    name="${entry#*|}"
+  elif [[ -n "${ROOT_COPY[$key]:-}" ]]; then
+    name="${ROOT_COPY[$key]}"
+    source=""
+  else
+    return 0
+  fi
+
+  target="${PROJECT_ROOT}/${name}"
+
+  if [[ -f "$target" ]] && [[ "$FORCE_OVERWRITE" != "true" ]]; then
+    return 0
+  fi
+
+  if [[ -n "$source" ]] && [[ ! -f "$source" ]]; then
+    log_warning "Source not found for ${name}: ${source#"$VENDOR_PATH"/}"
+    return 0
+  fi
+
+  if [[ -z "$source" ]] && [[ ! -f "${PROJECT_ROOT}/config/dev-tools/${name}" ]]; then
+    return 0
+  fi
+
+  if [[ -f "$target" ]] && backup_file "$target" 2>/dev/null; then
+    track_backed_up "$name"
+  fi
+
+  if [[ -n "$source" ]]; then
+    cp "$source" "$target"
+    track_published "${name} (root, points at config/dev-tools/)"
+  else
+    php "${SCRIPT_DIR}/config-copies.php" sync "$PROJECT_ROOT" "$name" > /dev/null
+    track_published "${name} (root, copy of config/dev-tools/${name})"
+  fi
+
+  log_success "Published: ${name} (root)"
 }
 
 # The name of the package: the first "name" of composer.json. sed reads the file itself and stops after the first match:
@@ -431,27 +494,33 @@ do_publish() {
       fi
     fi
 
+    local source_abs="${VENDOR_PATH}/${source_rel}"
+    local converted=""
+
+    # PHPUnit reads the paths of its file from the folder of that file: the one of config/dev-tools/ goes up two folders
+    if [[ "$key" == "phpunit" ]] && [[ -f "$source_abs" ]]; then
+      converted="$(mktemp)"
+      php "${SCRIPT_DIR}/config-copies.php" phpunit-config "$source_abs" "$converted"
+      source_abs="$converted"
+    fi
+
     # Baseline is never force-overwritten (accumulates accepted errors)
     local effective_force="$FORCE_OVERWRITE"
     if [[ "$key" == "phpstan-baseline" ]]; then
       effective_force="false"
     fi
 
-    if [[ "$effective_force" == "true" ]]; then
-      publish_file \
-        "${VENDOR_PATH}/${source_rel}" \
-        "${PROJECT_ROOT}/${target_rel}" \
-        "$key"
-    else
-      # Temporarily disable force for this file
-      local saved_force="$FORCE_OVERWRITE"
-      FORCE_OVERWRITE="false"
-      publish_file \
-        "${VENDOR_PATH}/${source_rel}" \
-        "${PROJECT_ROOT}/${target_rel}" \
-        "$key"
-      FORCE_OVERWRITE="$saved_force"
-    fi
+    local saved_force="$FORCE_OVERWRITE"
+    FORCE_OVERWRITE="$effective_force"
+    publish_file \
+      "$source_abs" \
+      "${PROJECT_ROOT}/${target_rel}" \
+      "$key"
+    FORCE_OVERWRITE="$saved_force"
+
+    [[ -n "$converted" ]] && rm -f "$converted"
+
+    publish_root_file "$key"
   done
 }
 
@@ -482,59 +551,78 @@ install_git_hooks() {
 
 # Pint Config Publisher
 # ================
-# Pint cannot extend a file and the editor reads only pint.json at the root: it is a copy, generated from the bases and
-# from the changes of the project (config/dev-tools/pint.json). It is regenerated each time, never edited by hand.
+# Pint cannot extend a file. config/dev-tools/pint.json is the complete file that the project edits: generated once from
+# the rules of php-dev-tools and the Laravel layer of this package, never written again over the project's changes unless
+# --force (after a backup). The pint.json of the root, which the editor reads, is a copy of it.
 
 publish_pint_config() {
-  if [[ ! -f "${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/config/pint.json" ]]; then
-    log_warning "Pint rules of php-dev-tools not found - run: composer install"
-    return 0
+  local target="${PROJECT_ROOT}/config/dev-tools/pint.json"
+
+  if [[ -f "$target" ]] && [[ "$FORCE_OVERWRITE" != "true" ]]; then
+    track_skipped "pint"
+    log_info "Already published: config/dev-tools/pint.json (use --force to generate it again)"
+  else
+    if [[ ! -f "${PROJECT_ROOT}/vendor/stanislas-poisson/php-dev-tools/config/pint.json" ]]; then
+      log_warning "Pint rules of php-dev-tools not found - run: composer install"
+      return 0
+    fi
+
+    if [[ -f "$target" ]] && backup_file "$target" 2>/dev/null; then
+      track_backed_up "pint"
+    fi
+
+    if php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "config/dev-tools/pint.json" "${VENDOR_PATH}/config/pint.json" > /dev/null; then
+      track_published "pint → config/dev-tools/pint.json (generated)"
+      log_success "Generated: config/dev-tools/pint.json"
+    else
+      log_warning "Could not generate config/dev-tools/pint.json"
+      return 0
+    fi
   fi
 
-  if build_pint_config > /dev/null; then
-    track_published "pint → pint.json (generated)"
-    log_success "Generated: pint.json"
-  else
-    log_warning "Could not generate pint.json"
-  fi
+  publish_root_file "pint"
 }
 
 # PHPStan Config Publisher
 # ================
-# Generates phpstan.neon in project root, adapted to project type
-# Never overwrites an existing file
+# Writes config/dev-tools/phpstan.neon, adapted to the project type, and the thin phpstan.neon of the root that includes
+# it. Never overwrites an existing file.
 
 publish_phpstan_config() {
-  local target="${PROJECT_ROOT}/phpstan.neon"
+  local target="${PROJECT_ROOT}/config/dev-tools/phpstan.neon"
 
-  # Never overwrite an existing customized config
   if [[ -f "$target" ]]; then
-    log_info "phpstan.neon already exists, skipping"
-    return 0
-  fi
-
-  # Detect project type dynamically via config.sh function
-  local project_type
-  project_type="$(detect_project_type)"
-
-  # Select the appropriate vendor config based on project type
-  local config_include
-  if [[ "$project_type" == "laravel" ]]; then
-    config_include="app.neon"
+    log_info "config/dev-tools/phpstan.neon already exists, skipping"
   else
-    config_include="library.neon"
-  fi
+    local project_type config_include paths
+    project_type="$(detect_project_type)"
 
-  cat > "$target" << EOF
-# PHPStan configuration
-# Generated by laravel-dev-tools setup - customize if needed
+    if [[ "$project_type" == "laravel" ]]; then
+      config_include="app.neon"
+      paths="    - ../../app"
+      [[ -d "${PROJECT_ROOT}/database" ]] && paths="${paths}"$'\n'"    - ../../database"
+      [[ -d "${PROJECT_ROOT}/routes" ]] && paths="${paths}"$'\n'"    - ../../routes"
+    else
+      config_include="library.neon"
+      paths=$'    - ../../src\n    - ../../tests'
+    fi
+
+    mkdir -p "${PROJECT_ROOT}/config/dev-tools"
+    cat > "$target" << EOF
 includes:
-  - vendor/zairakai/laravel-dev-tools/config/${config_include}
-  - config/dev-tools/baseline.neon
+  - ../../vendor/zairakai/laravel-dev-tools/config/${config_include}
+  - baseline.neon
+
+parameters:
+  paths:
+${paths}
 EOF
 
-  track_created "phpstan.neon"
-  log_success "Created: phpstan.neon (${project_type} → ${config_include})"
+    track_created "config/dev-tools/phpstan.neon"
+    log_success "Created: config/dev-tools/phpstan.neon (${project_type} → ${config_include})"
+  fi
+
+  publish_root_file "phpstan"
 }
 
 # Gitignore Updater

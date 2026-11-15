@@ -110,6 +110,14 @@ final class RepositoryStructureTest extends TestCase
     }
 
     #[Test]
+    public function it_checks_the_files_of_the_root_against_config_dev_tools_in_the_quality_gate(): void
+    {
+        self::assertFileExists($this->root('scripts/check-config-copies.sh'));
+        self::assertStringContainsString('check-config-copies.sh', (string) file_get_contents($this->root('scripts/ci-quality.sh')));
+        self::assertStringContainsString('config-check', (string) file_get_contents($this->root('tools/make/quality.mk')));
+    }
+
+    #[Test]
     public function it_folds_the_examples_of_the_readme_in_details(): void
     {
         $readme = (string) file_get_contents($this->root('README.md'));
@@ -295,6 +303,22 @@ final class RepositoryStructureTest extends TestCase
         self::assertFileExists($this->root('stubs/' . $file));
     }
 
+    // The root and config/dev-tools
+    // ================
+
+    #[Test]
+    public function it_holds_the_thin_files_of_the_root_in_stubs_root_and_points_them_at_config_dev_tools(): void
+    {
+        self::assertStringContainsString(
+            'config/dev-tools/phpstan.neon',
+            (string) file_get_contents($this->root('stubs/root/phpstan.neon')),
+        );
+        self::assertStringContainsString(
+            './config/dev-tools/.markdownlint.json',
+            (string) file_get_contents($this->root('stubs/root/.markdownlint.json')),
+        );
+    }
+
     #[Test]
     #[DataProvider('thinFiles')]
     public function it_keeps_no_stub_suffix_on_the_thin_files(string $file): void
@@ -379,6 +403,30 @@ final class RepositoryStructureTest extends TestCase
     }
 
     #[Test]
+    public function it_makes_the_stubs_of_config_dev_tools_reach_the_package_from_their_folder(): void
+    {
+        self::assertStringContainsString(
+            '../../vendor/zairakai/laravel-dev-tools/config/library.neon',
+            (string) file_get_contents($this->root('stubs/phpstan.neon')),
+        );
+        self::assertStringContainsString(
+            '../../vendor/zairakai/laravel-dev-tools/config/.markdownlint.json',
+            (string) file_get_contents($this->root('stubs/.markdownlint.json')),
+        );
+
+        foreach ([
+            'stubs/rector.php',
+            'stubs/phpinsights.php',
+        ] as $stub) {
+            self::assertStringContainsString(
+                'dirname(__DIR__, 2)',
+                (string) file_get_contents($this->root($stub)),
+                $stub,
+            );
+        }
+    }
+
+    #[Test]
     public function it_normalizes_the_line_endings_and_keeps_the_markdown_diffs(): void
     {
         $attributes = (string) file_get_contents($this->root('.gitattributes'));
@@ -390,6 +438,36 @@ final class RepositoryStructureTest extends TestCase
         ] as $line) {
             self::assertStringContainsString($line, $attributes);
         }
+    }
+
+    #[Test]
+    public function it_publishes_the_configuration_in_config_dev_tools_and_no_file_at_the_root_for_rector_and_insights(): void
+    {
+        $setup = (string) file_get_contents($this->root('scripts/setup-package.sh'));
+
+        foreach ([
+            'stubs/rector.php|config/dev-tools/rector.php',
+            'stubs/phpinsights.php|config/dev-tools/phpinsights.php',
+            'stubs/phpstan.neon|config/dev-tools/phpstan.neon',
+            'stubs/pint.json|config/dev-tools/pint.json',
+            'config/phpunit.xml|config/dev-tools/phpunit.xml',
+        ] as $entry) {
+            self::assertStringContainsString($entry, $setup);
+        }
+
+        self::assertMatchesRegularExpression('/declare -A ROOT_THIN=\(\s*\["phpstan"\].*\["markdownlint"\][^)]*\)/s', $setup);
+        self::assertDoesNotMatchRegularExpression('/ROOT_(THIN|COPY)=\([^)]*\["(rector|insights)"\]/s', $setup);
+    }
+
+    #[Test]
+    public function it_reads_the_configuration_of_config_dev_tools_before_the_root(): void
+    {
+        $config = (string) file_get_contents($this->root('scripts/config.sh'));
+
+        self::assertLessThan(
+            strpos($config, '${PROJECT_ROOT}/${filename}" ]]'),
+            strpos($config, '${PROJECT_ROOT}/config/dev-tools/${filename}" ]]'),
+        );
     }
 
     // Settings that must stay

@@ -122,16 +122,18 @@ export PHPMETRICS_BIN="${PHPMETRICS_BIN:-vendor/bin/phpmetrics}"
 
 # CONFIGURATION RESOLUTION
 # ================
-# Cascade: 1. PROJECT_ROOT/$filename          (user root override)
-#          2. config/dev-tools/$filename       (published - can extend bundled default)
+# The configuration of the project is the file of config/dev-tools/, which extends the one of this package. The files of
+# the root are for the editor: thin files that point at it, or copies of it (ConfigCopies).
+# Cascade: 1. config/dev-tools/$filename       (the configuration of the project)
+#          2. PROJECT_ROOT/$filename           (a project that has not moved its file yet)
 #          3. config/$filename                 (legacy or intermediate)
 #          4. vendor fallback path             (bundled default)
 resolve_config() {
   local filename="$1"
   local vendor_fallback="${2:-}"
 
-  [[ -f "${PROJECT_ROOT}/${filename}" ]]                  && { echo "${PROJECT_ROOT}/${filename}"; return 0; }
   [[ -f "${PROJECT_ROOT}/config/dev-tools/${filename}" ]] && { echo "${PROJECT_ROOT}/config/dev-tools/${filename}"; return 0; }
+  [[ -f "${PROJECT_ROOT}/${filename}" ]]                  && { echo "${PROJECT_ROOT}/${filename}"; return 0; }
   [[ -f "${PROJECT_ROOT}/config/${filename}" ]]           && { echo "${PROJECT_ROOT}/config/${filename}"; return 0; }
   [[ -n "$vendor_fallback" && -f "${PROJECT_ROOT}/${vendor_fallback}" ]] && { echo "${PROJECT_ROOT}/${vendor_fallback}"; return 0; }
 
@@ -160,23 +162,29 @@ unset _phpstan_vendor_default
 PHPSTAN_BASELINE=$(resolve_config "baseline.neon")
 export PHPSTAN_BASELINE="${PHPSTAN_BASELINE:-config/dev-tools/baseline.neon}"
 
-# Pint cannot extend a file, and the editor reads only the pint.json of the root: that file is a copy, generated from the
-# rules of stanislas-poisson/php-dev-tools, the Laravel layer of this package, and the changes of the project, kept apart
-# in config/dev-tools/pint.json. build_pint_config writes it and prints its path; the scripts of Pint call it once they run
-# where PHP is (maybe_dockerize).
-export PINT_CONFIG="${PROJECT_ROOT}/pint.json"
+# Pint cannot extend a file: config/dev-tools/pint.json is the complete one that the project edits (generated once from the
+# rules of stanislas-poisson/php-dev-tools and the Laravel layer of this package), and the pint.json of the root, which the
+# editor reads, is a copy of it. build_pint_config prints the path of the file to use. A project that has no
+# config/dev-tools/pint.json yet gets the root file generated as before; the scripts of Pint call it once they run where
+# PHP is (maybe_dockerize).
+export PINT_CONFIG="${PROJECT_ROOT}/config/dev-tools/pint.json"
 
 build_pint_config() {
+  local published="${PROJECT_ROOT}/config/dev-tools/pint.json"
   local laravel_layer
-  local project_layer="${PROJECT_ROOT}/config/dev-tools/pint.json"
-  local layers=()
+
+  if [[ -f "$published" ]]; then
+    echo "$published"
+    return 0
+  fi
 
   laravel_layer="$(dirname "$SCRIPT_DIR")/config/pint.json"
 
-  [[ -f "$laravel_layer" ]] && layers+=("$laravel_layer")
-  [[ -f "$project_layer" ]] && layers+=("$project_layer")
-
-  php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "${layers[@]}"
+  if [[ -f "$laravel_layer" ]]; then
+    php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "pint.json" "$laravel_layer"
+  else
+    php "${SCRIPT_DIR}/pint-config.php" "$PROJECT_ROOT" "pint.json"
+  fi
 }
 export -f build_pint_config
 
@@ -272,7 +280,7 @@ BACKUP_DIR=""
 backup_file() {
   local file="$1"; local base="${2:-${PROJECT_ROOT}/.dev-tools-backup}"
   [[ ! -f "$file" || -L "$file" ]] && return 1
-  [[ -z "$BACKUP_DIR" ]] && BACKUP_DIR="${base}/$(date +%Y%m%d-%H%M%S)" && mkdir -p "$BACKUP_DIR"
+  [[ -z "$BACKUP_DIR" ]] && BACKUP_DIR="${base}/$(date -u +%Y%m%d-%H%M%S)" && mkdir -p "$BACKUP_DIR"
   local rel="${file#"${PROJECT_ROOT}"/}"; local dest="${BACKUP_DIR}/${rel}"
   mkdir -p "$(dirname "$dest")"
   cp "$file" "$dest" 2>/dev/null

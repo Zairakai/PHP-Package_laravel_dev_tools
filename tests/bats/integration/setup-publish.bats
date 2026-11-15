@@ -17,7 +17,7 @@ setup() {
 
   mkdir -p "${PACKAGE}" "${PROJECT}/src"
 
-  for path in scripts stubs config tools bin .editorconfig; do
+  for path in scripts stubs config tools bin src .editorconfig; do
     cp -R "${PROJECT_ROOT}/${path}" "${PACKAGE}/"
   done
 
@@ -80,34 +80,73 @@ run_setup() {
 # The thin files
 # ================
 
-@test "--publish=style creates the markdownlint files and pint.json at the root" {
+@test "--publish=style publishes the markdownlint files in config/dev-tools, with a thin file and a copy at the root" {
   run_setup --publish=style
 
   [ "$status" -eq 0 ]
-  [ -f "${PROJECT}/.markdownlint.json" ]
-  [ -f "${PROJECT}/.markdownlintignore" ]
+  [ -f "${PROJECT}/config/dev-tools/.markdownlint.json" ]
+  [ -f "${PROJECT}/config/dev-tools/.markdownlintignore" ]
+
+  run grep -F "./config/dev-tools/.markdownlint.json" "${PROJECT}/.markdownlint.json"
+  [ "$status" -eq 0 ]
+
+  run cmp "${PROJECT}/.markdownlintignore" "${PROJECT}/config/dev-tools/.markdownlintignore"
+  [ "$status" -eq 0 ]
 }
 
-@test "--publish=quality creates the Rector and PHPInsights files at the root" {
+@test "--publish=quality publishes the configuration of PHPStan, Rector and PHP Insights in config/dev-tools" {
   run_setup --publish=quality
 
   [ "$status" -eq 0 ]
-  [ -f "${PROJECT}/rector.php" ]
-  [ -f "${PROJECT}/phpinsights.php" ]
+  [ -f "${PROJECT}/config/dev-tools/phpstan.neon" ]
+  [ -f "${PROJECT}/config/dev-tools/rector.php" ]
+  [ -f "${PROJECT}/config/dev-tools/phpinsights.php" ]
+  [ -f "${PROJECT}/config/dev-tools/baseline.neon" ]
 }
 
-@test "--publish=testing creates phpunit.xml in config/dev-tools" {
+@test "--publish=quality leaves no Rector or PHP Insights file at the root: no editor reads them" {
+  run_setup --publish=quality
+
+  [ "$status" -eq 0 ]
+  [ ! -e "${PROJECT}/rector.php" ]
+  [ ! -e "${PROJECT}/phpinsights.php" ]
+}
+
+@test "--publish=quality creates the thin phpstan.neon at the root, which includes the one of config/dev-tools" {
+  run_setup --publish=quality
+
+  [ "$status" -eq 0 ]
+  run grep -F "config/dev-tools/phpstan.neon" "${PROJECT}/phpstan.neon"
+  [ "$status" -eq 0 ]
+  run grep -F "../../vendor/zairakai/laravel-dev-tools/config/library.neon" "${PROJECT}/config/dev-tools/phpstan.neon"
+  [ "$status" -eq 0 ]
+}
+
+@test "the files of config/dev-tools reach the package from where they are, not from the root" {
+  run_setup --publish=quality
+
+  run grep -F "dirname(__DIR__, 2)" "${PROJECT}/config/dev-tools/rector.php"
+  [ "$status" -eq 0 ]
+  run grep -F "dirname(__DIR__, 2)" "${PROJECT}/config/dev-tools/phpinsights.php"
+  [ "$status" -eq 0 ]
+}
+
+@test "--publish=testing publishes phpunit.xml in config/dev-tools, and its copy at the root" {
   run_setup --publish=testing
 
   [ "$status" -eq 0 ]
   [ -f "${PROJECT}/config/dev-tools/phpunit.xml" ]
+  [ -f "${PROJECT}/phpunit.xml" ]
+
+  run grep -F 'bootstrap="../../vendor/autoload.php"' "${PROJECT}/config/dev-tools/phpunit.xml"
+  [ "$status" -eq 0 ]
 }
 
 @test "--publish=phpunit publishes the configuration of a package when the project has no artisan" {
   run_setup --publish=phpunit
 
   [ "$status" -eq 0 ]
-  run cmp "${PROJECT}/config/dev-tools/phpunit.xml" "${PACKAGE}/config/phpunit.xml"
+  run cmp "${PROJECT}/phpunit.xml" "${PACKAGE}/config/phpunit.xml"
   [ "$status" -eq 0 ]
 }
 
@@ -117,7 +156,7 @@ run_setup() {
   run_setup --publish=phpunit
 
   [ "$status" -eq 0 ]
-  run cmp "${PROJECT}/config/dev-tools/phpunit.xml" "${PACKAGE}/config/phpunit-app.xml"
+  run cmp "${PROJECT}/phpunit.xml" "${PACKAGE}/config/phpunit-app.xml"
   [ "$status" -eq 0 ]
 }
 
@@ -128,7 +167,133 @@ run_setup() {
   run_setup --publish=phpunit
 
   [ "$status" -eq 0 ]
-  run cmp "${PROJECT}/config/dev-tools/phpunit.xml" "${PACKAGE}/config/phpunit-app.xml"
+  run cmp "${PROJECT}/phpunit.xml" "${PACKAGE}/config/phpunit-app.xml"
+  [ "$status" -eq 0 ]
+}
+
+@test "a root file that the project already has is kept, and written again with --force" {
+  printf 'includes:\n  - vendor/old.neon\n' > "${PROJECT}/phpstan.neon"
+
+  run_setup --publish=phpstan
+  [ "$status" -eq 0 ]
+  run grep -F "vendor/old.neon" "${PROJECT}/phpstan.neon"
+  [ "$status" -eq 0 ]
+
+  run_setup --publish=phpstan --force
+  [ "$status" -eq 0 ]
+  run grep -F "config/dev-tools/phpstan.neon" "${PROJECT}/phpstan.neon"
+  [ "$status" -eq 0 ]
+}
+
+# The root and config/dev-tools
+# ================
+
+@test "check-config-copies.sh passes after a publication of everything" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '{"preset": "laravel"}\n' > "${PROJECT}/config/dev-tools/pint.json"
+
+  run_setup --publish=quality
+  run_setup --publish=style
+  run_setup --publish=testing
+
+  run bash "${PACKAGE}/scripts/check-config-copies.sh"
+  [ "$status" -eq 0 ]
+}
+
+@test "check-config-copies.sh fails when a copy of the root differs from config/dev-tools" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '{"preset": "laravel"}\n' > "${PROJECT}/config/dev-tools/pint.json"
+  run_setup --publish=style
+  run_setup --publish=testing
+  printf 'build/\n' > "${PROJECT}/.markdownlintignore"
+
+  run bash "${PACKAGE}/scripts/check-config-copies.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *".markdownlintignore at the root differs"* ]]
+}
+
+@test "check-config-copies.sh fails when a thin file of the root does not point at config/dev-tools" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '{"preset": "laravel"}\n' > "${PROJECT}/config/dev-tools/pint.json"
+
+  run_setup --publish=quality
+  run_setup --publish=style
+  run_setup --publish=testing
+  printf 'includes:\n  - vendor/old.neon\n' > "${PROJECT}/phpstan.neon"
+
+  run bash "${PACKAGE}/scripts/check-config-copies.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"phpstan.neon at the root does not point at config/dev-tools/phpstan.neon"* ]]
+}
+
+@test "check-config-copies.sh tells a rector.php that the project keeps at the root, where no editor reads it" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '{"preset": "laravel"}\n' > "${PROJECT}/config/dev-tools/pint.json"
+
+  run_setup --publish=quality
+  run_setup --publish=style
+  run_setup --publish=testing
+  printf '<?php return [];\n' > "${PROJECT}/rector.php"
+
+  run bash "${PACKAGE}/scripts/check-config-copies.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"rector.php at the root is not read"* ]]
+}
+
+@test "check-config-copies.sh with SYNC=true writes the copies again from config/dev-tools" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '{"preset": "laravel"}\n' > "${PROJECT}/config/dev-tools/pint.json"
+  run_setup --publish=quality
+  run_setup --publish=style
+  run_setup --publish=testing
+  printf 'build/\n' > "${PROJECT}/.markdownlintignore"
+
+  SYNC=true run bash "${PACKAGE}/scripts/check-config-copies.sh"
+  [ "$status" -eq 0 ]
+  run cmp "${PROJECT}/.markdownlintignore" "${PROJECT}/config/dev-tools/.markdownlintignore"
+  [ "$status" -eq 0 ]
+}
+
+@test "a forced publication keeps a copy of the file that it writes over" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '<?php // mine\n' > "${PROJECT}/config/dev-tools/rector.php"
+
+  run_setup --publish=rector --force
+
+  [ "$status" -eq 0 ]
+  run bash -c "cat ${PROJECT}/.dev-tools-backup/*/config/dev-tools/rector.php"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"// mine"* ]]
+}
+
+@test "a publication without force keeps no copy" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '<?php // mine\n' > "${PROJECT}/config/dev-tools/rector.php"
+
+  run_setup --publish=rector
+
+  [ "$status" -eq 0 ]
+  [ ! -d "${PROJECT}/.dev-tools-backup" ]
+}
+
+@test "SYNC=true keeps a copy of the file of the root that it writes over" {
+  mkdir -p "${PROJECT}/config/dev-tools"
+  printf '{"preset": "laravel"}\n' > "${PROJECT}/config/dev-tools/pint.json"
+  run_setup --publish=quality
+  run_setup --publish=style
+  run_setup --publish=testing
+  printf 'build/\n' > "${PROJECT}/.markdownlintignore"
+
+  SYNC=true run bash "${PACKAGE}/scripts/check-config-copies.sh"
+
+  [ "$status" -eq 0 ]
+  run bash -c "cat ${PROJECT}/.dev-tools-backup/*/.markdownlintignore"
+  [ "$status" -eq 0 ]
+  [ "$output" = "build/" ]
+}
+
+@test "check-config-copies.sh has nothing to compare in a project without config/dev-tools" {
+  run bash "${PACKAGE}/scripts/check-config-copies.sh"
   [ "$status" -eq 0 ]
 }
 
