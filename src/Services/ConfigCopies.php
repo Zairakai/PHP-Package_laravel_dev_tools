@@ -35,6 +35,8 @@ final class ConfigCopies
         'phpinsights.php',
     ];
 
+    public const string PUBLISHED = 'config/dev-tools/';
+
     /**
      * The thin files of the root, and what each must point at.
      */
@@ -42,8 +44,6 @@ final class ConfigCopies
         'phpstan.neon'       => 'config/dev-tools/phpstan.neon',
         '.markdownlint.json' => './config/dev-tools/.markdownlint.json',
     ];
-
-    private const string PUBLISHED = 'config/dev-tools/';
 
     /**
      * The content that the copy of the root must have, from the file of config/dev-tools/.
@@ -60,7 +60,7 @@ final class ConfigCopies
      */
     public static function phpunitForConfig(string $xml): string
     {
-        return self::convertPhpunitPaths(
+        return PhpunitPaths::convert(
             $xml,
             static fn (string $path): string => '../../' . $path,
         );
@@ -71,7 +71,7 @@ final class ConfigCopies
      */
     public static function phpunitForTheRoot(string $xml): string
     {
-        return self::convertPhpunitPaths(
+        return PhpunitPaths::convert(
             $xml,
             static fn (string $path): string => (string) preg_replace('#^(\\.\\./)+#', '', $path),
         );
@@ -86,80 +86,7 @@ final class ConfigCopies
      */
     public static function problems(string $root): array
     {
-        if (! is_dir($root . '/' . self::PUBLISHED)) {
-            return [];
-        }
-
-        $problems = [];
-
-        foreach (self::COPIES as $name) {
-            $published = $root . '/' . self::PUBLISHED . $name;
-            $copy      = $root . '/' . $name;
-
-            if (! is_file($published)) {
-                $problems[] = sprintf(
-                    '%s%s is missing',
-                    self::PUBLISHED,
-                    $name,
-                );
-
-                continue;
-            }
-
-            if (! is_file($copy)) {
-                $problems[] = sprintf('%s is missing at the root, where the editor reads it', $name);
-
-                continue;
-            }
-
-            if (self::expectedCopy($name, (string) file_get_contents($published)) !== (string) file_get_contents($copy)) {
-                $problems[] = sprintf(
-                    '%s at the root differs from %s%s',
-                    $name,
-                    self::PUBLISHED,
-                    $name,
-                );
-            }
-        }
-
-        foreach (self::THIN_FILES as $name => $target) {
-            $thin = $root . '/' . $name;
-
-            if (! is_file($thin)) {
-                $problems[] = sprintf('%s is missing at the root, where the editor reads it', $name);
-
-                continue;
-            }
-
-            if (! str_contains((string) file_get_contents($thin), $target)) {
-                $problems[] = sprintf(
-                    '%s at the root does not point at %s',
-                    $name,
-                    $target,
-                );
-            }
-
-            if (! is_file($root . '/' . self::PUBLISHED . $name)) {
-                $problems[] = sprintf(
-                    '%s%s is missing',
-                    self::PUBLISHED,
-                    $name,
-                );
-            }
-        }
-
-        foreach (self::NOT_AT_THE_ROOT as $name) {
-            if (is_file($root . '/' . $name)) {
-                $problems[] = sprintf(
-                    '%s at the root is not read: move its changes to %s%s and remove it',
-                    $name,
-                    self::PUBLISHED,
-                    $name,
-                );
-            }
-        }
-
-        return $problems;
+        return ConfigCopiesCheck::problems($root);
     }
 
     /**
@@ -175,89 +102,42 @@ final class ConfigCopies
         array $names = [],
         ?callable $before = null,
     ): array {
-        $written = [];
+        $wanted = [] === $names
+            ? self::COPIES
+            : array_values(array_intersect(self::COPIES, $names));
 
-        foreach (self::COPIES as $name) {
-            if ([] !== $names && ! in_array(
-                $name,
-                $names,
-                true,
-            )) {
-                continue;
-            }
-
-            $published = $root . '/' . self::PUBLISHED . $name;
-
-            if (! is_file($published)) {
-                continue;
-            }
-
-            $content = self::expectedCopy($name, (string) file_get_contents($published));
-            $copy    = $root . '/' . $name;
-
-            if (null !== $before && is_file($copy) && (string) file_get_contents($copy) !== $content) {
-                $before($copy);
-            }
-
-            file_put_contents($copy, $content);
-
-            $written[] = $name;
-        }
-
-        return $written;
+        return array_values(array_filter(
+            $wanted,
+            static fn (string $name): bool => self::write($root, $name, $before),
+        ));
     }
 
     /**
-     * Applies $convert to every path of a phpunit.xml, by the names of the PHPUnit schema.
+     * Writes one copy from the file of config/dev-tools/, when that file exists.
      *
-     * - The attributes that hold a path: bootstrap, cacheDirectory, extensionsDirectory, outputDirectory, outputFile,
-     *   baseline, testSuiteLoaderFile and xsi:noNamespaceSchemaLocation (the schema that the editor reads).
-     * - The elements that hold a path as text: directory, file, includePath, and exclude when it holds text (an exclude
-     *   with directory and file inside is left to them).
-     *
-     * A stream (`php://stdout`), an absolute path and a drive (`C:\`) are not paths of the project. A comment and a
-     * CDATA section are left as they are, and so is the layout of the file: the DOM would write the root element on one
-     * line, and the file is edited by the project.
-     *
-     * @param callable(string): string $convert
+     * @param callable(string): mixed|null $before called with the path of a copy that exists, before it is written over
      */
-    private static function convertPhpunitPaths(string $xml, callable $convert): string
+    private static function write(string $root, string $name, ?callable $before): bool
     {
-        $convertPath = (static fn (string $path): string => 1 === preg_match('~^(?:[a-z][a-z0-9+.-]*://|/|[A-Za-z]:[\\\\/])~', $path)
-            ? $path
-            : $convert($path));
+        $published = $root . '/' . self::PUBLISHED . $name;
 
-        // The parts that are not comments or CDATA, which come back in the order of the file
-        $parts = preg_split('~(<!--.*?-->|<!\[CDATA\[.*?\]\]>)~s', $xml, -1, PREG_SPLIT_DELIM_CAPTURE);
-
-        if (false === $parts) {
-            return $xml;
+        if (! is_file($published)) {
+            return false;
         }
 
-        foreach ($parts as $index => $part) {
-            if (1 === $index % 2) {
-                continue;
-            }
+        $content = self::expectedCopy($name, (string) file_get_contents($published));
+        $copy    = $root . '/' . $name;
 
-            // The attributes, in the start tags
-            $part = (string) preg_replace_callback(
-                '~(?<=\s)(?<name>(?:[A-Za-z_][\w.-]*:)?(?:bootstrap|cacheDirectory|extensionsDirectory|outputDirectory'
-                . '|outputFile|baseline|testSuiteLoaderFile|noNamespaceSchemaLocation))(?<equal>\s*=\s*)(?<quote>["\'])(?<value>[^"\']*)\k<quote>~',
-                static fn (array $m): string => $m['name'] . $m['equal'] . $m['quote']
-                    . ('' === trim($m['value']) ? $m['value'] : $convertPath($m['value'])) . $m['quote'],
-                $part,
-            );
-
-            // The elements with a path as text
-            $parts[$index] = (string) preg_replace_callback(
-                '~(?<open><(?<name>directory|file|includePath|exclude)\b[^>]*>)(?<lead>\s*)(?<path>[^<]*?)(?<trail>\s*)(?<close></\k<name>>)~',
-                static fn (array $m): string => '' === $m['path']
-                    ? $m[0]
-                    : $m['open'] . $m['lead'] . $convertPath($m['path']) . $m['trail'] . $m['close'],
-                $part,
-            );
+        if (
+            null !== $before
+            && is_file($copy)
+            && (string) file_get_contents($copy) !== $content
+        ) {
+            $before($copy);
         }
 
-        return implode('', $parts);
+        file_put_contents($copy, $content);
+
+        return true;
     }
 }

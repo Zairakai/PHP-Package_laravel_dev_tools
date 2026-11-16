@@ -21,6 +21,10 @@ use Zairakai\LaravelDevTools\Services\ConfigCopies;
 // The classes have no dependency: they do not need the autoloader of the project
 require dirname(__DIR__) . '/src/Services/ConfigBackup.php';
 
+require dirname(__DIR__) . '/src/Services/PhpunitPaths.php';
+
+require dirname(__DIR__) . '/src/Services/ConfigCopiesCheck.php';
+
 require dirname(__DIR__) . '/src/Services/ConfigCopies.php';
 
 $action = $argv[1] ?? '';

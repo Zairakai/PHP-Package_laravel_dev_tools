@@ -32,7 +32,9 @@ final readonly class SetupUpdater
                     }
 
                     $target = $basePath . '/' . $result['file'];
-                    $key    = SetupChecker::MISSING === $result['state'] ? 'created' : 'replaced';
+                    $key    = SetupChecker::MISSING === $result['state']
+                        ? 'created'
+                        : 'replaced';
 
                     $done[$key][] = $result['file'];
 

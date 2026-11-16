@@ -137,60 +137,25 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return match ($key) {
-            'phpstan'            => $this->publishPhpstan(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'rector'             => $this->publishRector(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'insights'           => $this->publishInsights(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'baseline'           => $this->publishBaseline($vendorPath, $basePath),
-            'pint'               => $this->publishPint(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'markdownlint'       => $this->publishMarkdownlint(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'markdownlintignore' => $this->publishMarkdownlintIgnore(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'phpunit'            => $this->publishPhpunit(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'hooks'              => $this->publishHooks(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'gitlab-ci'          => $this->publishGitlabCi(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'governance'         => $this->publishGovernanceFiles(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            default              => $this->unknownKey($key),
+        // The baseline is never forced: its method takes no $force, the call ignores it
+        $publish = match ($key) {
+            'phpstan'            => $this->publishPhpstan(...),
+            'rector'             => $this->publishRector(...),
+            'insights'           => $this->publishInsights(...),
+            'baseline'           => $this->publishBaseline(...),
+            'pint'               => $this->publishPint(...),
+            'markdownlint'       => $this->publishMarkdownlint(...),
+            'markdownlintignore' => $this->publishMarkdownlintIgnore(...),
+            'phpunit'            => $this->publishPhpunit(...),
+            'hooks'              => $this->publishHooks(...),
+            'gitlab-ci'          => $this->publishGitlabCi(...),
+            'governance'         => $this->publishGovernanceFiles(...),
+            default              => null,
         };
+
+        return null === $publish
+            ? $this->unknownKey($key)
+            : $publish($vendorPath, $basePath, $force);
     }
 
     // Public API - individual file publishers
@@ -509,7 +474,10 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force = false,
     ): bool {
-        if (is_file($basePath . '/config/dev-tools/pint.json') && ! $force) {
+        if (
+            is_file($basePath . '/config/dev-tools/pint.json')
+            && ! $force
+        ) {
             $this->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
         }
         else {
@@ -577,7 +545,10 @@ final class ConfigStubPublisher
             ? 'baseline'
             : $target;
 
-        if ('gitlab-ci' === $target && $this->wantsFullstack($basePath, $fullstack)) {
+        if (
+            'gitlab-ci' === $target
+            && $this->wantsFullstack($basePath, $fullstack)
+        ) {
             $this->publishGitlabCiFullstack($vendorPath, $basePath, $force);
 
             return true;
@@ -659,10 +630,17 @@ final class ConfigStubPublisher
      */
     private function packageName(string $basePath): string
     {
-        $composer = json_decode((string) @file_get_contents($basePath . '/composer.json'), true);
-        $name     = is_array($composer) ? ($composer['name'] ?? '') : '';
+        $file     = $basePath . '/composer.json';
+        $composer = is_file($file)
+            ? json_decode((string) file_get_contents($file), true)
+            : null;
+        $name     = is_array($composer)
+            ? ($composer['name'] ?? '')
+            : '';
 
-        return is_string($name) ? $name : '';
+        return is_string($name)
+            ? $name
+            : '';
     }
 
     /**
@@ -719,7 +697,7 @@ final class ConfigStubPublisher
                 ],
                 [
                     'PACKAGIST_PACKAGE: "' . $package . '"',
-                    'CACHE_KEY: "' . (str_contains($package, '/') ? substr($package, strpos($package, '/') + 1) : $package) . '"',
+                    'CACHE_KEY: "' . $this->shortName($package) . '"',
                 ],
                 $content,
             );
@@ -831,7 +809,10 @@ final class ConfigStubPublisher
         string $name,
         bool $force,
     ): void {
-        if (file_exists($basePath . '/' . $name) && ! $force) {
+        if (
+            file_exists($basePath . '/' . $name)
+            && ! $force
+        ) {
             return;
         }
 
@@ -964,6 +945,16 @@ final class ConfigStubPublisher
         $this->output->task('Backed up: ' . ltrim(substr($file, strlen($basePath)), '/'));
 
         return true;
+    }
+
+    /**
+     * The name of a package without its vendor: zairakai/laravel-dev-tools gives laravel-dev-tools.
+     */
+    private function shortName(string $package): string
+    {
+        return str_contains($package, '/')
+            ? substr($package, (int) strpos($package, '/') + 1)
+            : $package;
     }
 
     /**
