@@ -11,6 +11,7 @@ use Symfony\Component\Console\Output\BufferedOutput;
 use Zairakai\LaravelDevTools\Services\ConfigCopies;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\GitHooksActivator;
+use Zairakai\LaravelDevTools\Services\LaravelPublishOutput;
 use Zairakai\LaravelDevTools\Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ final class ConfigStubPublisherTest extends TestCase
         $bufferedOutput  = new BufferedOutput();
         $factory         = new Factory($bufferedOutput);
 
-        $this->configStubPublisher = new ConfigStubPublisher($factory);
+        $this->configStubPublisher = new ConfigStubPublisher(new LaravelPublishOutput($factory));
 
         $this->cleanDevToolsDir();
     }

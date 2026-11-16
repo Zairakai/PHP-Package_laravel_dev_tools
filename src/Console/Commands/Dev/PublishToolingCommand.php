@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use Zairakai\LaravelDevTools\Services\ComposerNormalizeManager;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\GitHooksActivator;
+use Zairakai\LaravelDevTools\Services\LaravelPublishOutput;
 
 /**
  * Publishes Zairakai Dev Tools configuration into the project.
@@ -50,8 +51,9 @@ final class PublishToolingCommand extends Command
         $force      = (bool) $this->option('force');
         $fullstack  = (bool) $this->option('fullstack');
 
-        $configStubPublisher          = new ConfigStubPublisher($this->components);
-        $gitHooksActivator            = new GitHooksActivator($this->components);
+        $output                       = new LaravelPublishOutput($this->components);
+        $configStubPublisher          = new ConfigStubPublisher($output);
+        $gitHooksActivator            = new GitHooksActivator($output);
         $composerNormalizeManager     = new ComposerNormalizeManager($this, $this->components);
 
         $this->components->info('Publishing zairakai/laravel-dev-tools configuration…');

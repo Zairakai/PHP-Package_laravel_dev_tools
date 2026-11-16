@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Services;
 
-use Illuminate\Console\View\Components\Factory;
-use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Zairakai\LaravelDevTools\Contracts\PublishOutput;
 
 /**
  * Publishes configuration stubs from the vendor package into the project.
@@ -26,7 +25,7 @@ use RuntimeException;
  * Each public method corresponds to one publishable asset - intentional by design.
  * Splitting into sub-publishers would add indirection without benefit.
  */
-final readonly class ConfigStubPublisher
+final class ConfigStubPublisher
 {
     /**
      * Maps group names to their list of publishable keys.
@@ -70,8 +69,15 @@ final readonly class ConfigStubPublisher
         ],
     ];
 
+    /**
+     * One backup per project: the copies of a run stay together in one folder, and two runs never share it.
+     *
+     * @var array<string, ConfigBackup>
+     */
+    private array $backups = [];
+
     public function __construct(
-        private Factory $componentsFactory,
+        private readonly PublishOutput $output,
     ) {}
 
     /**
@@ -270,8 +276,8 @@ final readonly class ConfigStubPublisher
     ): bool {
         $stubsDir = $vendorPath . '/stubs/governance';
 
-        if (! File::isDirectory($stubsDir)) {
-            $this->componentsFactory->error('Governance stubs directory not found: ' . $stubsDir);
+        if (! is_dir($stubsDir)) {
+            $this->output->error('Governance stubs directory not found: ' . $stubsDir);
 
             return false;
         }
@@ -319,7 +325,7 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): bool {
         if (! array_key_exists($group, self::GROUPS)) {
-            $this->componentsFactory->error(sprintf(
+            $this->output->error(sprintf(
                 'Unknown group "%s". Valid groups: %s',
                 $group,
                 implode(', ', array_keys(self::GROUPS)),
@@ -348,7 +354,7 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return new GitHooksActivator($this->componentsFactory)->activate($basePath);
+        return new GitHooksActivator($this->output)->activate($basePath);
     }
 
     /**
@@ -491,7 +497,7 @@ final readonly class ConfigStubPublisher
             protectUserChanges: true,
         );
 
-        File::delete($converted);
+        PlainFile::delete($converted);
 
         $this->publishRootCopy(
             $basePath,
@@ -526,12 +532,12 @@ final readonly class ConfigStubPublisher
                 ]);
             }
             catch (RuntimeException $runtimeException) {
-                $this->componentsFactory->error($runtimeException->getMessage());
+                $this->output->error($runtimeException->getMessage());
 
                 return false;
             }
 
-            $this->componentsFactory->task('Generated: config/dev-tools/pint.json');
+            $this->output->task('Generated: config/dev-tools/pint.json');
         }
 
         $this->publishRootCopy(
@@ -571,14 +577,14 @@ final readonly class ConfigStubPublisher
         string $targetFile,
         string $label,
     ): bool {
-        if (File::copy($stubFile, $targetFile)) {
-            $this->componentsFactory->task('Copied: ' . $label);
+        if (copy($stubFile, $targetFile)) {
+            $this->output->task('Copied: ' . $label);
 
             return true;
         }
 
         // @codeCoverageIgnoreStart
-        $this->componentsFactory->error('Failed to copy: ' . $label);
+        $this->output->error('Failed to copy: ' . $label);
 
         return false;
         // @codeCoverageIgnoreEnd
@@ -589,8 +595,8 @@ final readonly class ConfigStubPublisher
      */
     private function ensureDirectoryExists(string $directory): void
     {
-        if (! File::isDirectory($directory)) {
-            File::makeDirectory(
+        if (! is_dir($directory)) {
+            mkdir(
                 $directory,
                 0755,
                 true,
@@ -609,7 +615,7 @@ final readonly class ConfigStubPublisher
     ): bool {
         return $force
             && $protectUserChanges
-            && File::exists($targetFile)
+            && file_exists($targetFile)
             && $this->isUserModified($stubFile, $targetFile);
     }
 
@@ -637,8 +643,8 @@ final readonly class ConfigStubPublisher
         bool $force,
         string $basePath,
     ): bool {
-        if (! File::exists($stubFile)) {
-            $this->componentsFactory->warn('Stub not found, skipping: ' . $label);
+        if (! file_exists($stubFile)) {
+            $this->output->warn('Stub not found, skipping: ' . $label);
 
             return false;
         }
@@ -647,18 +653,18 @@ final readonly class ConfigStubPublisher
         $processed = str_replace(
             'PACKAGE_GITLAB_ISSUES',
             $issuesUrl,
-            (string) File::get($stubFile),
+            (string) file_get_contents($stubFile),
         );
         $tempFile  = sys_get_temp_dir() . '/ldt_governance_' . md5($label);
-        File::put($tempFile, $processed);
+        file_put_contents($tempFile, $processed);
 
         $this->ensureDirectoryExists(dirname($targetFile));
 
         try {
             // Target does not exist yet - just copy
-            if (! File::exists($targetFile)) {
-                File::copy($tempFile, $targetFile);
-                $this->componentsFactory->task('Copied: ' . $label);
+            if (! file_exists($targetFile)) {
+                copy($tempFile, $targetFile);
+                $this->output->task('Copied: ' . $label);
 
                 return true;
             }
@@ -670,8 +676,8 @@ final readonly class ConfigStubPublisher
 
                 if ($srcHash === $tgtHash) {
                     // Identical - silently refresh
-                    File::copy($tempFile, $targetFile);
-                    $this->componentsFactory->task('Refreshed: ' . $label);
+                    copy($tempFile, $targetFile);
+                    $this->output->task('Refreshed: ' . $label);
 
                     return true;
                 }
@@ -688,13 +694,13 @@ final readonly class ConfigStubPublisher
 
             // Force - overwrite unconditionally, after a copy of the file
             $this->saveBeforeOverwriting($basePath, $targetFile);
-            File::copy($tempFile, $targetFile);
-            $this->componentsFactory->task('Copied: ' . $label);
+            copy($tempFile, $targetFile);
+            $this->output->task('Copied: ' . $label);
 
             return true;
         }
         finally {
-            File::delete($tempFile);
+            PlainFile::delete($tempFile);
         }
     }
 
@@ -707,7 +713,7 @@ final readonly class ConfigStubPublisher
         string $name,
         bool $force,
     ): void {
-        if (File::exists($basePath . '/' . $name) && ! $force) {
+        if (file_exists($basePath . '/' . $name) && ! $force) {
             return;
         }
 
@@ -720,7 +726,7 @@ final readonly class ConfigStubPublisher
         );
 
         if ([] !== $written) {
-            $this->componentsFactory->task('Copied: ' . $name . ' (root)');
+            $this->output->task('Copied: ' . $name . ' (root)');
         }
     }
 
@@ -763,8 +769,8 @@ final readonly class ConfigStubPublisher
         string $label,
         bool $protectUserChanges,
     ): bool {
-        if (! File::exists($stubFile)) {
-            $this->componentsFactory->warn('Stub not found, skipping: ' . $label);
+        if (! file_exists($stubFile)) {
+            $this->output->warn('Stub not found, skipping: ' . $label);
 
             return false;
         }
@@ -801,11 +807,11 @@ final readonly class ConfigStubPublisher
     {
         $composerPath = $basePath . '/composer.json';
 
-        if (! File::exists($composerPath)) {
+        if (! file_exists($composerPath)) {
             return 'TODO: add GitLab issues URL';
         }
 
-        $composer = json_decode((string) File::get($composerPath), true);
+        $composer = json_decode((string) file_get_contents($composerPath), true);
         $raw      = is_array($composer)
             ? ($composer['name'] ?? '')
             : '';
@@ -831,21 +837,17 @@ final readonly class ConfigStubPublisher
      */
     private function saveBeforeOverwriting(string $basePath, string $file): bool
     {
-        if (! File::exists($file)) {
+        if (! file_exists($file)) {
             return false;
         }
 
-        // One folder per run and per project: the copies of a publication stay together
-        /** @var array<string, ConfigBackup> $backups */
-        static $backups = [];
+        $this->backups[$basePath] ??= new ConfigBackup($basePath);
 
-        $backups[$basePath] ??= new ConfigBackup($basePath);
-
-        if (! $backups[$basePath]->save($file)) {
+        if (! $this->backups[$basePath]->save($file)) {
             return false;
         }
 
-        $this->componentsFactory->task('Backed up: ' . ltrim(substr($file, strlen($basePath)), '/'));
+        $this->output->task('Backed up: ' . ltrim(substr($file, strlen($basePath)), '/'));
 
         return true;
     }
@@ -861,7 +863,7 @@ final readonly class ConfigStubPublisher
         string $label,
     ): bool {
         // File exists and no force flag - skip with a notice
-        if (File::exists($targetFile) && ! $force) {
+        if (file_exists($targetFile) && ! $force) {
             $this->skip($label, 'already exists (use --force to overwrite)');
 
             return true;
@@ -894,7 +896,7 @@ final readonly class ConfigStubPublisher
         string $reason,
         string $color = 'yellow',
     ): void {
-        $this->componentsFactory->twoColumnDetail(
+        $this->output->twoColumnDetail(
             'Skipped: ' . $label,
             sprintf(
                 '<fg=%s>%s</>',
@@ -909,7 +911,7 @@ final readonly class ConfigStubPublisher
      */
     private function unknownKey(string $key): bool
     {
-        $this->componentsFactory->error(sprintf(
+        $this->output->error(sprintf(
             'Unknown publishable key "%s". Valid keys: %s',
             $key,
             implode(', ', $this->availableKeys()),
