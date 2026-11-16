@@ -41,6 +41,10 @@ setup: ## Run the dev-tools setup wizard (Makefile, configs, CI stub)
 setup-check: ## Tell which files of the setup are missing or differ from the package (writes nothing)
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-check.sh
 
+.PHONY: setup-update
+setup-update: ## Publish again the files that setup-check reports, after a copy in .dev-tools-backup/ (DRY_RUN=true lists them)
+	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-update.sh
+
 .PHONY: uninstall
 uninstall: ## Remove dev-tools configuration files
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/uninstall-package.sh

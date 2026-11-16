@@ -163,6 +163,8 @@ php artisan dev-tools:publish --fullstack               # Makefile for PHP and J
 
 `make setup-check` tells which files of the setup are missing or differ from what the package publishes now (it writes nothing, and exits with 1 when a file is missing or different). A file that differs can be a change of the project or a file late on the package: the check shows the difference, you decide what to keep.
 
+`make setup-update` publishes again the files that `make setup-check` reports (missing or different), and only those. A file of the project that it replaces is copied first in `.dev-tools-backup/`: nothing is merged, you put your own settings back from the copy. `DRY_RUN=true make setup-update` lists the files without writing.
+
 The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.
 
 For a package without Artisan:
