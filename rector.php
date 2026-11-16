@@ -10,5 +10,8 @@ require __DIR__ . '/vendor/autoload.php';
 return RectorBaseConfig::configure(
     projectRoot: __DIR__,
     extraPaths: [],
-    extraSkips: [],
+    extraSkips: [
+        // Deletes a file with PHP alone, for the projects without Laravel (the Laravel set would use the File facade)
+        __DIR__ . '/src/Services/PlainFile.php',
+    ],
 );

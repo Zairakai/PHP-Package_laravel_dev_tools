@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Services;
 
-use Illuminate\Console\View\Components\Factory;
-use Illuminate\Support\Facades\File;
+use Zairakai\LaravelDevTools\Contracts\PublishOutput;
 
 /**
  * Activates the git hooks of zairakai/laravel-dev-tools.
@@ -21,7 +20,7 @@ final readonly class GitHooksActivator
      */
     public const string HOOKS_PATH = 'vendor/zairakai/laravel-dev-tools/stubs/githooks';
 
-    public function __construct(private Factory $componentsFactory)
+    public function __construct(private PublishOutput $output)
     {
         // Promoted properties are assigned by PHP automatically.
     }
@@ -35,8 +34,8 @@ final readonly class GitHooksActivator
      */
     public function activate(string $basePath): bool
     {
-        if (! File::isDirectory($basePath . '/.git')) {
-            $this->componentsFactory->warn('Not a git repository - skipping git hooks installation.');
+        if (! is_dir($basePath . '/.git')) {
+            $this->output->warn('Not a git repository - skipping git hooks installation.');
 
             return false;
         }
@@ -45,13 +44,13 @@ final readonly class GitHooksActivator
         exec(sprintf('git -C %s rev-parse --show-toplevel 2>/dev/null', escapeshellarg($basePath)), $toplevel);
 
         if (realpath($toplevel[0] ?? '') !== realpath($basePath)) {
-            $this->componentsFactory->warn('Not a git repository - skipping git hooks installation.');
+            $this->output->warn('Not a git repository - skipping git hooks installation.');
 
             return false;
         }
 
-        if (! File::isDirectory($this->installedHooksDirectory())) {
-            $this->componentsFactory->warn('Hooks of laravel-dev-tools not found - run: composer install');
+        if (! is_dir($this->installedHooksDirectory())) {
+            $this->output->warn('Hooks of laravel-dev-tools not found - run: composer install');
 
             return false;
         }
@@ -68,13 +67,13 @@ final readonly class GitHooksActivator
         unset($output);
 
         if (0 === $returnCode) {
-            $this->componentsFactory->task('Configured: git config core.hooksPath ' . self::HOOKS_PATH);
+            $this->output->task('Configured: git config core.hooksPath ' . self::HOOKS_PATH);
 
             return true;
         }
 
-        $this->componentsFactory->warn('Could not set git config core.hooksPath - run manually:');
-        $this->componentsFactory->twoColumnDetail('git config core.hooksPath ' . self::HOOKS_PATH, '');
+        $this->output->warn('Could not set git config core.hooksPath - run manually:');
+        $this->output->twoColumnDetail('git config core.hooksPath ' . self::HOOKS_PATH, '');
 
         return false;
     }
