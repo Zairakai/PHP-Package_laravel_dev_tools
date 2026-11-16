@@ -6,11 +6,11 @@ namespace Zairakai\LaravelDevTools\Tests\Unit;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Zairakai\LaravelDevTools\Contracts\PublishOutput;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\PlainFile;
 use Zairakai\LaravelDevTools\Services\SetupChecker;
 use Zairakai\LaravelDevTools\Services\SetupUpdater;
+use Zairakai\LaravelDevTools\Services\SilentPublishOutput;
 
 final class SetupUpdaterTest extends TestCase
 {
@@ -26,16 +26,7 @@ final class SetupUpdaterTest extends TestCase
         mkdir($this->project . '/src', 0755, true);
         file_put_contents($this->project . '/composer.json', '{"name": "acme/sample"}');
 
-        $silent = new class implements PublishOutput
-        {
-            public function error(string $message): void {}
-
-            public function task(string $description): void {}
-
-            public function twoColumnDetail(string $first, string $second = ''): void {}
-
-            public function warn(string $message): void {}
-        };
+        $silent = new SilentPublishOutput();
 
         foreach (['quality', 'style', 'testing'] as $group) {
             new ConfigStubPublisher($silent)->publishGroup($group, $this->vendor, $this->project, false);

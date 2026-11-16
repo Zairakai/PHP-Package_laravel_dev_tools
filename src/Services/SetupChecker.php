@@ -7,8 +7,6 @@ namespace Zairakai\LaravelDevTools\Services;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use SplFileInfo;
-use Zairakai\LaravelDevTools\Contracts\PublishOutput;
 
 /**
  * Tells what the setup would publish that the project does not have, or has differently.
@@ -62,16 +60,7 @@ final class SetupChecker
         try {
             $this->mirrorTheProject($basePath, $temporary);
 
-            $publisher = new ConfigStubPublisher(new class implements PublishOutput
-            {
-                public function error(string $message): void {}
-
-                public function task(string $description): void {}
-
-                public function twoColumnDetail(string $first, string $second = ''): void {}
-
-                public function warn(string $message): void {}
-            });
+            $publisher = new ConfigStubPublisher(new SilentPublishOutput());
 
             foreach (self::GROUPS as $group) {
                 $publisher->publishGroup($group, $vendorPath, $temporary, true);
@@ -80,7 +69,7 @@ final class SetupChecker
             return $then($temporary, $this->compare($temporary, $basePath));
         }
         finally {
-            $this->remove($temporary);
+            PlainFile::deleteDirectory($temporary);
         }
     }
 
@@ -100,7 +89,12 @@ final class SetupChecker
                 continue;
             }
 
-            if (self::BASELINE === $relative || hash_file('sha256', $mine) === hash_file('sha256', $temporary . '/' . $relative)) {
+            $generated = $temporary . '/' . $relative;
+
+            if (
+                self::BASELINE                === $relative
+                || hash_file('sha256', $mine) === hash_file('sha256', $generated)
+            ) {
                 $results[] = ['file' => $relative, 'state' => self::SAME, 'detail' => ''];
 
                 continue;
@@ -109,61 +103,15 @@ final class SetupChecker
             $results[] = [
                 'file'   => $relative,
                 'state'  => self::DIFFERENT,
-                'detail' => $this->difference((string) file_get_contents($mine), (string) file_get_contents($temporary . '/' . $relative), $relative),
+                'detail' => FileDifference::of(
+                    (string) file_get_contents($mine),
+                    (string) file_get_contents($generated),
+                    $relative,
+                ),
             ];
         }
 
         return $results;
-    }
-
-    /**
-     * What differs: the keys of a JSON file (the rules of pint.json), or the number of lines of another file.
-     */
-    private function difference(string $project, string $package, string $file): string
-    {
-        if (str_ends_with($file, '.json')) {
-            $mine   = json_decode($project, true);
-            $theirs = json_decode($package, true);
-
-            if (is_array($mine) && is_array($theirs)) {
-                return $this->jsonDifference($this->flatten($mine), $this->flatten($theirs));
-            }
-        }
-
-        $mine   = explode("\n", $project);
-        $theirs = explode("\n", $package);
-
-        return sprintf(
-            '%d line(s) only in the project, %d line(s) only in the package',
-            count(array_diff($mine, $theirs)),
-            count(array_diff($theirs, $mine)),
-        );
-    }
-
-    /**
-     * The leaves of a decoded JSON, by dotted path, as JSON text.
-     *
-     * @param array<mixed> $data
-     *
-     * @return array<string, string>
-     */
-    private function flatten(array $data, string $prefix = ''): array
-    {
-        $flat = [];
-
-        foreach ($data as $key => $value) {
-            $path = '' === $prefix ? (string) $key : $prefix . '.' . $key;
-
-            if (is_array($value) && ! array_is_list($value)) {
-                $flat += $this->flatten($value, $path);
-
-                continue;
-            }
-
-            $flat[$path] = (string) json_encode($value);
-        }
-
-        return $flat;
     }
 
     /**
@@ -173,61 +121,25 @@ final class SetupChecker
      */
     private function generated(string $temporary): array
     {
-        $files  = [];
-        $inputs = ['composer.json', 'artisan'];
-
+        $inputs   = ['composer.json', 'artisan'];
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($temporary, FilesystemIterator::SKIP_DOTS),
         );
+        $files    = [];
 
-        foreach ($iterator as $file) {
-            if (! $file instanceof SplFileInfo || ! $file->isFile()) {
-                continue;
-            }
-
-            $relative = ltrim(substr($file->getPathname(), strlen($temporary)), '/');
-
-            if (in_array($relative, $inputs, true) || str_starts_with($relative, ConfigBackup::FOLDER . '/')) {
-                continue;
-            }
-
-            $files[] = $relative;
+        foreach ($iterator as $leaf) {
+            $files[] = $iterator->getSubPathname();
         }
+
+        $files = array_filter(
+            $files,
+            static fn (string $relative): bool => ! in_array($relative, $inputs, true)
+                && ! str_starts_with($relative, ConfigBackup::FOLDER . '/'),
+        );
 
         sort($files);
 
         return $files;
-    }
-
-    /**
-     * @param array<string, string> $project
-     * @param array<string, string> $package
-     */
-    private function jsonDifference(array $project, array $package): string
-    {
-        $parts = [];
-
-        $onlyProject = array_keys(array_diff_key($project, $package));
-        $onlyPackage = array_keys(array_diff_key($package, $project));
-        $changed     = array_keys(array_filter(
-            array_intersect_key($project, $package),
-            static fn (string $value, string $key): bool => $value !== $package[$key],
-            ARRAY_FILTER_USE_BOTH,
-        ));
-
-        if ([] !== $onlyProject) {
-            $parts[] = 'only in the project: ' . implode(', ', $onlyProject);
-        }
-
-        if ([] !== $onlyPackage) {
-            $parts[] = 'only in the package: ' . implode(', ', $onlyPackage);
-        }
-
-        if ([] !== $changed) {
-            $parts[] = 'changed: ' . implode(', ', $changed);
-        }
-
-        return implode('; ', $parts);
     }
 
     /**
@@ -246,31 +158,5 @@ final class SetupChecker
                 mkdir($temporary . '/' . $folder, 0755, true);
             }
         }
-    }
-
-    private function remove(string $directory): void
-    {
-        if (! is_dir($directory)) {
-            return;
-        }
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-
-        foreach ($iterator as $entry) {
-            if ($entry instanceof SplFileInfo) {
-                if ($entry->isDir()) {
-                    rmdir($entry->getPathname());
-
-                    continue;
-                }
-
-                PlainFile::delete($entry->getPathname());
-            }
-        }
-
-        rmdir($directory);
     }
 }
