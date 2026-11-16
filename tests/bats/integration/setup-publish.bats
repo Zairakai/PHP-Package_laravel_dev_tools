@@ -341,3 +341,26 @@ run_setup() {
   run grep -c "^# Dev Tools temporary files$" "${PROJECT}/.gitignore"
   [ "$output" = "0" ]
 }
+
+# The merge of the composer scripts keeps the layout of composer.json
+# ================
+
+@test "the default setup keeps the 2 spaces of composer.json" {
+  run_setup
+
+  [ "$status" -eq 0 ]
+  run grep -E '^  "scripts": \{' "${PROJECT}/composer.json"
+  [ "$status" -eq 0 ]
+  run grep -E '^    "scripts"' "${PROJECT}/composer.json"
+  [ "$status" -ne 0 ]
+}
+
+@test "the default setup keeps the tabs of composer.json" {
+  printf '{\n\t"name": "acme/sample"\n}\n' > "${PROJECT}/composer.json"
+
+  run_setup
+
+  [ "$status" -eq 0 ]
+  run grep -P '^\t"scripts": \{' "${PROJECT}/composer.json"
+  [ "$status" -eq 0 ]
+}
