@@ -15,10 +15,10 @@ ensure_dir "$(dirname "$AUDIT_REPORT")"
 
 log_step "Running composer audit..."
 
-# The exit code of composer is not enough alone (it is also not 0 when the audit could not run): the report must be a
-# JSON, and the advisories are counted in it.
+# An abandoned package is not a vulnerability: composer would end with an error for it. The exit code is not enough alone
+# (it is also not 0 when the audit could not run): the report must be a JSON, and the advisories are counted in it.
 audit_status=0
-composer audit --format=json > "$AUDIT_REPORT" || audit_status=$?
+composer audit --format=json --abandoned=ignore > "$AUDIT_REPORT" || audit_status=$?
 
 if ! command_exists jq; then
   if [ "$audit_status" -eq 0 ]; then

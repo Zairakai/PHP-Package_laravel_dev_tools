@@ -57,6 +57,14 @@ run_in_project() {
   [[ "$output" != *"No security vulnerabilities found"* ]]
 }
 
+@test "security-audit.sh does not fail for an abandoned package" {
+  fake_command composer 'case "$*" in *--abandoned=ignore*) echo "{\"advisories\": []}" ;; *) echo "{\"advisories\": [], \"abandoned\": {\"acme/old\": null}}"; exit 2 ;; esac'
+
+  run_in_project security-audit.sh
+
+  [ "$status" -eq 0 ]
+}
+
 @test "security-audit.sh writes the report in the build folder" {
   fake_command composer 'echo "{\"advisories\": []}"'
 
