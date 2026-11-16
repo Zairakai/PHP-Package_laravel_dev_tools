@@ -75,6 +75,97 @@ final class ConfigCopiesTest extends TestCase
     }
 
     #[Test]
+    public function it_converts_every_kind_of_path_of_the_phpunit_schema(): void
+    {
+        $xml = <<<'XML_WRAP'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!-- <directory>comment/not/a/path</directory> -->
+        <phpunit
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+          bootstrap="vendor/autoload.php"
+          cacheDirectory="build/cache"
+          extensionsDirectory="tools/extensions"
+          colors="true">
+          <testsuites>
+            <testsuite name="Unit">
+              <directory prefix="Foo" suffix="Test.php">tests/Unit</directory>
+              <file>tests/ExtraTest.php</file>
+              <exclude>tests/Unit/Skipped</exclude>
+            </testsuite>
+          </testsuites>
+          <source baseline="build/baseline.xml">
+            <include>
+              <directory>src</directory>
+              <file>app.php</file>
+            </include>
+            <exclude>
+              <directory>src/Generated</directory>
+              <file>src/legacy.php</file>
+            </exclude>
+          </source>
+          <coverage>
+            <report>
+              <html outputDirectory="build/coverage"/>
+              <clover outputFile="build/logs/clover.xml"/>
+              <text outputFile="php://stdout"/>
+              <xml outputDirectory="/var/ci/xml"/>
+            </report>
+          </coverage>
+          <logging>
+            <junit outputFile="build/logs/junit.xml"/>
+            <testdoxHtml outputFile="C:\ci\testdox.html"/>
+          </logging>
+          <php>
+            <includePath>vendor/lib</includePath>
+            <env name="SOME_PATH" value="vendor/autoload.php"/>
+            <ini name="error_log" value="build/php.log"/>
+          </php>
+          <extensions>
+            <bootstrap class="Some\Extension"/>
+          </extensions>
+        </phpunit>
+        XML_WRAP;
+
+        $config = ConfigCopies::phpunitForConfig($xml);
+
+        foreach ([
+            'xsi:noNamespaceSchemaLocation="../../vendor/phpunit/phpunit/phpunit.xsd"',
+            'bootstrap="../../vendor/autoload.php"',
+            'cacheDirectory="../../build/cache"',
+            'extensionsDirectory="../../tools/extensions"',
+            '<directory prefix="Foo" suffix="Test.php">../../tests/Unit</directory>',
+            '<file>../../tests/ExtraTest.php</file>',
+            '<exclude>../../tests/Unit/Skipped</exclude>',
+            'baseline="../../build/baseline.xml"',
+            '<directory>../../src</directory>',
+            '<file>../../app.php</file>',
+            '<directory>../../src/Generated</directory>',
+            '<file>../../src/legacy.php</file>',
+            'outputDirectory="../../build/coverage"',
+            'outputFile="../../build/logs/clover.xml"',
+            'outputFile="../../build/logs/junit.xml"',
+            '<includePath>../../vendor/lib</includePath>',
+        ] as $converted) {
+            self::assertStringContainsString($converted, $config);
+        }
+
+        foreach ([
+            'outputFile="php://stdout"',
+            'outputDirectory="/var/ci/xml"',
+            'outputFile="C:\ci\testdox.html"',
+            '<directory>comment/not/a/path</directory>',
+            'value="vendor/autoload.php"',
+            'value="build/php.log"',
+            '<bootstrap class="Some\Extension"/>',
+        ] as $left) {
+            self::assertStringContainsString($left, $config, 'not a path of the project');
+        }
+
+        self::assertSame($xml, ConfigCopies::phpunitForTheRoot($config));
+    }
+
+    #[Test]
     public function it_finds_no_problem_when_the_root_agrees_with_config_dev_tools(): void
     {
         $this->publishEverything();
@@ -127,6 +218,28 @@ final class ConfigCopiesTest extends TestCase
         File::deleteDirectory($this->root . '/config');
 
         self::assertSame([], ConfigCopies::problems($this->root));
+    }
+
+    #[Test]
+    public function it_keeps_the_layout_of_the_phpunit_file(): void
+    {
+        $xml = "<phpunit\n  bootstrap=\"vendor/autoload.php\"\n  colors=\"true\">\n  <testsuites>\n    <testsuite name=\"Unit\">\n      <directory>\n        tests/Unit\n      </directory>\n    </testsuite>\n  </testsuites>\n</phpunit>\n";
+
+        self::assertSame(
+            "<phpunit\n  bootstrap=\"../../vendor/autoload.php\"\n  colors=\"true\">\n  <testsuites>\n    <testsuite name=\"Unit\">\n      <directory>\n        ../../tests/Unit\n      </directory>\n    </testsuite>\n  </testsuites>\n</phpunit>\n",
+            ConfigCopies::phpunitForConfig($xml),
+        );
+    }
+
+    #[Test]
+    public function it_leaves_a_schema_that_is_an_address_as_it_is(): void
+    {
+        $xml = '<phpunit xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.0/phpunit.xsd" bootstrap="vendor/autoload.php"/>';
+
+        self::assertSame(
+            '<phpunit xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.0/phpunit.xsd" bootstrap="../../vendor/autoload.php"/>',
+            ConfigCopies::phpunitForConfig($xml),
+        );
     }
 
     #[Test]

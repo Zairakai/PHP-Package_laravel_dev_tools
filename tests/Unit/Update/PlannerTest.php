@@ -7,7 +7,15 @@ namespace Zairakai\LaravelDevTools\Tests\Unit\Update;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Zairakai\LaravelDevTools\Update\Planner;
+use Zairakai\LaravelDevTools\Update\Advisories;
+use Zairakai\LaravelDevTools\Update\Manifest;
+use Zairakai\LaravelDevTools\Update\PackageGraph;
+use Zairakai\LaravelDevTools\Update\PolicyChecks;
+use Zairakai\LaravelDevTools\Update\PolicyDocument;
+use Zairakai\LaravelDevTools\Update\ReleasePlan;
+use Zairakai\LaravelDevTools\Update\Releases;
+use Zairakai\LaravelDevTools\Update\UpdateConfig;
+use Zairakai\LaravelDevTools\Update\Versions;
 
 final class PlannerTest extends TestCase
 {
@@ -26,29 +34,29 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertSame([], Planner::validatePolicy([
+        $this->assertSame([], PolicyDocument::validatePolicy([
             'entries' => [
                 $entry,
             ],
         ]));
-        $this->assertSame([], Planner::validatePolicy([
+        $this->assertSame([], PolicyDocument::validatePolicy([
             'entries' => [],
         ]));
         $this->assertSame([
             '"entries" must be a list.',
-        ], Planner::validatePolicy([]));
+        ], PolicyDocument::validatePolicy([]));
         $this->assertSame([
             'entries[0]: "package" is missing.',
             'entries[0]: "reason" is missing.',
             'entries[0]: "since" must be a date (YYYY-MM-DD).',
-        ], Planner::validatePolicy([
+        ], PolicyDocument::validatePolicy([
             'entries' => [
                 [],
             ],
         ]));
         $this->assertSame([
             'entries[1]: "a/b" is listed twice.',
-        ], Planner::validatePolicy([
+        ], PolicyDocument::validatePolicy([
             'entries' => [
                 $entry,
                 $entry,
@@ -57,7 +65,7 @@ final class PlannerTest extends TestCase
         $this->assertSame([
             'entries[0]: "unblock.version" must be a version (X.Y.Z).',
             'entries[0]: "unblock.peers" must be a list of packages.',
-        ], Planner::validatePolicy([
+        ], PolicyDocument::validatePolicy([
             'entries' => [
                 [
                     ...$entry,
@@ -70,7 +78,7 @@ final class PlannerTest extends TestCase
         ]));
         $this->assertSame([
             'a/b',
-        ], Planner::policyPackages([
+        ], PolicyDocument::policyPackages([
             'entries' => [
                 $entry,
             ],
@@ -80,16 +88,16 @@ final class PlannerTest extends TestCase
     #[Test]
     public function accepts_a_version_through_the_constraint_of_composer(): void
     {
-        $this->assertTrue(Planner::acceptsVersion('^7.8 || ^8.0', '8.0.0'));
-        $this->assertTrue(Planner::acceptsVersion('^7.8 | ^8.0', '8.0.0'));
-        $this->assertTrue(Planner::acceptsVersion('>=8.1, <9.0', '8.4.0'));
-        $this->assertTrue(Planner::acceptsVersion('~1.2', '1.9.0'));
-        $this->assertTrue(Planner::acceptsVersion('1.2.*', '1.2.7'));
-        $this->assertTrue(Planner::acceptsVersion('^1.0@stable', '1.4.0'));
-        $this->assertFalse(Planner::acceptsVersion('^7.8', '8.0.0'));
-        $this->assertFalse(Planner::acceptsVersion('~1.2.3', '1.3.0'));
-        $this->assertFalse(Planner::acceptsVersion('dev-main', '1.0.0'));
-        $this->assertFalse(Planner::acceptsVersion('not a constraint', '1.0.0'));
+        $this->assertTrue(Versions::acceptsVersion('^7.8 || ^8.0', '8.0.0'));
+        $this->assertTrue(Versions::acceptsVersion('^7.8 | ^8.0', '8.0.0'));
+        $this->assertTrue(Versions::acceptsVersion('>=8.1, <9.0', '8.4.0'));
+        $this->assertTrue(Versions::acceptsVersion('~1.2', '1.9.0'));
+        $this->assertTrue(Versions::acceptsVersion('1.2.*', '1.2.7'));
+        $this->assertTrue(Versions::acceptsVersion('^1.0@stable', '1.4.0'));
+        $this->assertFalse(Versions::acceptsVersion('^7.8', '8.0.0'));
+        $this->assertFalse(Versions::acceptsVersion('~1.2.3', '1.3.0'));
+        $this->assertFalse(Versions::acceptsVersion('dev-main', '1.0.0'));
+        $this->assertFalse(Versions::acceptsVersion('not a constraint', '1.0.0'));
     }
 
     #[Test]
@@ -97,16 +105,16 @@ final class PlannerTest extends TestCase
     {
         $header = "--- a/.gitlab-ci.yml\n+++ b/.gitlab-ci.yml\n@@ -6 +6 @@\n";
 
-        $this->assertTrue(Planner::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1"));
-        $this->assertFalse(Planner::isRefOnlyChange($header . "-    file: \"a.yml\"\n+    file: \"b.yml\""));
-        $this->assertFalse(Planner::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1\n+  extra: true"));
-        $this->assertFalse(Planner::isRefOnlyChange(''));
+        $this->assertTrue(Manifest::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1"));
+        $this->assertFalse(Manifest::isRefOnlyChange($header . "-    file: \"a.yml\"\n+    file: \"b.yml\""));
+        $this->assertFalse(Manifest::isRefOnlyChange($header . "-    ref: 4.3.0\n+    ref: 4.3.1\n+  extra: true"));
+        $this->assertFalse(Manifest::isRefOnlyChange(''));
     }
 
     #[Test]
     public function completes_the_releases_that_list_only_what_changed(): void
     {
-        $full = Planner::expandReleases([
+        $full = Releases::expandReleases([
             [
                 'name'        => 'a/b',
                 'version'     => '2.1.0',
@@ -132,18 +140,18 @@ final class PlannerTest extends TestCase
     #[Test]
     public function computes_the_next_version(): void
     {
-        $this->assertSame('1.2.4', Planner::nextVersion('1.2.3', 'patch'));
-        $this->assertSame('1.3.0', Planner::nextVersion('1.2.3', 'minor'));
-        $this->assertSame('2.0.0', Planner::nextVersion('1.2.3', 'major'));
+        $this->assertSame('1.2.4', Versions::nextVersion('1.2.3', 'patch'));
+        $this->assertSame('1.3.0', Versions::nextVersion('1.2.3', 'minor'));
+        $this->assertSame('2.0.0', Versions::nextVersion('1.2.3', 'major'));
 
         $this->expectException(InvalidArgumentException::class);
-        Planner::nextVersion('1.2.3', 'huge');
+        Versions::nextVersion('1.2.3', 'huge');
     }
 
     #[Test]
     public function decodes_the_signing_key(): void
     {
-        $signer = Planner::signerIdentity([
+        $signer = ReleasePlan::signerIdentity([
             'GPG_PRIVATE_KEY_B64'  => base64_encode('KEY'),
             'RELEASE_SIGNER_NAME'  => 'N',
             'RELEASE_SIGNER_EMAIL' => 'e@x.fr',
@@ -169,12 +177,12 @@ final class PlannerTest extends TestCase
             'range'    => '<1.5',
         ];
 
-        $on  = Planner::advisoryIssueBody(
+        $on  = Advisories::advisoryIssueBody(
             $advisory,
             'https://ci.test/1',
             true,
         );
-        $off = Planner::advisoryIssueBody(
+        $off = Advisories::advisoryIssueBody(
             [
                 ...$advisory,
                 'severity' => 'low',
@@ -192,7 +200,7 @@ final class PlannerTest extends TestCase
     #[Test]
     public function does_not_tag_when_only_development_requirements_changed(): void
     {
-        $config = Planner::config();
+        $config = UpdateConfig::config();
         $before = [
             'require' => [
                 'php' => '^8.4',
@@ -210,7 +218,7 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertNull(Planner::planTag(
+        $this->assertNull(ReleasePlan::planTag(
             $config,
             '1.0.0',
             [
@@ -219,7 +227,7 @@ final class PlannerTest extends TestCase
             $before,
             $after,
         )['version']);
-        $this->assertNull(Planner::planTag(
+        $this->assertNull(ReleasePlan::planTag(
             $config,
             null,
             [
@@ -228,15 +236,15 @@ final class PlannerTest extends TestCase
             $before,
             $after,
         )['version']);
-        $this->assertNull(Planner::planTag(
+        $this->assertNull(ReleasePlan::planTag(
             $config,
             '1.0.0',
             [],
             $before,
             $after,
         )['version']);
-        $this->assertNull(Planner::planTag(
-            Planner::config([
+        $this->assertNull(ReleasePlan::planTag(
+            UpdateConfig::config([
                 'tag' => [
                     'when' => 'never',
                 ],
@@ -286,22 +294,22 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertTrue(Planner::isInherited(
+        $this->assertTrue(PackageGraph::isInherited(
             $lock,
             $manifest,
             'x/inherited',
         ));
-        $this->assertFalse(Planner::isInherited(
+        $this->assertFalse(PackageGraph::isInherited(
             $lock,
             $manifest,
             'x/shared',
         ));
-        $this->assertFalse(Planner::isInherited(
+        $this->assertFalse(PackageGraph::isInherited(
             $lock,
             $manifest,
             'x/own',
         ));
-        $this->assertFalse(Planner::isInherited(
+        $this->assertFalse(PackageGraph::isInherited(
             [],
             [],
             'x/inherited',
@@ -311,14 +319,14 @@ final class PlannerTest extends TestCase
     #[Test]
     public function finds_the_highest_plain_tag(): void
     {
-        $this->assertSame('1.10.0', Planner::latestTag([
+        $this->assertSame('1.10.0', Releases::latestTag([
             '1.2.0',
             '1.10.0',
             'v9.0.0',
             '2.0.0-rc1',
             'latest',
         ]));
-        $this->assertNull(Planner::latestTag([
+        $this->assertNull(Releases::latestTag([
             'v1.0.0',
             'main',
         ]));
@@ -327,11 +335,11 @@ final class PlannerTest extends TestCase
     #[Test]
     public function fixes_without_waiting_only_the_serious_or_unknown_severities(): void
     {
-        $this->assertTrue(Planner::isUrgent('critical'));
-        $this->assertTrue(Planner::isUrgent('high'));
-        $this->assertTrue(Planner::isUrgent(''));
-        $this->assertFalse(Planner::isUrgent('medium'));
-        $this->assertFalse(Planner::isUrgent('low'));
+        $this->assertTrue(Advisories::isUrgent('critical'));
+        $this->assertTrue(Advisories::isUrgent('high'));
+        $this->assertTrue(Advisories::isUrgent(''));
+        $this->assertFalse(Advisories::isUrgent('medium'));
+        $this->assertFalse(Advisories::isUrgent('low'));
     }
 
     #[Test]
@@ -342,11 +350,11 @@ final class PlannerTest extends TestCase
             'c/d' => '1.0.0',
         ];
 
-        $this->assertSame([], Planner::heldConstraints([], $locked));
+        $this->assertSame([], Versions::heldConstraints([], $locked));
         $this->assertSame([
             '--with',
             'a/b:==v2.7.1',
-        ], Planner::heldConstraints([
+        ], Versions::heldConstraints([
             'a/b',
         ], $locked));
         $this->assertSame([
@@ -354,11 +362,11 @@ final class PlannerTest extends TestCase
             'a/b:==v2.7.1',
             '--with',
             'c/d:==1.0.0',
-        ], Planner::heldConstraints([
+        ], Versions::heldConstraints([
             'a/b',
             'c/d',
         ], $locked));
-        $this->assertSame([], Planner::heldConstraints([
+        $this->assertSame([], Versions::heldConstraints([
             'x/y',
         ], $locked));
     }
@@ -377,22 +385,22 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertFalse(Planner::isLifted($entry, [
+        $this->assertFalse(PolicyChecks::isLifted($entry, [
             'a/b' => '^7.8 || ^8.0',
             'c/d' => '^7.8',
         ]));
-        $this->assertFalse(Planner::isLifted($entry, [
+        $this->assertFalse(PolicyChecks::isLifted($entry, [
             'a/b' => '^7.8 || ^8.0',
             'c/d' => null,
         ]));
-        $this->assertFalse(Planner::isLifted($entry, [
+        $this->assertFalse(PolicyChecks::isLifted($entry, [
             'a/b' => '^7.8 || ^8.0',
         ]));
-        $this->assertTrue(Planner::isLifted($entry, [
+        $this->assertTrue(PolicyChecks::isLifted($entry, [
             'a/b' => '^7.8 || ^8.0',
             'c/d' => '~8.0',
         ]));
-        $this->assertFalse(Planner::isLifted([
+        $this->assertFalse(PolicyChecks::isLifted([
             'package' => 'x/y',
         ], []));
     }
@@ -400,7 +408,7 @@ final class PlannerTest extends TestCase
     #[Test]
     public function lists_and_formats_the_changes(): void
     {
-        $rows = Planner::diffDependencies([
+        $rows = Manifest::diffDependencies([
             'require-dev' => [
                 'pint' => '^1.0',
             ],
@@ -425,7 +433,7 @@ final class PlannerTest extends TestCase
                 'to'      => '^2.0',
             ],
         ], $rows);
-        $this->assertStringContainsString('| require-dev | rector | - | ^2.0 |', Planner::formatChanges($rows));
+        $this->assertStringContainsString('| require-dev | rector | - | ^2.0 |', Manifest::formatChanges($rows));
     }
 
     #[Test]
@@ -440,19 +448,19 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertFalse(Planner::runtimeChanged($before, [
+        $this->assertFalse(Manifest::runtimeChanged($before, [
             ...$before,
             'require-dev' => [
                 'pint' => '^2.0',
             ],
         ]));
-        $this->assertTrue(Planner::runtimeChanged($before, [
+        $this->assertTrue(Manifest::runtimeChanged($before, [
             ...$before,
             'require' => [
                 'php' => '^8.4 || ^8.5',
             ],
         ]));
-        $this->assertFalse(Planner::runtimeChanged([
+        $this->assertFalse(Manifest::runtimeChanged([
             'require' => [
                 'a' => '1',
                 'b' => '2',
@@ -475,10 +483,10 @@ final class PlannerTest extends TestCase
             'moderate',
             '',
         ] as $severity) {
-            $this->assertTrue(Planner::isNotable($severity));
+            $this->assertTrue(Advisories::isNotable($severity));
         }
 
-        $this->assertFalse(Planner::isNotable('low'));
+        $this->assertFalse(Advisories::isNotable('low'));
     }
 
     #[Test]
@@ -507,7 +515,7 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $rows = Planner::advisories($report);
+        $rows = Advisories::advisories($report);
 
         $this->assertSame([
             'vendor/a',
@@ -516,10 +524,10 @@ final class PlannerTest extends TestCase
         $this->assertSame('', $rows[0]['severity']);
         $this->assertSame('high', $rows[1]['severity']);
         $this->assertSame('CVE-2026-2', $rows[1]['cve']);
-        $this->assertSame([], Planner::advisories([
+        $this->assertSame([], Advisories::advisories([
             'advisories' => [],
         ]));
-        $this->assertSame([], Planner::advisories([]));
+        $this->assertSame([], Advisories::advisories([]));
     }
 
     #[Test]
@@ -543,8 +551,8 @@ final class PlannerTest extends TestCase
         $this->assertSame([
             'a/b' => '1.2.3',
             'c/d' => '4.5.6',
-        ], Planner::lockVersions($lock));
-        $this->assertSame([], Planner::lockVersions([]));
+        ], Manifest::lockVersions($lock));
+        $this->assertSame([], Manifest::lockVersions([]));
     }
 
     #[Test]
@@ -575,11 +583,11 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertSame('^7.8 || ^8.0', Planner::peerRange($releases, 'g/g'));
-        $this->assertNull(Planner::peerRange($releases, 'other/package'));
-        $this->assertNull(Planner::peerRange([], 'g/g'));
-        $this->assertSame('2.1.0', Planner::latestStable(Planner::expandReleases($releases))['version'] ?? null);
-        $this->assertNull(Planner::latestStable([
+        $this->assertSame('^7.8 || ^8.0', Releases::peerRange($releases, 'g/g'));
+        $this->assertNull(Releases::peerRange($releases, 'other/package'));
+        $this->assertNull(Releases::peerRange([], 'g/g'));
+        $this->assertSame('2.1.0', Releases::latestStable(Releases::expandReleases($releases))['version'] ?? null);
+        $this->assertNull(Releases::latestStable([
             [
                 'version' => 'dev-main',
             ],
@@ -590,7 +598,7 @@ final class PlannerTest extends TestCase
     public function refuses_to_sign_without_the_group_variables(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        Planner::signerIdentity([
+        ReleasePlan::signerIdentity([
             'RELEASE_SIGNER_NAME' => 'x',
         ]);
     }
@@ -616,7 +624,7 @@ final class PlannerTest extends TestCase
             'require-dev' => [],
         ];
 
-        $this->assertSame([], Planner::policyViolations(
+        $this->assertSame([], PolicyChecks::policyViolations(
             [],
             $before,
             $after,
@@ -628,7 +636,7 @@ final class PlannerTest extends TestCase
                 'composer.json: a/a moves from ^1.0 to ^2.0.',
                 'composer.lock: e/e moves from 1.0.0 to 1.0.1.',
             ],
-            Planner::policyViolations([
+            PolicyChecks::policyViolations([
                 'a/a',
                 'c/c',
                 'd/d',
@@ -646,7 +654,7 @@ final class PlannerTest extends TestCase
     #[Test]
     public function sends_nothing_when_only_low_advisories_were_opened(): void
     {
-        $this->assertNull(Planner::auditAlert([
+        $this->assertNull(Advisories::auditAlert([
             [
                 'advisory' => [
                     'package'  => 'c/d',
@@ -656,13 +664,13 @@ final class PlannerTest extends TestCase
                 'url' => 'u',
             ],
         ], 'p'));
-        $this->assertNull(Planner::auditAlert([], 'p'));
+        $this->assertNull(Advisories::auditAlert([], 'p'));
     }
 
     #[Test]
     public function sends_one_message_for_the_notable_advisories_and_counts_the_low_ones(): void
     {
-        $alert = Planner::auditAlert([
+        $alert = Advisories::auditAlert([
             [
                 'advisory' => [
                     'package'  => 'a/b',
@@ -690,17 +698,17 @@ final class PlannerTest extends TestCase
     #[Test]
     public function sets_the_priority_from_the_severity_and_the_status(): void
     {
-        $this->assertSame('Kind::Security,Priority::Critical,Status::Ready', Planner::advisoryLabels([
+        $this->assertSame('Kind::Security,Priority::Critical,Status::Ready', Advisories::advisoryLabels([
             'severity' => 'critical',
         ], [
             'Kind::Security',
         ]));
-        $this->assertSame('Kind::Security,Priority::High,Status::Ready', Planner::advisoryLabels([
+        $this->assertSame('Kind::Security,Priority::High,Status::Ready', Advisories::advisoryLabels([
             'severity' => 'high',
         ], [
             'Kind::Security',
         ]));
-        $this->assertSame('Kind::Security,Priority::Low,Status::Ready', Planner::advisoryLabels([
+        $this->assertSame('Kind::Security,Priority::Low,Status::Ready', Advisories::advisoryLabels([
             'severity' => 'medium',
         ], [
             'Kind::Security',
@@ -728,7 +736,7 @@ final class PlannerTest extends TestCase
                 '      - dependency-name: "a/a"',
                 '      - dependency-name: "b/b"',
             ]),
-            Planner::syncDependabot(
+            Manifest::syncDependabot(
                 $file([]),
                 [
                     'a/a',
@@ -737,7 +745,7 @@ final class PlannerTest extends TestCase
                 'composer',
             ),
         );
-        $this->assertSame($file([]), Planner::syncDependabot(
+        $this->assertSame($file([]), Manifest::syncDependabot(
             $file([
                 '    ignore:',
                 '      - dependency-name: "old/old"',
@@ -745,19 +753,19 @@ final class PlannerTest extends TestCase
             [],
             'composer',
         ));
-        $this->assertSame($file([]), Planner::syncDependabot(
+        $this->assertSame($file([]), Manifest::syncDependabot(
             $file([]),
             [],
             'composer',
         ));
-        $this->assertNull(Planner::syncDependabot(
+        $this->assertNull(Manifest::syncDependabot(
             $file([]),
             [
                 'a/a',
             ],
             'npm',
         ));
-        $this->assertNull(Planner::syncDependabot(
+        $this->assertNull(Manifest::syncDependabot(
             "updates: []\n",
             [
                 'a/a',
@@ -769,8 +777,8 @@ final class PlannerTest extends TestCase
     #[Test]
     public function tags_when_a_published_range_changed(): void
     {
-        $plan = Planner::planTag(
-            Planner::config([
+        $plan = ReleasePlan::planTag(
+            UpdateConfig::config([
                 'tag' => [
                     'level' => 'minor',
                 ],
@@ -797,11 +805,11 @@ final class PlannerTest extends TestCase
     #[Test]
     public function titles_the_issue_of_an_advisory_with_a_stable_key(): void
     {
-        $this->assertSame('Security advisory: vendor/a (PKSA-1)', Planner::advisoryTitle([
+        $this->assertSame('Security advisory: vendor/a (PKSA-1)', Advisories::advisoryTitle([
             'id'      => 'PKSA-1',
             'package' => 'vendor/a',
         ]));
-        $this->assertStringStartsWith(Planner::ADVISORY_TITLE_PREFIX, Planner::advisoryTitle([
+        $this->assertStringStartsWith(Advisories::ADVISORY_TITLE_PREFIX, Advisories::advisoryTitle([
             'id'      => 'x',
             'package' => 'y',
         ]));
@@ -831,15 +839,15 @@ final class PlannerTest extends TestCase
             ],
         ];
 
-        $this->assertSame("{\n  \"entries\": []\n}\n", Planner::encodePolicy(Planner::withoutEntries($doc, [
+        $this->assertSame("{\n  \"entries\": []\n}\n", PolicyDocument::encodePolicy(PolicyDocument::withoutEntries($doc, [
             'a/a',
             'c/c',
         ])));
         $this->assertSame([
             'c/c',
-        ], Planner::policyPackages(Planner::withoutEntries($doc, [
+        ], PolicyDocument::policyPackages(PolicyDocument::withoutEntries($doc, [
             'a/a',
         ])));
-        $this->assertStringContainsString("\n        \"peers\": [\n          \"b/b\"\n        ]", Planner::encodePolicy($doc));
+        $this->assertStringContainsString("\n        \"peers\": [\n          \"b/b\"\n        ]", PolicyDocument::encodePolicy($doc));
     }
 }

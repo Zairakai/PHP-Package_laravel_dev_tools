@@ -150,19 +150,9 @@ run_setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "--publish=phpunit publishes the configuration of an application when the project has artisan" {
+@test "--publish=phpunit publishes the configuration of an application when the project has artisan and laravel/framework" {
   touch "${PROJECT}/artisan"
-
-  run_setup --publish=phpunit
-
-  [ "$status" -eq 0 ]
-  run cmp "${PROJECT}/phpunit.xml" "${PACKAGE}/config/phpunit-app.xml"
-  [ "$status" -eq 0 ]
-}
-
-@test "--publish=phpunit publishes the configuration of an application when the project has app/ and no src/" {
-  rmdir "${PROJECT}/src"
-  mkdir "${PROJECT}/app"
+  printf '{\n  "name": "acme/app",\n  "require": {"laravel/framework": "^12.0"}\n}\n' > "${PROJECT}/composer.json"
 
   run_setup --publish=phpunit
 
@@ -340,4 +330,28 @@ run_setup() {
 
   run grep -c "^# Dev Tools temporary files$" "${PROJECT}/.gitignore"
   [ "$output" = "0" ]
+}
+
+# The merge of the composer scripts keeps the layout of composer.json
+# ================
+
+@test "the default setup keeps the 2 spaces of composer.json" {
+  run_setup
+
+  [ "$status" -eq 0 ]
+  run grep -E '^  "scripts": \{' "${PROJECT}/composer.json"
+  [ "$status" -eq 0 ]
+  run grep -E '^    "scripts"' "${PROJECT}/composer.json"
+  [ "$status" -ne 0 ]
+}
+
+@test "the default setup keeps the tabs of composer.json" {
+  printf '{\n\t"name": "acme/sample"\n}\n' > "${PROJECT}/composer.json"
+
+  run_setup
+
+  [ "$status" -eq 0 ]
+  # grep -P does not exist in the image of the CI (Alpine): a fixed string with a tab
+  run grep -F $'\t"scripts": {' "${PROJECT}/composer.json"
+  [ "$status" -eq 0 ]
 }

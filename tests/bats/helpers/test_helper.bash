@@ -17,9 +17,21 @@ setup_test_env() {
   # Export scripts directory
   export SCRIPT_DIR="${PROJECT_ROOT}/scripts"
 
-  # Source config.sh for helpers
+  # Source config.sh for helpers. It sets "set -euo pipefail" and its own traps: left in the test, they replace what Bats
+  # relies on, and a test that fails ends silently, without a "not ok". The options and the traps of Bats are put back.
+  local saved_flags="$-" saved_pipefail saved_traps
+  saved_pipefail="$(set +o | grep ' pipefail$')"
+  saved_traps="$(trap -p EXIT INT TERM)"
+
   # shellcheck source=../../scripts/config.sh
   source "${SCRIPT_DIR}/config.sh"
+
+  set +eu
+  [[ "$saved_flags" == *e* ]] && set -e
+  [[ "$saved_flags" == *u* ]] && set -u
+  eval "$saved_pipefail"
+  trap - EXIT INT TERM
+  eval "$saved_traps"
 }
 
 # Teardown test environment
@@ -109,4 +121,36 @@ EOF
 
   chmod +x "${mock_dir}/${command_name}"
   export PATH="${mock_dir}:${PATH}"
+}
+
+# Command that runs the given shell body, found first in the PATH
+fake_command() {
+  local command_name="$1"
+  local body="$2"
+  local fake_dir="${TEST_TEMP_DIR}/fake-bin"
+
+  mkdir -p "$fake_dir"
+  printf '#!/usr/bin/env bash\n%s\n' "$body" > "${fake_dir}/${command_name}"
+  chmod +x "${fake_dir}/${command_name}"
+
+  case ":${PATH}:" in
+    *":${fake_dir}:"*) ;;
+    *) export PATH="${fake_dir}:${PATH}" ;;
+  esac
+}
+
+# Project with a copy of scripts/ (the scripts take their root from their own folder), an empty vendor/, no docker, and a
+# composer.json
+make_script_project() {
+  export PROJECT="${TEST_TEMP_DIR}/project"
+  export DEV_TOOLS_NO_DOCKER=true
+
+  mkdir -p "${PROJECT}/vendor"
+  cp -R "${PROJECT_ROOT}/scripts" "${PROJECT}/scripts"
+  printf '{\n  "name": "acme/sample"\n}\n' > "${PROJECT}/composer.json"
+}
+
+# Skips the test when a tool that it needs is not installed (the image of the pipeline has fewer tools than a machine)
+require_command() {
+  command -v "$1" > /dev/null 2>&1 || skip "$1 is not installed"
 }

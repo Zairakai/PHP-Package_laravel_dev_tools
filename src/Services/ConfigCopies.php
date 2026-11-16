@@ -35,6 +35,8 @@ final class ConfigCopies
         'phpinsights.php',
     ];
 
+    public const string PUBLISHED = 'config/dev-tools/';
+
     /**
      * The thin files of the root, and what each must point at.
      */
@@ -42,8 +44,6 @@ final class ConfigCopies
         'phpstan.neon'       => 'config/dev-tools/phpstan.neon',
         '.markdownlint.json' => './config/dev-tools/.markdownlint.json',
     ];
-
-    private const string PUBLISHED = 'config/dev-tools/';
 
     /**
      * The content that the copy of the root must have, from the file of config/dev-tools/.
@@ -60,10 +60,9 @@ final class ConfigCopies
      */
     public static function phpunitForConfig(string $xml): string
     {
-        return (string) preg_replace_callback(
-            self::phpunitPaths(),
-            static fn (array $m): string => $m['head'] . '../../' . $m['path'] . $m['tail'],
+        return PhpunitPaths::convert(
             $xml,
+            static fn (string $path): string => '../../' . $path,
         );
     }
 
@@ -72,14 +71,9 @@ final class ConfigCopies
      */
     public static function phpunitForTheRoot(string $xml): string
     {
-        return (string) preg_replace_callback(
-            self::phpunitPaths(),
-            static fn (array $m): string => $m['head'] . preg_replace(
-                '#^(\.\./)+#',
-                '',
-                $m['path'],
-            ) . $m['tail'],
+        return PhpunitPaths::convert(
             $xml,
+            static fn (string $path): string => (string) preg_replace('#^(\\.\\./)+#', '', $path),
         );
     }
 
@@ -92,80 +86,7 @@ final class ConfigCopies
      */
     public static function problems(string $root): array
     {
-        if (! is_dir($root . '/' . self::PUBLISHED)) {
-            return [];
-        }
-
-        $problems = [];
-
-        foreach (self::COPIES as $name) {
-            $published = $root . '/' . self::PUBLISHED . $name;
-            $copy      = $root . '/' . $name;
-
-            if (! is_file($published)) {
-                $problems[] = sprintf(
-                    '%s%s is missing',
-                    self::PUBLISHED,
-                    $name,
-                );
-
-                continue;
-            }
-
-            if (! is_file($copy)) {
-                $problems[] = sprintf('%s is missing at the root, where the editor reads it', $name);
-
-                continue;
-            }
-
-            if (self::expectedCopy($name, (string) file_get_contents($published)) !== (string) file_get_contents($copy)) {
-                $problems[] = sprintf(
-                    '%s at the root differs from %s%s',
-                    $name,
-                    self::PUBLISHED,
-                    $name,
-                );
-            }
-        }
-
-        foreach (self::THIN_FILES as $name => $target) {
-            $thin = $root . '/' . $name;
-
-            if (! is_file($thin)) {
-                $problems[] = sprintf('%s is missing at the root, where the editor reads it', $name);
-
-                continue;
-            }
-
-            if (! str_contains((string) file_get_contents($thin), $target)) {
-                $problems[] = sprintf(
-                    '%s at the root does not point at %s',
-                    $name,
-                    $target,
-                );
-            }
-
-            if (! is_file($root . '/' . self::PUBLISHED . $name)) {
-                $problems[] = sprintf(
-                    '%s%s is missing',
-                    self::PUBLISHED,
-                    $name,
-                );
-            }
-        }
-
-        foreach (self::NOT_AT_THE_ROOT as $name) {
-            if (is_file($root . '/' . $name)) {
-                $problems[] = sprintf(
-                    '%s at the root is not read: move its changes to %s%s and remove it',
-                    $name,
-                    self::PUBLISHED,
-                    $name,
-                );
-            }
-        }
-
-        return $problems;
+        return ConfigCopiesCheck::problems($root);
     }
 
     /**
@@ -181,46 +102,42 @@ final class ConfigCopies
         array $names = [],
         ?callable $before = null,
     ): array {
-        $written = [];
+        $wanted = [] === $names
+            ? self::COPIES
+            : array_values(array_intersect(self::COPIES, $names));
 
-        foreach (self::COPIES as $name) {
-            if ([] !== $names && ! in_array(
-                $name,
-                $names,
-                true,
-            )) {
-                continue;
-            }
-
-            $published = $root . '/' . self::PUBLISHED . $name;
-
-            if (! is_file($published)) {
-                continue;
-            }
-
-            $content = self::expectedCopy($name, (string) file_get_contents($published));
-            $copy    = $root . '/' . $name;
-
-            if (null !== $before && is_file($copy) && (string) file_get_contents($copy) !== $content) {
-                $before($copy);
-            }
-
-            file_put_contents($copy, $content);
-
-            $written[] = $name;
-        }
-
-        return $written;
+        return array_values(array_filter(
+            $wanted,
+            static fn (string $name): bool => self::write($root, $name, $before),
+        ));
     }
 
     /**
-     * The paths of a phpunit.xml: the attributes bootstrap, cacheDirectory, outputDirectory and outputFile, and the
-     * elements directory and file. A stream (`php://stdout`) and an absolute path are not paths of the project.
+     * Writes one copy from the file of config/dev-tools/, when that file exists.
+     *
+     * @param callable(string): mixed|null $before called with the path of a copy that exists, before it is written over
      */
-    private static function phpunitPaths(): string
+    private static function write(string $root, string $name, ?callable $before): bool
     {
-        return '~(?<head>(?:\b(?:bootstrap|cacheDirectory|outputDirectory|outputFile)="|<(?:directory|file)\b[^>]*>))'
-            . '(?<path>(?![a-z]+://|/)[^"<]+)'
-            . '(?<tail>"|</)~';
+        $published = $root . '/' . self::PUBLISHED . $name;
+
+        if (! is_file($published)) {
+            return false;
+        }
+
+        $content = self::expectedCopy($name, (string) file_get_contents($published));
+        $copy    = $root . '/' . $name;
+
+        if (
+            null !== $before
+            && is_file($copy)
+            && (string) file_get_contents($copy) !== $content
+        ) {
+            $before($copy);
+        }
+
+        file_put_contents($copy, $content);
+
+        return true;
     }
 }

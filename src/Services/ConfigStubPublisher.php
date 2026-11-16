@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Services;
 
-use Illuminate\Console\View\Components\Factory;
-use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Zairakai\LaravelDevTools\Contracts\PublishOutput;
 
 /**
  * Publishes configuration stubs from the vendor package into the project.
@@ -34,6 +33,14 @@ final readonly class ConfigStubPublisher
      * @var array<string, list<string>>
      */
     private const array GROUPS = [
+        'setup'      => [
+            'makefile',
+            'editorconfig',
+            'baseline',
+            'phpstan',
+            'gitignore',
+            'composer-scripts',
+        ],
         'quality'    => [
             'phpstan',
             'rector',
@@ -70,9 +77,16 @@ final readonly class ConfigStubPublisher
         ],
     ];
 
+    private BaseFilesPublisher $base;
+
+    private StubWriter $writer;
+
     public function __construct(
-        private Factory $componentsFactory,
-    ) {}
+        private PublishOutput $output,
+    ) {
+        $this->writer = new StubWriter($output);
+        $this->base   = new BaseFilesPublisher($this->writer, $output);
+    }
 
     /**
      * Returns valid publishable group names.
@@ -107,14 +121,13 @@ final readonly class ConfigStubPublisher
      */
     public function publishBaseline(string $vendorPath, string $basePath): bool
     {
-        return $this->publishStub(
+        return $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/baseline.neon',
             targetFile: $basePath . '/config/dev-tools/baseline.neon',
             // Baseline is NEVER overwritten even with --force - it contains accepted errors
             force: false,
             label: 'config/dev-tools/baseline.neon',
-            protectUserChanges: false,
         );
     }
 
@@ -131,61 +144,31 @@ final readonly class ConfigStubPublisher
         string $vendorPath,
         string $basePath,
         bool $force,
+        bool $fullstack = false,
     ): bool {
-        return match ($key) {
-            'phpstan'            => $this->publishPhpstan(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'rector'             => $this->publishRector(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'insights'           => $this->publishInsights(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'baseline'           => $this->publishBaseline($vendorPath, $basePath),
-            'pint'               => $this->publishPint(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'markdownlint'       => $this->publishMarkdownlint(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'markdownlintignore' => $this->publishMarkdownlintIgnore(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'phpunit'            => $this->publishPhpunit(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'hooks'              => $this->publishHooks(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'gitlab-ci'          => $this->publishGitlabCi(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            'governance'         => $this->publishGovernanceFiles(
-                $vendorPath,
-                $basePath,
-                $force,
-            ),
-            default              => $this->unknownKey($key),
+        // The baseline is never forced: its method takes no $force, the call ignores it
+        $publish = match ($key) {
+            'phpstan'            => $this->publishPhpstan(...),
+            'rector'             => $this->publishRector(...),
+            'insights'           => $this->publishInsights(...),
+            'baseline'           => $this->publishBaseline(...),
+            'pint'               => $this->publishPint(...),
+            'markdownlint'       => $this->publishMarkdownlint(...),
+            'markdownlintignore' => $this->publishMarkdownlintIgnore(...),
+            'phpunit'            => $this->publishPhpunit(...),
+            'hooks'              => $this->publishHooks(...),
+            'gitlab-ci'          => $this->publishGitlabCi(...),
+            'governance'         => $this->publishGovernanceFiles(...),
+            'makefile'           => $this->base->makefile(...),
+            'editorconfig'       => $this->base->editorConfig(...),
+            'composer-scripts'   => $this->base->composerScripts(...),
+            'gitignore'          => fn (string $vendor, string $base): bool => $this->base->gitignore($base),
+            default              => null,
         };
+
+        return null === $publish
+            ? $this->unknownKey($key)
+            : $publish($vendorPath, $basePath, $force, $fullstack);
     }
 
     // Public API - individual file publishers
@@ -200,13 +183,12 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): void {
-        $this->publishStub(
+        $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/enlightn.php',
             targetFile: $basePath . '/config/enlightn.php',
             force: $force,
             label: 'config/enlightn.php',
-            protectUserChanges: false,
         );
     }
 
@@ -226,13 +208,10 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/gitlab-ci.yml',
-            targetFile: $basePath . '/.gitlab-ci.yml',
-            force: $force,
-            label: '.gitlab-ci.yml',
-            protectUserChanges: true,
+        return $this->publishGitlabCiStub(
+            $vendorPath . '/stubs/gitlab-ci.yml',
+            $basePath,
+            $force,
         );
     }
 
@@ -246,13 +225,10 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
-            targetFile: $basePath . '/.gitlab-ci.yml',
-            force: $force,
-            label: '.gitlab-ci.yml',
-            protectUserChanges: true,
+        return $this->publishGitlabCiStub(
+            $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
+            $basePath,
+            $force,
         );
     }
 
@@ -270,8 +246,8 @@ final readonly class ConfigStubPublisher
     ): bool {
         $stubsDir = $vendorPath . '/stubs/governance';
 
-        if (! File::isDirectory($stubsDir)) {
-            $this->componentsFactory->error('Governance stubs directory not found: ' . $stubsDir);
+        if (! is_dir($stubsDir)) {
+            $this->output->error('Governance stubs directory not found: ' . $stubsDir);
 
             return false;
         }
@@ -317,9 +293,10 @@ final readonly class ConfigStubPublisher
         string $vendorPath,
         string $basePath,
         bool $force,
+        bool $fullstack = false,
     ): bool {
         if (! array_key_exists($group, self::GROUPS)) {
-            $this->componentsFactory->error(sprintf(
+            $this->output->error(sprintf(
                 'Unknown group "%s". Valid groups: %s',
                 $group,
                 implode(', ', array_keys(self::GROUPS)),
@@ -334,6 +311,7 @@ final readonly class ConfigStubPublisher
                 $vendorPath,
                 $basePath,
                 $force,
+                $fullstack,
             );
         }
 
@@ -348,7 +326,7 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return new GitHooksActivator($this->componentsFactory)->activate($basePath);
+        return new GitHooksActivator($this->output)->activate($basePath);
     }
 
     /**
@@ -361,13 +339,12 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        return $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/phpinsights.php',
             targetFile: $basePath . '/config/dev-tools/phpinsights.php',
             force: $force,
             label: 'config/dev-tools/phpinsights.php',
-            protectUserChanges: true,
         );
     }
 
@@ -380,13 +357,12 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/.markdownlint.json',
             targetFile: $basePath . '/config/dev-tools/.markdownlint.json',
             force: $force,
             label: 'config/dev-tools/.markdownlint.json',
-            protectUserChanges: true,
         );
 
         $this->publishRootThin(
@@ -408,13 +384,12 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/.markdownlintignore',
             targetFile: $basePath . '/config/dev-tools/.markdownlintignore',
             force: $force,
             label: 'config/dev-tools/.markdownlintignore',
-            protectUserChanges: true,
         );
 
         $this->publishRootCopy(
@@ -438,14 +413,19 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        $published = $this->publishStub(
+        $generated = (string) tempnam(sys_get_temp_dir(), 'phpstan');
+
+        file_put_contents($generated, $this->phpstanContents($vendorPath, $basePath));
+
+        $published = $this->writer->publish(
             basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/phpstan.neon',
+            stubFile: $generated,
             targetFile: $basePath . '/config/dev-tools/phpstan.neon',
             force: $force,
             label: 'config/dev-tools/phpstan.neon',
-            protectUserChanges: true,
         );
+
+        PlainFile::delete($generated);
 
         $this->publishRootThin(
             $vendorPath,
@@ -470,11 +450,7 @@ final readonly class ConfigStubPublisher
         bool $force,
     ): bool {
         // Use app config for Laravel applications, library config for packages
-        $isLaravelApp = file_exists($basePath . '/artisan')
-            && file_exists($basePath . '/composer.json')
-            && str_contains((string) file_get_contents($basePath . '/composer.json'), '"laravel/framework"');
-
-        $stubFile = $isLaravelApp
+        $stubFile = $this->isLaravelApp($basePath)
             ? $vendorPath . '/config/phpunit-app.xml'
             : $vendorPath . '/config/phpunit.xml';
 
@@ -482,16 +458,15 @@ final readonly class ConfigStubPublisher
 
         file_put_contents($converted, ConfigCopies::phpunitForConfig((string) file_get_contents($stubFile)));
 
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $converted,
             targetFile: $basePath . '/config/dev-tools/phpunit.xml',
             force: $force,
             label: 'config/dev-tools/phpunit.xml',
-            protectUserChanges: true,
         );
 
-        File::delete($converted);
+        PlainFile::delete($converted);
 
         $this->publishRootCopy(
             $basePath,
@@ -514,11 +489,14 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force = false,
     ): bool {
-        if (is_file($basePath . '/config/dev-tools/pint.json') && ! $force) {
-            $this->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
+        if (
+            is_file($basePath . '/config/dev-tools/pint.json')
+            && ! $force
+        ) {
+            $this->writer->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
         }
         else {
-            $this->saveBeforeOverwriting($basePath, $basePath . '/config/dev-tools/pint.json');
+            $this->writer->saveBeforeOverwriting($basePath, $basePath . '/config/dev-tools/pint.json');
 
             try {
                 PintConfigWriter::write($basePath, [
@@ -526,12 +504,12 @@ final readonly class ConfigStubPublisher
                 ]);
             }
             catch (RuntimeException $runtimeException) {
-                $this->componentsFactory->error($runtimeException->getMessage());
+                $this->output->error($runtimeException->getMessage());
 
                 return false;
             }
 
-            $this->componentsFactory->task('Generated: config/dev-tools/pint.json');
+            $this->output->task('Generated: config/dev-tools/pint.json');
         }
 
         $this->publishRootCopy(
@@ -553,69 +531,173 @@ final readonly class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        return $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/rector.php',
             targetFile: $basePath . '/config/dev-tools/rector.php',
             force: $force,
             label: 'config/dev-tools/rector.php',
-            protectUserChanges: true,
         );
     }
 
     /**
-     * Copy the stub file to the target location.
+     * Publish a group or a key, as `--publish=<target>` says. The one entry of the two commands (Artisan and the shell
+     * setup).
+     *
+     * @param string $target    A group, or a key (`phpstan-baseline` is the old name of `baseline`)
+     * @param bool   $fullstack Publish the CI file of a project with PHP and JS
+     *
+     * @return bool false for an unknown target (a file left alone is not an error)
      */
-    private function copyStub(
-        string $stubFile,
-        string $targetFile,
-        string $label,
+    public function publishTarget(
+        string $target,
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+        bool $fullstack = false,
     ): bool {
-        if (File::copy($stubFile, $targetFile)) {
-            $this->componentsFactory->task('Copied: ' . $label);
+        $target = 'phpstan-baseline' === $target
+            ? 'baseline'
+            : $target;
+
+        if (
+            'gitlab-ci' === $target
+            && $this->wantsFullstack($basePath, $fullstack)
+        ) {
+            $this->publishGitlabCiFullstack($vendorPath, $basePath, $force);
 
             return true;
         }
 
-        // @codeCoverageIgnoreStart
-        $this->componentsFactory->error('Failed to copy: ' . $label);
+        if (in_array($target, $this->availableGroups(), true)) {
+            return $this->publishGroup($target, $vendorPath, $basePath, $force, $fullstack);
+        }
+
+        if (in_array($target, $this->availableKeys(), true)) {
+            // A file that is left alone (the project's own) is not an error: the output says it
+            $this->publishByKey($target, $vendorPath, $basePath, $force, $fullstack);
+
+            return true;
+        }
+
+        $this->output->error(sprintf('Unknown publish target: "%s"', $target));
+        $this->output->twoColumnDetail('Valid groups', implode(', ', $this->availableGroups()));
+        $this->output->twoColumnDetail('Valid keys', implode(', ', $this->availableKeys()));
 
         return false;
-        // @codeCoverageIgnoreEnd
     }
 
     /**
-     * Create the given directory recursively if it does not already exist.
+     * The CI file with PHP and JS: asked for, or the project uses js-dev-tools.
      */
-    private function ensureDirectoryExists(string $directory): void
+    public function wantsFullstack(string $basePath, bool $asked = false): bool
     {
-        if (! File::isDirectory($directory)) {
-            File::makeDirectory(
-                $directory,
-                0755,
-                true,
+        return $asked || is_dir($basePath . '/node_modules/@zairakai/js-dev-tools');
+    }
+
+    /**
+     * A Laravel application: an artisan file and laravel/framework in composer.json.
+     */
+    private function isLaravelApp(string $basePath): bool
+    {
+        return file_exists($basePath . '/artisan')
+            && file_exists($basePath . '/composer.json')
+            && str_contains((string) file_get_contents($basePath . '/composer.json'), '"laravel/framework"');
+    }
+
+    /**
+     * The name of the package: the "name" of composer.json, or an empty string.
+     */
+    private function packageName(string $basePath): string
+    {
+        $file     = $basePath . '/composer.json';
+        $composer = is_file($file)
+            ? json_decode((string) file_get_contents($file), true)
+            : null;
+        $name     = is_array($composer)
+            ? ($composer['name'] ?? '')
+            : '';
+
+        return is_string($name)
+            ? $name
+            : '';
+    }
+
+    /**
+     * The PHPStan file of the project: the stub (a package), or the one of an application with its own folders.
+     */
+    private function phpstanContents(string $vendorPath, string $basePath): string
+    {
+        $stub = (string) file_get_contents($vendorPath . '/stubs/phpstan.neon');
+
+        if (! $this->isLaravelApp($basePath)) {
+            return $stub;
+        }
+
+        $paths = ['../../app'];
+
+        foreach (['database', 'routes'] as $folder) {
+            if (is_dir($basePath . '/' . $folder)) {
+                $paths[] = '../../' . $folder;
+            }
+        }
+
+        return str_replace(
+            [
+                'library.neon',
+                "    - ../../src\n    - ../../tests\n",
+            ],
+            [
+                'app.neon',
+                implode('', array_map(static fn (string $path): string => '    - ' . $path . "\n", $paths)),
+            ],
+            $stub,
+        );
+    }
+
+    /**
+     * The .gitlab-ci.yml of the project: the stub, with the name of the package and the cache key of composer.json.
+     */
+    private function publishGitlabCiStub(string $stubFile, string $basePath, bool $force): bool
+    {
+        if (! file_exists($stubFile)) {
+            $this->output->warn('Stub not found, skipping: .gitlab-ci.yml');
+
+            return false;
+        }
+
+        $content = (string) file_get_contents($stubFile);
+        $package = $this->packageName($basePath);
+
+        if ('' !== $package) {
+            $content = str_replace(
+                [
+                    'PACKAGIST_PACKAGE: "vendor/my-package"',
+                    'CACHE_KEY: "my-package"',
+                ],
+                [
+                    'PACKAGIST_PACKAGE: "' . $package . '"',
+                    'CACHE_KEY: "' . $this->shortName($package) . '"',
+                ],
+                $content,
             );
         }
-    }
 
-    /**
-     * Determine whether the target is a user-modified file that must not be overwritten.
-     */
-    private function isProtectedUserFile(
-        string $stubFile,
-        string $targetFile,
-        bool $force,
-        bool $protectUserChanges,
-    ): bool {
-        return $force
-            && $protectUserChanges
-            && File::exists($targetFile)
-            && $this->isUserModified($stubFile, $targetFile);
-    }
+        $generated = (string) tempnam(sys_get_temp_dir(), 'gitlabci');
 
-    private function isUserModified(string $stubFile, string $targetFile): bool
-    {
-        return hash_file('sha256', $stubFile) !== hash_file('sha256', $targetFile);
+        file_put_contents($generated, $content);
+
+        $published = $this->writer->publish(
+            basePath: $basePath,
+            stubFile: $generated,
+            targetFile: $basePath . '/.gitlab-ci.yml',
+            force: $force,
+            label: '.gitlab-ci.yml',
+        );
+
+        PlainFile::delete($generated);
+
+        return $published;
     }
 
     /**
@@ -637,8 +719,8 @@ final readonly class ConfigStubPublisher
         bool $force,
         string $basePath,
     ): bool {
-        if (! File::exists($stubFile)) {
-            $this->componentsFactory->warn('Stub not found, skipping: ' . $label);
+        if (! file_exists($stubFile)) {
+            $this->output->warn('Stub not found, skipping: ' . $label);
 
             return false;
         }
@@ -647,18 +729,18 @@ final readonly class ConfigStubPublisher
         $processed = str_replace(
             'PACKAGE_GITLAB_ISSUES',
             $issuesUrl,
-            (string) File::get($stubFile),
+            (string) file_get_contents($stubFile),
         );
         $tempFile  = sys_get_temp_dir() . '/ldt_governance_' . md5($label);
-        File::put($tempFile, $processed);
+        file_put_contents($tempFile, $processed);
 
-        $this->ensureDirectoryExists(dirname($targetFile));
+        $this->writer->ensureDirectory(dirname($targetFile));
 
         try {
             // Target does not exist yet - just copy
-            if (! File::exists($targetFile)) {
-                File::copy($tempFile, $targetFile);
-                $this->componentsFactory->task('Copied: ' . $label);
+            if (! file_exists($targetFile)) {
+                copy($tempFile, $targetFile);
+                $this->output->task('Copied: ' . $label);
 
                 return true;
             }
@@ -670,14 +752,14 @@ final readonly class ConfigStubPublisher
 
                 if ($srcHash === $tgtHash) {
                     // Identical - silently refresh
-                    File::copy($tempFile, $targetFile);
-                    $this->componentsFactory->task('Refreshed: ' . $label);
+                    copy($tempFile, $targetFile);
+                    $this->output->task('Refreshed: ' . $label);
 
                     return true;
                 }
 
                 // User has modified the file - protect it
-                $this->skip(
+                $this->writer->skip(
                     $label,
                     'contains user modifications (use --force to overwrite)',
                     'yellow',
@@ -687,14 +769,14 @@ final readonly class ConfigStubPublisher
             }
 
             // Force - overwrite unconditionally, after a copy of the file
-            $this->saveBeforeOverwriting($basePath, $targetFile);
-            File::copy($tempFile, $targetFile);
-            $this->componentsFactory->task('Copied: ' . $label);
+            $this->writer->saveBeforeOverwriting($basePath, $targetFile);
+            copy($tempFile, $targetFile);
+            $this->output->task('Copied: ' . $label);
 
             return true;
         }
         finally {
-            File::delete($tempFile);
+            PlainFile::delete($tempFile);
         }
     }
 
@@ -707,7 +789,10 @@ final readonly class ConfigStubPublisher
         string $name,
         bool $force,
     ): void {
-        if (File::exists($basePath . '/' . $name) && ! $force) {
+        if (
+            file_exists($basePath . '/' . $name)
+            && ! $force
+        ) {
             return;
         }
 
@@ -716,11 +801,11 @@ final readonly class ConfigStubPublisher
             [
                 $name,
             ],
-            fn (string $file): bool => $this->saveBeforeOverwriting($basePath, $file),
+            fn (string $file): bool => $this->writer->saveBeforeOverwriting($basePath, $file),
         );
 
         if ([] !== $written) {
-            $this->componentsFactory->task('Copied: ' . $name . ' (root)');
+            $this->output->task('Copied: ' . $name . ' (root)');
         }
     }
 
@@ -733,64 +818,17 @@ final readonly class ConfigStubPublisher
         string $name,
         bool $force,
     ): void {
-        $this->publishStub(
+        $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/root/' . $name,
             targetFile: $basePath . '/' . $name,
             force: $force,
             label: $name . ' (root)',
-            protectUserChanges: false,
         );
     }
 
     // Core publishing logic
     // ================
-
-    /**
-     * Core workflow for copying a stub file to its target location.
-     *
-     * @param string $stubFile           Absolute path to the stub file
-     * @param string $targetFile         Absolute path to the target file
-     * @param bool   $force              Whether to overwrite an existing file
-     * @param string $label              Human-readable label for console output
-     * @param bool   $protectUserChanges Skip overwrite if file differs from stub
-     */
-    private function publishStub(
-        string $basePath,
-        string $stubFile,
-        string $targetFile,
-        bool $force,
-        string $label,
-        bool $protectUserChanges,
-    ): bool {
-        if (! File::exists($stubFile)) {
-            $this->componentsFactory->warn('Stub not found, skipping: ' . $label);
-
-            return false;
-        }
-
-        $this->ensureDirectoryExists(dirname($targetFile));
-
-        if ($this->shouldSkip(
-            $stubFile,
-            $targetFile,
-            $force,
-            $protectUserChanges,
-            $label,
-        )) {
-            return false;
-        }
-
-        if ($force) {
-            $this->saveBeforeOverwriting($basePath, $targetFile);
-        }
-
-        return $this->copyStub(
-            $stubFile,
-            $targetFile,
-            $label,
-        );
-    }
 
     /**
      * Derive the GitLab issues URL from the project's composer.json name.
@@ -801,11 +839,11 @@ final readonly class ConfigStubPublisher
     {
         $composerPath = $basePath . '/composer.json';
 
-        if (! File::exists($composerPath)) {
+        if (! file_exists($composerPath)) {
             return 'TODO: add GitLab issues URL';
         }
 
-        $composer = json_decode((string) File::get($composerPath), true);
+        $composer = json_decode((string) file_get_contents($composerPath), true);
         $raw      = is_array($composer)
             ? ($composer['name'] ?? '')
             : '';
@@ -826,82 +864,13 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Keeps a copy of a file that a forced publication is about to write over, in .dev-tools-backup/ (the same folder as
-     * the shell scripts use). Nothing is kept when the file does not exist.
+     * The name of a package without its vendor: zairakai/laravel-dev-tools gives laravel-dev-tools.
      */
-    private function saveBeforeOverwriting(string $basePath, string $file): bool
+    private function shortName(string $package): string
     {
-        if (! File::exists($file)) {
-            return false;
-        }
-
-        // One folder per run and per project: the copies of a publication stay together
-        /** @var array<string, ConfigBackup> $backups */
-        static $backups = [];
-
-        $backups[$basePath] ??= new ConfigBackup($basePath);
-
-        if (! $backups[$basePath]->save($file)) {
-            return false;
-        }
-
-        $this->componentsFactory->task('Backed up: ' . ltrim(substr($file, strlen($basePath)), '/'));
-
-        return true;
-    }
-
-    /**
-     * Determine whether publishing should be skipped for this file.
-     */
-    private function shouldSkip(
-        string $stubFile,
-        string $targetFile,
-        bool $force,
-        bool $protectUserChanges,
-        string $label,
-    ): bool {
-        // File exists and no force flag - skip with a notice
-        if (File::exists($targetFile) && ! $force) {
-            $this->skip($label, 'already exists (use --force to overwrite)');
-
-            return true;
-        }
-
-        // File exists, force is set, but user has modified it - refuse overwrite
-        if ($this->isProtectedUserFile(
-            $stubFile,
-            $targetFile,
-            $force,
-            $protectUserChanges,
-        )) {
-            $this->skip(
-                $label,
-                'contains user modifications (refusing to overwrite)',
-                'red',
-            );
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Display a skipped-file message in the console.
-     */
-    private function skip(
-        string $label,
-        string $reason,
-        string $color = 'yellow',
-    ): void {
-        $this->componentsFactory->twoColumnDetail(
-            'Skipped: ' . $label,
-            sprintf(
-                '<fg=%s>%s</>',
-                $color,
-                $reason,
-            ),
-        );
+        return str_contains($package, '/')
+            ? substr($package, (int) strpos($package, '/') + 1)
+            : $package;
     }
 
     /**
@@ -909,7 +878,7 @@ final readonly class ConfigStubPublisher
      */
     private function unknownKey(string $key): bool
     {
-        $this->componentsFactory->error(sprintf(
+        $this->output->error(sprintf(
             'Unknown publishable key "%s". Valid keys: %s',
             $key,
             implode(', ', $this->availableKeys()),

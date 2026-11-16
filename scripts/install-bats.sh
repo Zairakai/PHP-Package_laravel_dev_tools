@@ -44,14 +44,14 @@ get_bats_version() {
     version=$(grep "^bats=" "${TOOL_VERSIONS_FILE}" | awk -F "="  '{print $2}' || echo "")
 
     if [[ -n "${version}" ]]; then
-      log_info "Found .tool-versions: ${version}"
+      log_info "Found .tool-versions: ${version}" >&2
     fi
   fi
 
   # Fallback to default if not found
   if [[ -z "${version}" ]]; then
     version="1.11.0"
-    log_info "Using default version: ${version}"
+    log_info "Using default version: ${version}" >&2
   fi
 
   # Ensure version has 'v' prefix
@@ -72,7 +72,9 @@ version_ge() {
   fi
 
   local IFS=.
-  local i ver1_arr=("$ver1") ver2_arr=("$ver2")
+  local i ver1_arr ver2_arr
+  read -ra ver1_arr <<< "$ver1"
+  read -ra ver2_arr <<< "$ver2"
 
   # Fill empty positions with zeros
   for ((i=${#ver1_arr[@]}; i<${#ver2_arr[@]}; i++)); do
@@ -259,4 +261,7 @@ main() {
   install_bats "${required_version}"
 }
 
-main "$@"
+# Not run when the file is sourced (the tests load the functions)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

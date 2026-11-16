@@ -11,6 +11,7 @@ use Symfony\Component\Console\Output\BufferedOutput;
 use Zairakai\LaravelDevTools\Services\ConfigCopies;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\GitHooksActivator;
+use Zairakai\LaravelDevTools\Services\LaravelPublishOutput;
 use Zairakai\LaravelDevTools\Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ final class ConfigStubPublisherTest extends TestCase
         $bufferedOutput  = new BufferedOutput();
         $factory         = new Factory($bufferedOutput);
 
-        $this->configStubPublisher = new ConfigStubPublisher($factory);
+        $this->configStubPublisher = new ConfigStubPublisher(new LaravelPublishOutput($factory));
 
         $this->cleanDevToolsDir();
     }
@@ -491,31 +492,6 @@ final class ConfigStubPublisherTest extends TestCase
     }
 
     #[Test]
-    public function publish_gitlab_ci_protects_user_modified_file_with_force(): void
-    {
-        $targetPath = $this->basePath . '/.gitlab-ci.yml';
-        // User has modified the file (different from stub)
-        File::put($targetPath, "include:
-  - project: 'zairakai/php-packages/laravel-dev-tools'
-    ref: 1.5.0
-    file: '.gitlab/ci/pipeline-php-package.yml'
-variables:
-  CACHE_KEY: 'my-custom-project'
-  PACKAGIST_PACKAGE: 'zairakai/my-package'
-");
-
-        $result = $this->configStubPublisher->publishGitlabCi(
-            $this->vendorPath,
-            $this->basePath,
-            true,
-        );
-
-        $this->assertFalse($result);
-        $this->assertStringContainsString('my-custom-project', File::get($targetPath));
-        File::delete($targetPath);
-    }
-
-    #[Test]
     public function publish_gitlab_ci_skips_when_exists_without_force(): void
     {
         $targetPath = $this->basePath . '/.gitlab-ci.yml';
@@ -549,6 +525,35 @@ variables:
         $this->assertStringContainsString('pipeline-php-package.yml', $content);
         $this->assertStringContainsString('CACHE_KEY', $content);
         $this->assertStringContainsString('PACKAGIST_PACKAGE', $content);
+        File::delete($targetPath);
+    }
+
+    #[Test]
+    public function publish_gitlab_ci_with_force_replaces_a_user_modified_file_and_keeps_a_copy(): void
+    {
+        $targetPath = $this->basePath . '/.gitlab-ci.yml';
+        // User has modified the file (different from stub)
+        File::put($targetPath, "include:
+  - project: 'zairakai/php-packages/laravel-dev-tools'
+    ref: 1.5.0
+    file: '.gitlab/ci/pipeline-php-package.yml'
+variables:
+  CACHE_KEY: 'my-custom-project'
+  PACKAGIST_PACKAGE: 'zairakai/my-package'
+");
+
+        $result = $this->configStubPublisher->publishGitlabCi(
+            $this->vendorPath,
+            $this->basePath,
+            true,
+        );
+
+        $this->assertTrue($result);
+        $this->assertStringNotContainsString('my-custom-project', File::get($targetPath));
+        $this->assertStringContainsString(
+            'my-custom-project',
+            File::get((glob($this->basePath . '/.dev-tools-backup/*/.gitlab-ci.yml') ?: [''])[0]),
+        );
         File::delete($targetPath);
     }
 

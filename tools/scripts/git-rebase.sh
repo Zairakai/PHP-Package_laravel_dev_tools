@@ -62,6 +62,12 @@ fi
 
 # Resolve selected branch
 total_local=${#local_branches[@]}
+total=$((total_local + ${#remote_branches[@]}))
+
+if (( choice < 1 || choice > total )); then
+  echo "Invalid choice: enter a number from 1 to $total."
+  exit 1
+fi
 
 if (( choice <= total_local )); then
   target_branch="${local_branches[$((choice-1))]}"

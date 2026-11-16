@@ -108,14 +108,14 @@ PHP Insights only reports: its sniffs are fixed by hand, following the [handbook
 
 ### PHPStan
 
-```neon
+```yaml
 includes:
-    - vendor/zairakai/laravel-dev-tools/config/library.neon
+  - vendor/zairakai/laravel-dev-tools/config/library.neon
 
 parameters:
-    paths:
-        - src
-        - tests
+  paths:
+    - src
+    - tests
 ```
 
 ### Rector
@@ -160,6 +160,16 @@ php artisan dev-tools:publish --publish=pint            # a single file: phpstan
                                                         # pint, markdownlint, markdownlintignore, phpunit, gitlab-ci
 php artisan dev-tools:publish --fullstack               # Makefile for PHP and JS
 ```
+
+`make setup-check` tells which files of the setup are missing or differ from what the package publishes now (it writes nothing, and exits with 1 when a file is missing or different). A file that differs can be a change of the project or a file late on the package: the check shows the difference, you decide what to keep.
+
+The setup also gives each project the Makefile, `.editorconfig`, the Composer scripts of the package and the block of the tools in `.gitignore` (the group `setup`: `--publish=setup`, or one key at a time: `makefile`, `editorconfig`, `composer-scripts`, `gitignore`). `make setup-check` and `make setup-update` cover them too. The CI file and the governance files are not checked: a project makes them its own when it publishes them.
+
+`make uninstall` (or `bash vendor/zairakai/laravel-dev-tools/scripts/uninstall-package.sh`) removes the files of the setup that are still what the package publishes. A file that the project changed is kept and named; the files of `config/dev-tools/` that were changed go only after confirmation (or `--force`). Everything that is removed is copied first in `.dev-tools-backup/<date>/`, under its path from the root, and that folder is kept: `cp -R .dev-tools-backup/<date>/. .` puts it all back. `--dry-run` lists the files and removes nothing.
+
+`make setup-update` publishes again the files that `make setup-check` reports (missing or different), and only those. A file of the project that it replaces is copied first in `.dev-tools-backup/`: nothing is merged, you put your own settings back from the copy. `DRY_RUN=true make setup-update` lists the files without writing.
+
+The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.
 
 For a package without Artisan:
 

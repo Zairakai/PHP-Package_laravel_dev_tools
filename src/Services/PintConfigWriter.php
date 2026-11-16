@@ -33,8 +33,7 @@ final class PintConfigWriter
         array $layers,
         string $target = 'config/dev-tools/pint.json',
     ): string {
-        $pintFile = (string) new ReflectionClass(Pint::class)->getFileName();
-        $config   = self::read(dirname($pintFile, 2) . '/config/pint.json');
+        $config = self::read(self::rulesFile());
 
         foreach ($layers as $layer) {
             if (is_file($layer)) {
@@ -107,5 +106,19 @@ final class PintConfigWriter
             is_string(...),
             ARRAY_FILTER_USE_KEY,
         ) : [];
+    }
+
+    /**
+     * The base rules of php-dev-tools: the file of its package, found through its class.
+     *
+     * @throws RuntimeException when php-dev-tools is not installed
+     */
+    private static function rulesFile(): string
+    {
+        if (! class_exists(Pint::class)) {
+            throw new RuntimeException('The Pint rules of php-dev-tools were not found - run: composer install');
+        }
+
+        return dirname((string) new ReflectionClass(Pint::class)->getFileName(), 2) . '/config/pint.json';
     }
 }

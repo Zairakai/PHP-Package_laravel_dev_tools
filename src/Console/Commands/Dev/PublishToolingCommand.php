@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Zairakai\LaravelDevTools\Console\Commands\Dev;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
 use Zairakai\LaravelDevTools\Services\ComposerNormalizeManager;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\GitHooksActivator;
+use Zairakai\LaravelDevTools\Services\LaravelPublishOutput;
 
 /**
  * Publishes Zairakai Dev Tools configuration into the project.
@@ -50,8 +50,9 @@ final class PublishToolingCommand extends Command
         $force      = (bool) $this->option('force');
         $fullstack  = (bool) $this->option('fullstack');
 
-        $configStubPublisher          = new ConfigStubPublisher($this->components);
-        $gitHooksActivator            = new GitHooksActivator($this->components);
+        $output                       = new LaravelPublishOutput($this->components);
+        $configStubPublisher          = new ConfigStubPublisher($output);
+        $gitHooksActivator            = new GitHooksActivator($output);
         $composerNormalizeManager     = new ComposerNormalizeManager($this, $this->components);
 
         $this->components->info('Publishing zairakai/laravel-dev-tools configuration…');
@@ -73,23 +74,10 @@ final class PublishToolingCommand extends Command
             );
         }
 
-        // Default setup: Makefile + .editorconfig + baseline only
+        // Default setup: the files that every project has (the group "setup")
         // ================
 
-        $this->publishMakefile(
-            $basePath,
-            $vendorPath,
-            $force,
-            $fullstack,
-        );
-        $this->publishEditorConfig(
-            $basePath,
-            $vendorPath,
-            $force,
-        );
-
-        // Baseline is always created if missing (never force-overwritten)
-        $configStubPublisher->publishBaseline($vendorPath, $basePath);
+        $configStubPublisher->publishGroup('setup', $vendorPath, $basePath, $force, $fullstack);
 
         // Optional: git hooks
         // ================
@@ -212,53 +200,7 @@ final class PublishToolingCommand extends Command
         $this->components->info(sprintf('Publishing group/key: <fg=cyan>%s</>', $target));
         $this->newLine();
 
-        $availableGroups = $configStubPublisher->availableGroups();
-        $availableKeys   = $configStubPublisher->availableKeys();
-
-        if (
-            'gitlab-ci' === $target
-            && (
-                $fullstack
-                || file_exists($basePath . '/package.json')
-            )
-        ) {
-            $configStubPublisher->publishGitlabCiFullstack(
-                $vendorPath,
-                $basePath,
-                $force,
-            );
-        }
-        // Attempt to publish as group first, then as individual key
-        elseif (in_array(
-            $target,
-            $availableGroups,
-            true,
-        )) {
-            $configStubPublisher->publishGroup(
-                $target,
-                $vendorPath,
-                $basePath,
-                $force,
-            );
-        }
-        elseif (in_array(
-            $target,
-            $availableKeys,
-            true,
-        )) {
-            $configStubPublisher->publishByKey(
-                $target,
-                $vendorPath,
-                $basePath,
-                $force,
-            );
-        }
-        else {
-            $this->components->error(sprintf('Unknown publish target: "%s"', $target));
-            $this->newLine();
-            $this->line(sprintf('  <fg=yellow>Valid groups:</> %s', implode(', ', $availableGroups)));
-            $this->line(sprintf('  <fg=yellow>Valid keys:</>   %s', implode(', ', $availableKeys)));
-
+        if (! $configStubPublisher->publishTarget($target, $vendorPath, $basePath, $force, $fullstack)) {
             return self::FAILURE;
         }
 
@@ -276,76 +218,6 @@ final class PublishToolingCommand extends Command
         return file_exists($basePath . '/vendor/bin/composer-normalize');
     }
 
-    /**
-     * Copy the .editorconfig stub into the project root.
-     */
-    private function publishEditorConfig(
-        string $basePath,
-        string $vendorPath,
-        bool $force,
-    ): void {
-        $targetFile = $basePath . '/.editorconfig';
-        $stubFile   = $vendorPath . '/.editorconfig';
-
-        if (! File::exists($stubFile)) {
-            // @codeCoverageIgnoreStart
-            // .editorconfig is optional - no error if missing from package.
-            return;
-            // @codeCoverageIgnoreEnd
-        }
-
-        if (File::exists($targetFile) && ! $force) {
-            $this->components->twoColumnDetail(
-                'Skipped: .editorconfig',
-                '<fg=yellow>already exists (use --force to overwrite)</>',
-            );
-
-            return;
-        }
-
-        File::copy($stubFile, $targetFile);
-        $this->components->task('Copied: .editorconfig');
-    }
-
     // Default setup file publishers
     // ================
-
-    /**
-     * Copy the Makefile stub into the project root.
-     */
-    private function publishMakefile(
-        string $basePath,
-        string $vendorPath,
-        bool $force,
-        bool $fullstack,
-    ): void {
-        $targetFile   = $basePath . '/Makefile';
-        $stubFile     = $vendorPath . '/stubs/Makefile';
-        $useFullstack = $fullstack || file_exists($basePath . '/package.json');
-
-        if ($useFullstack) {
-            $stubFile = $vendorPath . '/stubs/Makefile.fullstack';
-        }
-
-        if (! File::exists($stubFile)) {
-            // @codeCoverageIgnoreStart
-            // Makefile stub is always packaged with the vendor - this path is not reachable in practice.
-            $this->components->error('Makefile stub not found.');
-
-            return;
-            // @codeCoverageIgnoreEnd
-        }
-
-        if (File::exists($targetFile) && ! $force) {
-            $this->components->twoColumnDetail(
-                'Skipped: Makefile',
-                '<fg=yellow>already exists (use --force to overwrite)</>',
-            );
-
-            return;
-        }
-
-        File::copy($stubFile, $targetFile);
-        $this->components->task('Copied: Makefile');
-    }
 }

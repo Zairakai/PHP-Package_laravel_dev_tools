@@ -15,21 +15,25 @@ current_branch=$(git symbolic-ref --short HEAD)
 echo ""
 echo "==== Updating local branches ===="
 for branch in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
-  upstream=$(git rev-parse --abbrev-ref "$branch@{upstream}" 2>/dev/null || true)
-  if [ -n "$upstream" ]; then
-    echo "---- Updating $branch from $upstream ----"
-    git checkout "$branch"
-    # Fast-forward only; will fail if a merge is required
-    if git merge --ff-only "$upstream"; then
-      echo "Updated $branch ✅"
-    else
-      echo "Cannot fast-forward $branch (diverged). Skipping."
-    fi
+  upstream=$(git rev-parse --abbrev-ref "$branch@{upstream}" 2> /dev/null || true)
+  if [ -z "$upstream" ]; then
+    continue
+  fi
+
+  echo "---- Updating $branch from $upstream ----"
+  # Fast-forward only, without a checkout: a branch that is checked out in another worktree, or that diverged, is skipped
+  if [ "$branch" = "$current_branch" ]; then
+    update=(git merge --ff-only "$upstream")
+  else
+    update=(git fetch . "$upstream:$branch")
+  fi
+
+  if "${update[@]}"; then
+    echo "Updated $branch ✅"
+  else
+    echo "Cannot fast-forward $branch (diverged or checked out elsewhere). Skipping."
   fi
 done
-
-# Return to original branch
-git checkout "$current_branch"
 
 echo ""
 echo "==== Update completed ===="
