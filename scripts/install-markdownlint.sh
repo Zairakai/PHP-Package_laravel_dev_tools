@@ -204,4 +204,7 @@ main() {
   install_markdownlint "${desired_version}"
 }
 
-main "$@"
+# Not run when the file is sourced (the tests load the functions)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

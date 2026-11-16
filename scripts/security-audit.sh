@@ -15,14 +15,34 @@ ensure_dir "$(dirname "$AUDIT_REPORT")"
 
 log_step "Running composer audit..."
 
-composer audit --format=json | tee "$AUDIT_REPORT" || true
+# The exit code of composer is not enough alone (it is also not 0 when the audit could not run): the report must be a
+# JSON, and the advisories are counted in it.
+audit_status=0
+composer audit --format=json > "$AUDIT_REPORT" || audit_status=$?
 
-VULNERABILITIES=$(jq '.advisories | length' "$AUDIT_REPORT" 2>/dev/null || echo "0")
+if ! command_exists jq; then
+  if [ "$audit_status" -eq 0 ]; then
+    log_success "No security vulnerabilities found"
+    exit 0
+  fi
+
+  log_error "composer audit failed (install jq to count the advisories)"
+  cat "$AUDIT_REPORT"
+  exit 1
+fi
+
+if ! jq -e '.advisories' "$AUDIT_REPORT" > /dev/null 2>&1; then
+  log_error "composer audit could not run: its report has no list of advisories"
+  cat "$AUDIT_REPORT"
+  exit 1
+fi
+
+VULNERABILITIES=$(jq '.advisories | length' "$AUDIT_REPORT")
 
 if [ "$VULNERABILITIES" -gt 0 ]; then
   log_warning "Found $VULNERABILITIES security advisories"
   cat "$AUDIT_REPORT"
   exit 1
-else
-  log_success "No security vulnerabilities found"
 fi
+
+log_success "No security vulnerabilities found"
