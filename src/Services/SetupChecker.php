@@ -40,6 +40,21 @@ final class SetupChecker
      */
     public function check(string $vendorPath, string $basePath): array
     {
+        return $this->inspect($vendorPath, $basePath, static fn (string $generated, array $results): array => $results);
+    }
+
+    /**
+     * Generates the files of the setup in a temporary folder, compares them with the project's, calls $then with the
+     * folder and the results, then removes the folder. The project is not written here.
+     *
+     * @template T
+     *
+     * @param callable(string, list<array{file: string, state: string, detail: string}>): T $then
+     *
+     * @return T
+     */
+    public function inspect(string $vendorPath, string $basePath, callable $then): mixed
+    {
         $temporary = sys_get_temp_dir() . '/ldt-setup-check-' . bin2hex(random_bytes(6));
 
         mkdir($temporary, 0755, true);
@@ -62,7 +77,7 @@ final class SetupChecker
                 $publisher->publishGroup($group, $vendorPath, $temporary, true);
             }
 
-            return $this->compare($temporary, $basePath);
+            return $then($temporary, $this->compare($temporary, $basePath));
         }
         finally {
             $this->remove($temporary);
