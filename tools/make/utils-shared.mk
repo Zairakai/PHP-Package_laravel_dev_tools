@@ -16,7 +16,7 @@ git-update: ## Fast-forward all local branches that track a remote
 	@$(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/git-update.sh
 
 .PHONY: git-cleanup
-git-cleanup: ## Remove the merged local branches whose remote tracking branch no longer exists
+git-cleanup: ## Remove merged local branches whose remote is gone
 	@$(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/git-cleanup.sh
 
 .PHONY: git-rebase

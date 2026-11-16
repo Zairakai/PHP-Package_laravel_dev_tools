@@ -24,7 +24,7 @@ ifneq ($(NPM_DIRECTORY_TOOLS_AVAILABLE),false)
 endif
 
 .PHONY: git-cleanup
-git-cleanup: ## Remove the merged local branches whose remote tracking branch no longer exists
+git-cleanup: ## Remove merged local branches whose remote is gone
 	@$(LARAVEL_DIRECTORY_TOOLS_TOOLS_SCRIPTS_DIR)/git-cleanup.sh
 ifneq ($(NPM_DIRECTORY_TOOLS_AVAILABLE),false)
 	@bash $(NPM_DIRECTORY_TOOLS_PACKAGE_ROOT)/tools/scripts/git-cleanup.sh
