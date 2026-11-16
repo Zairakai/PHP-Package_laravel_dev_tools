@@ -60,10 +60,9 @@ final class ConfigCopies
      */
     public static function phpunitForConfig(string $xml): string
     {
-        return (string) preg_replace_callback(
-            self::phpunitPaths(),
-            static fn (array $m): string => $m['head'] . '../../' . $m['path'] . $m['tail'],
+        return self::convertPhpunitPaths(
             $xml,
+            static fn (string $path): string => '../../' . $path,
         );
     }
 
@@ -72,14 +71,9 @@ final class ConfigCopies
      */
     public static function phpunitForTheRoot(string $xml): string
     {
-        return (string) preg_replace_callback(
-            self::phpunitPaths(),
-            static fn (array $m): string => $m['head'] . preg_replace(
-                '#^(\.\./)+#',
-                '',
-                $m['path'],
-            ) . $m['tail'],
+        return self::convertPhpunitPaths(
             $xml,
+            static fn (string $path): string => (string) preg_replace('#^(\\.\\./)+#', '', $path),
         );
     }
 
@@ -214,13 +208,56 @@ final class ConfigCopies
     }
 
     /**
-     * The paths of a phpunit.xml: the attributes bootstrap, cacheDirectory, outputDirectory and outputFile, and the
-     * elements directory and file. A stream (`php://stdout`) and an absolute path are not paths of the project.
+     * Applies $convert to every path of a phpunit.xml, by the names of the PHPUnit schema.
+     *
+     * - The attributes that hold a path: bootstrap, cacheDirectory, extensionsDirectory, outputDirectory, outputFile,
+     *   baseline, testSuiteLoaderFile and xsi:noNamespaceSchemaLocation (the schema that the editor reads).
+     * - The elements that hold a path as text: directory, file, includePath, and exclude when it holds text (an exclude
+     *   with directory and file inside is left to them).
+     *
+     * A stream (`php://stdout`), an absolute path and a drive (`C:\`) are not paths of the project. A comment and a
+     * CDATA section are left as they are, and so is the layout of the file: the DOM would write the root element on one
+     * line, and the file is edited by the project.
+     *
+     * @param callable(string): string $convert
      */
-    private static function phpunitPaths(): string
+    private static function convertPhpunitPaths(string $xml, callable $convert): string
     {
-        return '~(?<head>(?:\b(?:bootstrap|cacheDirectory|outputDirectory|outputFile)="|<(?:directory|file)\b[^>]*>))'
-            . '(?<path>(?![a-z]+://|/)[^"<]+)'
-            . '(?<tail>"|</)~';
+        $convertPath = (static fn (string $path): string => 1 === preg_match('~^(?:[a-z][a-z0-9+.-]*://|/|[A-Za-z]:[\\\\/])~', $path)
+            ? $path
+            : $convert($path));
+
+        // The parts that are not comments or CDATA, which come back in the order of the file
+        $parts = preg_split('~(<!--.*?-->|<!\[CDATA\[.*?\]\]>)~s', $xml, -1, PREG_SPLIT_DELIM_CAPTURE);
+
+        if (false === $parts) {
+            return $xml;
+        }
+
+        foreach ($parts as $index => $part) {
+            if (1 === $index % 2) {
+                continue;
+            }
+
+            // The attributes, in the start tags
+            $part = (string) preg_replace_callback(
+                '~(?<=\s)(?<name>(?:[A-Za-z_][\w.-]*:)?(?:bootstrap|cacheDirectory|extensionsDirectory|outputDirectory'
+                . '|outputFile|baseline|testSuiteLoaderFile|noNamespaceSchemaLocation))(?<equal>\s*=\s*)(?<quote>["\'])(?<value>[^"\']*)\k<quote>~',
+                static fn (array $m): string => $m['name'] . $m['equal'] . $m['quote']
+                    . ('' === trim($m['value']) ? $m['value'] : $convertPath($m['value'])) . $m['quote'],
+                $part,
+            );
+
+            // The elements with a path as text
+            $parts[$index] = (string) preg_replace_callback(
+                '~(?<open><(?<name>directory|file|includePath|exclude)\b[^>]*>)(?<lead>\s*)(?<path>[^<]*?)(?<trail>\s*)(?<close></\k<name>>)~',
+                static fn (array $m): string => '' === $m['path']
+                    ? $m[0]
+                    : $m['open'] . $m['lead'] . $convertPath($m['path']) . $m['trail'] . $m['close'],
+                $part,
+            );
+        }
+
+        return implode('', $parts);
     }
 }
