@@ -165,6 +165,8 @@ php artisan dev-tools:publish --fullstack               # Makefile for PHP and J
 
 The setup also gives each project the Makefile, `.editorconfig`, the Composer scripts of the package and the block of the tools in `.gitignore` (the group `setup`: `--publish=setup`, or one key at a time: `makefile`, `editorconfig`, `composer-scripts`, `gitignore`). `make setup-check` and `make setup-update` cover them too. The CI file and the governance files are not checked: a project makes them its own when it publishes them.
 
+`make uninstall` (or `bash vendor/zairakai/laravel-dev-tools/scripts/uninstall-package.sh`) removes the files of the setup that are still what the package publishes. A file that the project changed is kept and named; the files of `config/dev-tools/` that were changed go only after confirmation (or `--force`). Everything that is removed is copied first in `.dev-tools-backup/<date>/`, under its path from the root, and that folder is kept: `cp -R .dev-tools-backup/<date>/. .` puts it all back. `--dry-run` lists the files and removes nothing.
+
 `make setup-update` publishes again the files that `make setup-check` reports (missing or different), and only those. A file of the project that it replaces is copied first in `.dev-tools-backup/`: nothing is merged, you put your own settings back from the copy. `DRY_RUN=true make setup-update` lists the files without writing.
 
 The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.

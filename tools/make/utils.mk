@@ -46,6 +46,6 @@ setup-update: ## Publish again the files that setup-check reports, after a copy 
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-update.sh
 
 .PHONY: uninstall
-uninstall: ## Remove dev-tools configuration files
+uninstall: ## Remove the files of the setup that are unchanged (DRY_RUN=true lists them); a copy is kept in .dev-tools-backup/
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/uninstall-package.sh
 

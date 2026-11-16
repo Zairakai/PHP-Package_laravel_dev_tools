@@ -51,6 +51,8 @@ final class ConfigBackup
             );
         }
 
+        $this->ignoreTheFolder();
+
         return copy($file, $target);
     }
 
@@ -64,5 +66,18 @@ final class ConfigBackup
         }
 
         return $this->directory;
+    }
+
+    /**
+     * The folder ignores itself for git (a .gitignore with `*` in it): the copies are never committed by mistake, also
+     * when the .gitignore of the project does not name the folder.
+     */
+    private function ignoreTheFolder(): void
+    {
+        $ignore = rtrim($this->root, '/') . '/' . self::FOLDER . '/.gitignore';
+
+        if (! is_file($ignore)) {
+            file_put_contents($ignore, "*\n");
+        }
     }
 }
