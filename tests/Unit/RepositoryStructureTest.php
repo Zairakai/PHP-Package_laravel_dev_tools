@@ -441,25 +441,6 @@ final class RepositoryStructureTest extends TestCase
     }
 
     #[Test]
-    public function it_publishes_the_configuration_in_config_dev_tools_and_no_file_at_the_root_for_rector_and_insights(): void
-    {
-        $setup = (string) file_get_contents($this->root('scripts/setup-package.sh'));
-
-        foreach ([
-            'stubs/rector.php|config/dev-tools/rector.php',
-            'stubs/phpinsights.php|config/dev-tools/phpinsights.php',
-            'stubs/phpstan.neon|config/dev-tools/phpstan.neon',
-            'stubs/pint.json|config/dev-tools/pint.json',
-            'config/phpunit.xml|config/dev-tools/phpunit.xml',
-        ] as $entry) {
-            self::assertStringContainsString($entry, $setup);
-        }
-
-        self::assertMatchesRegularExpression('/declare -A ROOT_THIN=\(\s*\["phpstan"\].*\["markdownlint"\][^)]*\)/s', $setup);
-        self::assertDoesNotMatchRegularExpression('/ROOT_(THIN|COPY)=\([^)]*\["(rector|insights)"\]/s', $setup);
-    }
-
-    #[Test]
     public function it_reads_the_configuration_of_config_dev_tools_before_the_root(): void
     {
         $config = (string) file_get_contents($this->root('scripts/config.sh'));

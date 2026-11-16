@@ -120,7 +120,6 @@ final class ConfigStubPublisher
             // Baseline is NEVER overwritten even with --force - it contains accepted errors
             force: false,
             label: 'config/dev-tools/baseline.neon',
-            protectUserChanges: false,
         );
     }
 
@@ -212,7 +211,6 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/config/enlightn.php',
             force: $force,
             label: 'config/enlightn.php',
-            protectUserChanges: false,
         );
     }
 
@@ -232,13 +230,10 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/gitlab-ci.yml',
-            targetFile: $basePath . '/.gitlab-ci.yml',
-            force: $force,
-            label: '.gitlab-ci.yml',
-            protectUserChanges: true,
+        return $this->publishGitlabCiStub(
+            $vendorPath . '/stubs/gitlab-ci.yml',
+            $basePath,
+            $force,
         );
     }
 
@@ -252,13 +247,10 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
-            targetFile: $basePath . '/.gitlab-ci.yml',
-            force: $force,
-            label: '.gitlab-ci.yml',
-            protectUserChanges: true,
+        return $this->publishGitlabCiStub(
+            $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
+            $basePath,
+            $force,
         );
     }
 
@@ -373,7 +365,6 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/config/dev-tools/phpinsights.php',
             force: $force,
             label: 'config/dev-tools/phpinsights.php',
-            protectUserChanges: true,
         );
     }
 
@@ -392,7 +383,6 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/config/dev-tools/.markdownlint.json',
             force: $force,
             label: 'config/dev-tools/.markdownlint.json',
-            protectUserChanges: true,
         );
 
         $this->publishRootThin(
@@ -420,7 +410,6 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/config/dev-tools/.markdownlintignore',
             force: $force,
             label: 'config/dev-tools/.markdownlintignore',
-            protectUserChanges: true,
         );
 
         $this->publishRootCopy(
@@ -444,14 +433,19 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
+        $generated = (string) tempnam(sys_get_temp_dir(), 'phpstan');
+
+        file_put_contents($generated, $this->phpstanContents($vendorPath, $basePath));
+
         $published = $this->publishStub(
             basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/phpstan.neon',
+            stubFile: $generated,
             targetFile: $basePath . '/config/dev-tools/phpstan.neon',
             force: $force,
             label: 'config/dev-tools/phpstan.neon',
-            protectUserChanges: true,
         );
+
+        PlainFile::delete($generated);
 
         $this->publishRootThin(
             $vendorPath,
@@ -476,11 +470,7 @@ final class ConfigStubPublisher
         bool $force,
     ): bool {
         // Use app config for Laravel applications, library config for packages
-        $isLaravelApp = file_exists($basePath . '/artisan')
-            && file_exists($basePath . '/composer.json')
-            && str_contains((string) file_get_contents($basePath . '/composer.json'), '"laravel/framework"');
-
-        $stubFile = $isLaravelApp
+        $stubFile = $this->isLaravelApp($basePath)
             ? $vendorPath . '/config/phpunit-app.xml'
             : $vendorPath . '/config/phpunit.xml';
 
@@ -494,7 +484,6 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/config/dev-tools/phpunit.xml',
             force: $force,
             label: 'config/dev-tools/phpunit.xml',
-            protectUserChanges: true,
         );
 
         PlainFile::delete($converted);
@@ -565,8 +554,59 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/config/dev-tools/rector.php',
             force: $force,
             label: 'config/dev-tools/rector.php',
-            protectUserChanges: true,
         );
+    }
+
+    /**
+     * Publish a group or a key, as `--publish=<target>` says. The one entry of the two commands (Artisan and the shell
+     * setup).
+     *
+     * @param string $target    A group, or a key (`phpstan-baseline` is the old name of `baseline`)
+     * @param bool   $fullstack Publish the CI file of a project with PHP and JS
+     *
+     * @return bool false for an unknown target (a file left alone is not an error)
+     */
+    public function publishTarget(
+        string $target,
+        string $vendorPath,
+        string $basePath,
+        bool $force,
+        bool $fullstack = false,
+    ): bool {
+        $target = 'phpstan-baseline' === $target
+            ? 'baseline'
+            : $target;
+
+        if ('gitlab-ci' === $target && $this->wantsFullstack($basePath, $fullstack)) {
+            $this->publishGitlabCiFullstack($vendorPath, $basePath, $force);
+
+            return true;
+        }
+
+        if (in_array($target, $this->availableGroups(), true)) {
+            return $this->publishGroup($target, $vendorPath, $basePath, $force);
+        }
+
+        if (in_array($target, $this->availableKeys(), true)) {
+            // A file that is left alone (the project's own) is not an error: the output says it
+            $this->publishByKey($target, $vendorPath, $basePath, $force);
+
+            return true;
+        }
+
+        $this->output->error(sprintf('Unknown publish target: "%s"', $target));
+        $this->output->twoColumnDetail('Valid groups', implode(', ', $this->availableGroups()));
+        $this->output->twoColumnDetail('Valid keys', implode(', ', $this->availableKeys()));
+
+        return false;
+    }
+
+    /**
+     * The CI file with PHP and JS: asked for, or the project uses js-dev-tools.
+     */
+    public function wantsFullstack(string $basePath, bool $asked = false): bool
+    {
+        return $asked || is_dir($basePath . '/node_modules/@zairakai/js-dev-tools');
     }
 
     /**
@@ -605,23 +645,101 @@ final class ConfigStubPublisher
     }
 
     /**
-     * Determine whether the target is a user-modified file that must not be overwritten.
+     * A Laravel application: an artisan file and laravel/framework in composer.json.
      */
-    private function isProtectedUserFile(
-        string $stubFile,
-        string $targetFile,
-        bool $force,
-        bool $protectUserChanges,
-    ): bool {
-        return $force
-            && $protectUserChanges
-            && file_exists($targetFile)
-            && $this->isUserModified($stubFile, $targetFile);
+    private function isLaravelApp(string $basePath): bool
+    {
+        return file_exists($basePath . '/artisan')
+            && file_exists($basePath . '/composer.json')
+            && str_contains((string) file_get_contents($basePath . '/composer.json'), '"laravel/framework"');
     }
 
-    private function isUserModified(string $stubFile, string $targetFile): bool
+    /**
+     * The name of the package: the "name" of composer.json, or an empty string.
+     */
+    private function packageName(string $basePath): string
     {
-        return hash_file('sha256', $stubFile) !== hash_file('sha256', $targetFile);
+        $composer = json_decode((string) @file_get_contents($basePath . '/composer.json'), true);
+        $name     = is_array($composer) ? ($composer['name'] ?? '') : '';
+
+        return is_string($name) ? $name : '';
+    }
+
+    /**
+     * The PHPStan file of the project: the stub (a package), or the one of an application with its own folders.
+     */
+    private function phpstanContents(string $vendorPath, string $basePath): string
+    {
+        $stub = (string) file_get_contents($vendorPath . '/stubs/phpstan.neon');
+
+        if (! $this->isLaravelApp($basePath)) {
+            return $stub;
+        }
+
+        $paths = ['../../app'];
+
+        foreach (['database', 'routes'] as $folder) {
+            if (is_dir($basePath . '/' . $folder)) {
+                $paths[] = '../../' . $folder;
+            }
+        }
+
+        return str_replace(
+            [
+                'library.neon',
+                "    - ../../src\n    - ../../tests\n",
+            ],
+            [
+                'app.neon',
+                implode('', array_map(static fn (string $path): string => '    - ' . $path . "\n", $paths)),
+            ],
+            $stub,
+        );
+    }
+
+    /**
+     * The .gitlab-ci.yml of the project: the stub, with the name of the package and the cache key of composer.json.
+     */
+    private function publishGitlabCiStub(string $stubFile, string $basePath, bool $force): bool
+    {
+        if (! file_exists($stubFile)) {
+            $this->output->warn('Stub not found, skipping: .gitlab-ci.yml');
+
+            return false;
+        }
+
+        $content = (string) file_get_contents($stubFile);
+        $package = $this->packageName($basePath);
+
+        if ('' !== $package) {
+            $content = str_replace(
+                [
+                    'PACKAGIST_PACKAGE: "vendor/my-package"',
+                    'CACHE_KEY: "my-package"',
+                ],
+                [
+                    'PACKAGIST_PACKAGE: "' . $package . '"',
+                    'CACHE_KEY: "' . (str_contains($package, '/') ? substr($package, strpos($package, '/') + 1) : $package) . '"',
+                ],
+                $content,
+            );
+        }
+
+        $generated = (string) tempnam(sys_get_temp_dir(), 'gitlabci');
+
+        file_put_contents($generated, $content);
+
+        $published = $this->publishStub(
+            basePath: $basePath,
+            stubFile: $generated,
+            targetFile: $basePath . '/.gitlab-ci.yml',
+            force: $force,
+            label: '.gitlab-ci.yml',
+        );
+
+        PlainFile::delete($generated);
+
+        return $published;
     }
 
     /**
@@ -745,7 +863,6 @@ final class ConfigStubPublisher
             targetFile: $basePath . '/' . $name,
             force: $force,
             label: $name . ' (root)',
-            protectUserChanges: false,
         );
     }
 
@@ -755,11 +872,10 @@ final class ConfigStubPublisher
     /**
      * Core workflow for copying a stub file to its target location.
      *
-     * @param string $stubFile           Absolute path to the stub file
-     * @param string $targetFile         Absolute path to the target file
-     * @param bool   $force              Whether to overwrite an existing file
-     * @param string $label              Human-readable label for console output
-     * @param bool   $protectUserChanges Skip overwrite if file differs from stub
+     * @param string $stubFile   Absolute path to the stub file
+     * @param string $targetFile Absolute path to the target file
+     * @param bool   $force      Whether to overwrite an existing file
+     * @param string $label      Human-readable label for console output
      */
     private function publishStub(
         string $basePath,
@@ -767,7 +883,6 @@ final class ConfigStubPublisher
         string $targetFile,
         bool $force,
         string $label,
-        bool $protectUserChanges,
     ): bool {
         if (! file_exists($stubFile)) {
             $this->output->warn('Stub not found, skipping: ' . $label);
@@ -781,7 +896,6 @@ final class ConfigStubPublisher
             $stubFile,
             $targetFile,
             $force,
-            $protectUserChanges,
             $label,
         )) {
             return false;
@@ -853,39 +967,31 @@ final class ConfigStubPublisher
     }
 
     /**
-     * Determine whether publishing should be skipped for this file.
+     * What to do with a target that already exists, without --force: a file that equals the stub is refreshed (nothing
+     * changes), a file that differs is the project's and is left alone. With --force the file is replaced, after a copy
+     * in .dev-tools-backup/ (the caller does it).
      */
     private function shouldSkip(
         string $stubFile,
         string $targetFile,
         bool $force,
-        bool $protectUserChanges,
         string $label,
     ): bool {
-        // File exists and no force flag - skip with a notice
-        if (file_exists($targetFile) && ! $force) {
-            $this->skip($label, 'already exists (use --force to overwrite)');
-
-            return true;
+        if (! file_exists($targetFile) || $force) {
+            return false;
         }
 
-        // File exists, force is set, but user has modified it - refuse overwrite
-        if ($this->isProtectedUserFile(
-            $stubFile,
-            $targetFile,
-            $force,
-            $protectUserChanges,
-        )) {
-            $this->skip(
-                $label,
-                'contains user modifications (refusing to overwrite)',
-                'red',
-            );
-
-            return true;
+        if (hash_file('sha256', $stubFile) === hash_file('sha256', $targetFile)) {
+            return false;
         }
 
-        return false;
+        $this->skip(
+            $label,
+            'contains user modifications (use --force to overwrite)',
+            'yellow',
+        );
+
+        return true;
     }
 
     /**
