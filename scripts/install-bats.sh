@@ -44,14 +44,14 @@ get_bats_version() {
     version=$(grep "^bats=" "${TOOL_VERSIONS_FILE}" | awk -F "="  '{print $2}' || echo "")
 
     if [[ -n "${version}" ]]; then
-      log_info "Found .tool-versions: ${version}"
+      log_info "Found .tool-versions: ${version}" >&2
     fi
   fi
 
   # Fallback to default if not found
   if [[ -z "${version}" ]]; then
     version="1.11.0"
-    log_info "Using default version: ${version}"
+    log_info "Using default version: ${version}" >&2
   fi
 
   # Ensure version has 'v' prefix

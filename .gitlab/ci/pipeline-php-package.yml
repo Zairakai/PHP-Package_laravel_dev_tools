@@ -346,6 +346,26 @@ php:test:
     expire_in: 1 week
     when: always
 
+# The shell tests of the project (tests/bats/). The job exists only when the project has some. It fails when a test fails
+# and when a test disappears from the report (the number of results differs from the plan).
+php:test:bats:
+  <<: *job_php
+  stage: test
+  rules:
+    - if: $UPDATE_DEPENDENCIES == "true"
+      when: never
+    - exists:
+        - tests/bats/**/*.bats
+  before_script:
+    - git config --global user.email "ci@gitlab.com"
+    - git config --global user.name "GitLab CI"
+    - git config --global init.defaultBranch main
+    - git config --global --add safe.directory '*'
+    - export PATH="$HOME/.local/bin:$PATH"
+    - bash "$DEV_TOOLS_SCRIPTS/install-bats.sh"
+  script:
+    - bash "$DEV_TOOLS_SCRIPTS/bats-run.sh"
+
 # PUBLISH
 # ================
 php:publish:

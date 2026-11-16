@@ -17,9 +17,21 @@ setup_test_env() {
   # Export scripts directory
   export SCRIPT_DIR="${PROJECT_ROOT}/scripts"
 
-  # Source config.sh for helpers
+  # Source config.sh for helpers. It sets "set -euo pipefail" and its own traps: left in the test, they replace what Bats
+  # relies on, and a test that fails ends silently, without a "not ok". The options and the traps of Bats are put back.
+  local saved_flags="$-" saved_pipefail saved_traps
+  saved_pipefail="$(set +o | grep ' pipefail$')"
+  saved_traps="$(trap -p EXIT INT TERM)"
+
   # shellcheck source=../../scripts/config.sh
   source "${SCRIPT_DIR}/config.sh"
+
+  set +eu
+  [[ "$saved_flags" == *e* ]] && set -e
+  [[ "$saved_flags" == *u* ]] && set -u
+  eval "$saved_pipefail"
+  trap - EXIT INT TERM
+  eval "$saved_traps"
 }
 
 # Teardown test environment
