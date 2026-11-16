@@ -55,15 +55,17 @@ get_shellcheck_version() {
 
 # Compare versions (returns 0 if ver1 >= ver2)
 version_ge() {
-  local ver1="$1"
-  local ver2="$2"
+  local ver1="${1#v}"
+  local ver2="${2#v}"
 
   if [[ "${ver1}" == "${ver2}" ]]; then
     return 0
   fi
 
   local IFS=.
-  local i ver1_arr=("$ver1") ver2_arr=("$ver2")
+  local i ver1_arr ver2_arr
+  read -ra ver1_arr <<< "$ver1"
+  read -ra ver2_arr <<< "$ver2"
 
   # Fill empty positions with zeros
   for ((i=${#ver1_arr[@]}; i<${#ver2_arr[@]}; i++)); do
@@ -229,4 +231,7 @@ main() {
   install_shellcheck "${required_version}"
 }
 
-main "$@"
+# Not run when the file is sourced (the tests load the functions)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

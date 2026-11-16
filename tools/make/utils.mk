@@ -34,7 +34,7 @@ install-packages: ## Install optional PHP tools interactively
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/install-packages.sh
 
 .PHONY: setup
-setup: ## Run the dev-tools setup (Makefile, .editorconfig, baseline, phpstan, Composer scripts, .gitignore block)
+setup: ## Run the dev-tools setup
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-package.sh
 
 .PHONY: setup-check
@@ -42,10 +42,10 @@ setup-check: ## Tell which files of the setup are missing or differ from the pac
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-check.sh
 
 .PHONY: setup-update
-setup-update: ## Publish again the files that setup-check reports, after a copy in .dev-tools-backup/ (DRY_RUN=true lists them)
+setup-update: ## Replace the files that setup-check reports
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-update.sh
 
 .PHONY: uninstall
-uninstall: ## Remove the files of the setup that are unchanged (DRY_RUN=true lists them); a copy is kept in .dev-tools-backup/
+uninstall: ## Remove the setup files (copy kept in .dev-tools-backup/)
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/uninstall-package.sh
 
