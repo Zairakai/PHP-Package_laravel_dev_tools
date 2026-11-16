@@ -91,6 +91,7 @@ write_bats() {
 # ================
 
 @test "validate-shellcheck.sh passes on a clean script" {
+  require_command shellcheck
   printf '#!/usr/bin/env bash\necho "ok"\n' > "${PROJECT}/clean.sh"
 
   run_in_project validate-shellcheck.sh
@@ -100,6 +101,7 @@ write_bats() {
 }
 
 @test "validate-shellcheck.sh fails and names the script that does not pass" {
+  require_command shellcheck
   printf '#!/usr/bin/env bash\ncd $1\nrm -rf $2/*\n' > "${PROJECT}/bad.sh"
 
   run_in_project validate-shellcheck.sh
@@ -109,6 +111,7 @@ write_bats() {
 }
 
 @test "validate-shellcheck.sh uses the severity of SHELLCHECK_SEVERITY" {
+  require_command shellcheck
   printf '#!/usr/bin/env bash\nrm -rf $1/*\n' > "${PROJECT}/loose.sh"
 
   SHELLCHECK_SEVERITY=error run_in_project validate-shellcheck.sh

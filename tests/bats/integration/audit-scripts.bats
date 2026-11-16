@@ -38,6 +38,7 @@ run_in_project() {
 }
 
 @test "security-audit.sh fails and shows the report when composer finds advisories" {
+  require_command jq
   fake_command composer 'echo "{\"advisories\": {\"acme/lib\": [{\"title\": \"bad\"}]}}"; exit 1'
 
   run_in_project security-audit.sh
@@ -48,6 +49,7 @@ run_in_project() {
 }
 
 @test "security-audit.sh fails when composer audit could not run" {
+  require_command jq
   fake_command composer 'echo "Could not reach packagist" >&2; exit 100'
 
   run_in_project security-audit.sh
@@ -79,6 +81,7 @@ run_in_project() {
 OUTDATED_TWO='{"installed": [{"name": "acme/lib", "version": "1.0"}, {"name": "acme/other", "version": "2.0"}]}'
 
 @test "outdated.sh passes when nothing is outdated" {
+  require_command jq
   fake_command composer 'echo "{\"installed\": []}"'
 
   run_in_project outdated.sh
@@ -88,6 +91,7 @@ OUTDATED_TWO='{"installed": [{"name": "acme/lib", "version": "1.0"}, {"name": "a
 }
 
 @test "outdated.sh fails and lists the outdated packages" {
+  require_command jq
   fake_command composer "echo '${OUTDATED_TWO}'"
 
   run_in_project outdated.sh
@@ -98,6 +102,7 @@ OUTDATED_TWO='{"installed": [{"name": "acme/lib", "version": "1.0"}, {"name": "a
 }
 
 @test "outdated.sh ignores the packages of OUTDATED_IGNORE" {
+  require_command jq
   fake_command composer "echo '${OUTDATED_TWO}'"
   export OUTDATED_IGNORE="acme/lib, acme/other"
 
@@ -108,6 +113,7 @@ OUTDATED_TWO='{"installed": [{"name": "acme/lib", "version": "1.0"}, {"name": "a
 }
 
 @test "outdated.sh ignores the packages of outdatedIgnore in composer.json" {
+  require_command jq
   fake_command composer "echo '${OUTDATED_TWO}'"
   printf '{\n  "name": "acme/sample",\n  "outdatedIgnore": ["acme/lib"]\n}\n' > "${PROJECT}/composer.json"
 

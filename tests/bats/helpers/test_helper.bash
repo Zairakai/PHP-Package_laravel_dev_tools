@@ -149,3 +149,8 @@ make_script_project() {
   cp -R "${PROJECT_ROOT}/scripts" "${PROJECT}/scripts"
   printf '{\n  "name": "acme/sample"\n}\n' > "${PROJECT}/composer.json"
 }
+
+# Skips the test when a tool that it needs is not installed (the image of the pipeline has fewer tools than a machine)
+require_command() {
+  command -v "$1" > /dev/null 2>&1 || skip "$1 is not installed"
+}
