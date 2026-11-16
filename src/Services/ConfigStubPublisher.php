@@ -25,7 +25,7 @@ use Zairakai\LaravelDevTools\Contracts\PublishOutput;
  * Each public method corresponds to one publishable asset - intentional by design.
  * Splitting into sub-publishers would add indirection without benefit.
  */
-final class ConfigStubPublisher
+final readonly class ConfigStubPublisher
 {
     /**
      * Maps group names to their list of publishable keys.
@@ -33,6 +33,14 @@ final class ConfigStubPublisher
      * @var array<string, list<string>>
      */
     private const array GROUPS = [
+        'setup'      => [
+            'makefile',
+            'editorconfig',
+            'baseline',
+            'phpstan',
+            'gitignore',
+            'composer-scripts',
+        ],
         'quality'    => [
             'phpstan',
             'rector',
@@ -69,16 +77,16 @@ final class ConfigStubPublisher
         ],
     ];
 
-    /**
-     * One backup per project: the copies of a run stay together in one folder, and two runs never share it.
-     *
-     * @var array<string, ConfigBackup>
-     */
-    private array $backups = [];
+    private BaseFilesPublisher $base;
+
+    private StubWriter $writer;
 
     public function __construct(
-        private readonly PublishOutput $output,
-    ) {}
+        private PublishOutput $output,
+    ) {
+        $this->writer = new StubWriter($output);
+        $this->base   = new BaseFilesPublisher($this->writer, $output);
+    }
 
     /**
      * Returns valid publishable group names.
@@ -113,7 +121,7 @@ final class ConfigStubPublisher
      */
     public function publishBaseline(string $vendorPath, string $basePath): bool
     {
-        return $this->publishStub(
+        return $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/baseline.neon',
             targetFile: $basePath . '/config/dev-tools/baseline.neon',
@@ -136,6 +144,7 @@ final class ConfigStubPublisher
         string $vendorPath,
         string $basePath,
         bool $force,
+        bool $fullstack = false,
     ): bool {
         // The baseline is never forced: its method takes no $force, the call ignores it
         $publish = match ($key) {
@@ -150,12 +159,16 @@ final class ConfigStubPublisher
             'hooks'              => $this->publishHooks(...),
             'gitlab-ci'          => $this->publishGitlabCi(...),
             'governance'         => $this->publishGovernanceFiles(...),
+            'makefile'           => $this->base->makefile(...),
+            'editorconfig'       => $this->base->editorConfig(...),
+            'composer-scripts'   => $this->base->composerScripts(...),
+            'gitignore'          => fn (string $vendor, string $base): bool => $this->base->gitignore($base),
             default              => null,
         };
 
         return null === $publish
             ? $this->unknownKey($key)
-            : $publish($vendorPath, $basePath, $force);
+            : $publish($vendorPath, $basePath, $force, $fullstack);
     }
 
     // Public API - individual file publishers
@@ -170,7 +183,7 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): void {
-        $this->publishStub(
+        $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/enlightn.php',
             targetFile: $basePath . '/config/enlightn.php',
@@ -280,6 +293,7 @@ final class ConfigStubPublisher
         string $vendorPath,
         string $basePath,
         bool $force,
+        bool $fullstack = false,
     ): bool {
         if (! array_key_exists($group, self::GROUPS)) {
             $this->output->error(sprintf(
@@ -297,6 +311,7 @@ final class ConfigStubPublisher
                 $vendorPath,
                 $basePath,
                 $force,
+                $fullstack,
             );
         }
 
@@ -324,7 +339,7 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        return $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/phpinsights.php',
             targetFile: $basePath . '/config/dev-tools/phpinsights.php',
@@ -342,7 +357,7 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/.markdownlint.json',
             targetFile: $basePath . '/config/dev-tools/.markdownlint.json',
@@ -369,7 +384,7 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/.markdownlintignore',
             targetFile: $basePath . '/config/dev-tools/.markdownlintignore',
@@ -402,7 +417,7 @@ final class ConfigStubPublisher
 
         file_put_contents($generated, $this->phpstanContents($vendorPath, $basePath));
 
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $generated,
             targetFile: $basePath . '/config/dev-tools/phpstan.neon',
@@ -443,7 +458,7 @@ final class ConfigStubPublisher
 
         file_put_contents($converted, ConfigCopies::phpunitForConfig((string) file_get_contents($stubFile)));
 
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $converted,
             targetFile: $basePath . '/config/dev-tools/phpunit.xml',
@@ -478,10 +493,10 @@ final class ConfigStubPublisher
             is_file($basePath . '/config/dev-tools/pint.json')
             && ! $force
         ) {
-            $this->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
+            $this->writer->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
         }
         else {
-            $this->saveBeforeOverwriting($basePath, $basePath . '/config/dev-tools/pint.json');
+            $this->writer->saveBeforeOverwriting($basePath, $basePath . '/config/dev-tools/pint.json');
 
             try {
                 PintConfigWriter::write($basePath, [
@@ -516,7 +531,7 @@ final class ConfigStubPublisher
         string $basePath,
         bool $force,
     ): bool {
-        return $this->publishStub(
+        return $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/rector.php',
             targetFile: $basePath . '/config/dev-tools/rector.php',
@@ -555,12 +570,12 @@ final class ConfigStubPublisher
         }
 
         if (in_array($target, $this->availableGroups(), true)) {
-            return $this->publishGroup($target, $vendorPath, $basePath, $force);
+            return $this->publishGroup($target, $vendorPath, $basePath, $force, $fullstack);
         }
 
         if (in_array($target, $this->availableKeys(), true)) {
             // A file that is left alone (the project's own) is not an error: the output says it
-            $this->publishByKey($target, $vendorPath, $basePath, $force);
+            $this->publishByKey($target, $vendorPath, $basePath, $force, $fullstack);
 
             return true;
         }
@@ -578,41 +593,6 @@ final class ConfigStubPublisher
     public function wantsFullstack(string $basePath, bool $asked = false): bool
     {
         return $asked || is_dir($basePath . '/node_modules/@zairakai/js-dev-tools');
-    }
-
-    /**
-     * Copy the stub file to the target location.
-     */
-    private function copyStub(
-        string $stubFile,
-        string $targetFile,
-        string $label,
-    ): bool {
-        if (copy($stubFile, $targetFile)) {
-            $this->output->task('Copied: ' . $label);
-
-            return true;
-        }
-
-        // @codeCoverageIgnoreStart
-        $this->output->error('Failed to copy: ' . $label);
-
-        return false;
-        // @codeCoverageIgnoreEnd
-    }
-
-    /**
-     * Create the given directory recursively if it does not already exist.
-     */
-    private function ensureDirectoryExists(string $directory): void
-    {
-        if (! is_dir($directory)) {
-            mkdir(
-                $directory,
-                0755,
-                true,
-            );
-        }
     }
 
     /**
@@ -707,7 +687,7 @@ final class ConfigStubPublisher
 
         file_put_contents($generated, $content);
 
-        $published = $this->publishStub(
+        $published = $this->writer->publish(
             basePath: $basePath,
             stubFile: $generated,
             targetFile: $basePath . '/.gitlab-ci.yml',
@@ -754,7 +734,7 @@ final class ConfigStubPublisher
         $tempFile  = sys_get_temp_dir() . '/ldt_governance_' . md5($label);
         file_put_contents($tempFile, $processed);
 
-        $this->ensureDirectoryExists(dirname($targetFile));
+        $this->writer->ensureDirectory(dirname($targetFile));
 
         try {
             // Target does not exist yet - just copy
@@ -779,7 +759,7 @@ final class ConfigStubPublisher
                 }
 
                 // User has modified the file - protect it
-                $this->skip(
+                $this->writer->skip(
                     $label,
                     'contains user modifications (use --force to overwrite)',
                     'yellow',
@@ -789,7 +769,7 @@ final class ConfigStubPublisher
             }
 
             // Force - overwrite unconditionally, after a copy of the file
-            $this->saveBeforeOverwriting($basePath, $targetFile);
+            $this->writer->saveBeforeOverwriting($basePath, $targetFile);
             copy($tempFile, $targetFile);
             $this->output->task('Copied: ' . $label);
 
@@ -821,7 +801,7 @@ final class ConfigStubPublisher
             [
                 $name,
             ],
-            fn (string $file): bool => $this->saveBeforeOverwriting($basePath, $file),
+            fn (string $file): bool => $this->writer->saveBeforeOverwriting($basePath, $file),
         );
 
         if ([] !== $written) {
@@ -838,7 +818,7 @@ final class ConfigStubPublisher
         string $name,
         bool $force,
     ): void {
-        $this->publishStub(
+        $this->writer->publish(
             basePath: $basePath,
             stubFile: $vendorPath . '/stubs/root/' . $name,
             targetFile: $basePath . '/' . $name,
@@ -849,49 +829,6 @@ final class ConfigStubPublisher
 
     // Core publishing logic
     // ================
-
-    /**
-     * Core workflow for copying a stub file to its target location.
-     *
-     * @param string $stubFile   Absolute path to the stub file
-     * @param string $targetFile Absolute path to the target file
-     * @param bool   $force      Whether to overwrite an existing file
-     * @param string $label      Human-readable label for console output
-     */
-    private function publishStub(
-        string $basePath,
-        string $stubFile,
-        string $targetFile,
-        bool $force,
-        string $label,
-    ): bool {
-        if (! file_exists($stubFile)) {
-            $this->output->warn('Stub not found, skipping: ' . $label);
-
-            return false;
-        }
-
-        $this->ensureDirectoryExists(dirname($targetFile));
-
-        if ($this->shouldSkip(
-            $stubFile,
-            $targetFile,
-            $force,
-            $label,
-        )) {
-            return false;
-        }
-
-        if ($force) {
-            $this->saveBeforeOverwriting($basePath, $targetFile);
-        }
-
-        return $this->copyStub(
-            $stubFile,
-            $targetFile,
-            $label,
-        );
-    }
 
     /**
      * Derive the GitLab issues URL from the project's composer.json name.
@@ -927,27 +864,6 @@ final class ConfigStubPublisher
     }
 
     /**
-     * Keeps a copy of a file that a forced publication is about to write over, in .dev-tools-backup/ (the same folder as
-     * the shell scripts use). Nothing is kept when the file does not exist.
-     */
-    private function saveBeforeOverwriting(string $basePath, string $file): bool
-    {
-        if (! file_exists($file)) {
-            return false;
-        }
-
-        $this->backups[$basePath] ??= new ConfigBackup($basePath);
-
-        if (! $this->backups[$basePath]->save($file)) {
-            return false;
-        }
-
-        $this->output->task('Backed up: ' . ltrim(substr($file, strlen($basePath)), '/'));
-
-        return true;
-    }
-
-    /**
      * The name of a package without its vendor: zairakai/laravel-dev-tools gives laravel-dev-tools.
      */
     private function shortName(string $package): string
@@ -955,52 +871,6 @@ final class ConfigStubPublisher
         return str_contains($package, '/')
             ? substr($package, (int) strpos($package, '/') + 1)
             : $package;
-    }
-
-    /**
-     * What to do with a target that already exists, without --force: a file that equals the stub is refreshed (nothing
-     * changes), a file that differs is the project's and is left alone. With --force the file is replaced, after a copy
-     * in .dev-tools-backup/ (the caller does it).
-     */
-    private function shouldSkip(
-        string $stubFile,
-        string $targetFile,
-        bool $force,
-        string $label,
-    ): bool {
-        if (! file_exists($targetFile) || $force) {
-            return false;
-        }
-
-        if (hash_file('sha256', $stubFile) === hash_file('sha256', $targetFile)) {
-            return false;
-        }
-
-        $this->skip(
-            $label,
-            'contains user modifications (use --force to overwrite)',
-            'yellow',
-        );
-
-        return true;
-    }
-
-    /**
-     * Display a skipped-file message in the console.
-     */
-    private function skip(
-        string $label,
-        string $reason,
-        string $color = 'yellow',
-    ): void {
-        $this->output->twoColumnDetail(
-            'Skipped: ' . $label,
-            sprintf(
-                '<fg=%s>%s</>',
-                $color,
-                $reason,
-            ),
-        );
     }
 
     /**

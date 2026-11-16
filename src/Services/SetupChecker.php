@@ -31,7 +31,7 @@ final class SetupChecker
     /**
      * The groups of the default publication. The hooks are a git setting, not a file.
      */
-    private const array GROUPS = ['quality', 'style', 'testing'];
+    private const array GROUPS = ['setup', 'quality', 'style', 'testing'];
 
     /**
      * @return list<array{file: string, state: string, detail: string}>
@@ -121,7 +121,7 @@ final class SetupChecker
      */
     private function generated(string $temporary): array
     {
-        $inputs   = ['composer.json', 'artisan'];
+        $inputs   = ['artisan'];
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($temporary, FilesystemIterator::SKIP_DOTS),
         );
@@ -147,7 +147,7 @@ final class SetupChecker
      */
     private function mirrorTheProject(string $basePath, string $temporary): void
     {
-        foreach (['composer.json', 'artisan'] as $file) {
+        foreach (['composer.json', 'artisan', '.gitignore'] as $file) {
             if (is_file($basePath . '/' . $file)) {
                 copy($basePath . '/' . $file, $temporary . '/' . $file);
             }

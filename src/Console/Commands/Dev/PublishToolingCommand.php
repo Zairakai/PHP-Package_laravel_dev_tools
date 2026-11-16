@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Zairakai\LaravelDevTools\Console\Commands\Dev;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
 use Zairakai\LaravelDevTools\Services\ComposerNormalizeManager;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
 use Zairakai\LaravelDevTools\Services\GitHooksActivator;
@@ -75,23 +74,10 @@ final class PublishToolingCommand extends Command
             );
         }
 
-        // Default setup: Makefile + .editorconfig + baseline only
+        // Default setup: the files that every project has (the group "setup")
         // ================
 
-        $this->publishMakefile(
-            $basePath,
-            $vendorPath,
-            $force,
-            $fullstack,
-        );
-        $this->publishEditorConfig(
-            $basePath,
-            $vendorPath,
-            $force,
-        );
-
-        // Baseline is always created if missing (never force-overwritten)
-        $configStubPublisher->publishBaseline($vendorPath, $basePath);
+        $configStubPublisher->publishGroup('setup', $vendorPath, $basePath, $force, $fullstack);
 
         // Optional: git hooks
         // ================
@@ -232,76 +218,6 @@ final class PublishToolingCommand extends Command
         return file_exists($basePath . '/vendor/bin/composer-normalize');
     }
 
-    /**
-     * Copy the .editorconfig stub into the project root.
-     */
-    private function publishEditorConfig(
-        string $basePath,
-        string $vendorPath,
-        bool $force,
-    ): void {
-        $targetFile = $basePath . '/.editorconfig';
-        $stubFile   = $vendorPath . '/.editorconfig';
-
-        if (! File::exists($stubFile)) {
-            // @codeCoverageIgnoreStart
-            // .editorconfig is optional - no error if missing from package.
-            return;
-            // @codeCoverageIgnoreEnd
-        }
-
-        if (File::exists($targetFile) && ! $force) {
-            $this->components->twoColumnDetail(
-                'Skipped: .editorconfig',
-                '<fg=yellow>already exists (use --force to overwrite)</>',
-            );
-
-            return;
-        }
-
-        File::copy($stubFile, $targetFile);
-        $this->components->task('Copied: .editorconfig');
-    }
-
     // Default setup file publishers
     // ================
-
-    /**
-     * Copy the Makefile stub into the project root.
-     */
-    private function publishMakefile(
-        string $basePath,
-        string $vendorPath,
-        bool $force,
-        bool $fullstack,
-    ): void {
-        $targetFile   = $basePath . '/Makefile';
-        $stubFile     = $vendorPath . '/stubs/Makefile';
-        $useFullstack = $fullstack || file_exists($basePath . '/package.json');
-
-        if ($useFullstack) {
-            $stubFile = $vendorPath . '/stubs/Makefile.fullstack';
-        }
-
-        if (! File::exists($stubFile)) {
-            // @codeCoverageIgnoreStart
-            // Makefile stub is always packaged with the vendor - this path is not reachable in practice.
-            $this->components->error('Makefile stub not found.');
-
-            return;
-            // @codeCoverageIgnoreEnd
-        }
-
-        if (File::exists($targetFile) && ! $force) {
-            $this->components->twoColumnDetail(
-                'Skipped: Makefile',
-                '<fg=yellow>already exists (use --force to overwrite)</>',
-            );
-
-            return;
-        }
-
-        File::copy($stubFile, $targetFile);
-        $this->components->task('Copied: Makefile');
-    }
 }

@@ -53,21 +53,23 @@ for arg in "$@"; do
       echo "  Options"
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       echo "  (no options)         Normal setup"
-      echo "                       Installs: Makefile, .editorconfig, baseline.neon"
-      echo "                       Uses full-stack Makefile when package.json is present"
+      echo "                       Installs: Makefile, .editorconfig, baseline.neon, phpstan.neon (and its root file),"
+      echo "                       the Composer scripts of the package, the block of .gitignore"
+      echo "                       Uses the full-stack Makefile when @zairakai/js-dev-tools is installed"
       echo ""
       echo "  --publish            Publish ALL configs to config/dev-tools/ (and the files that the editor reads, at the root)"
       echo "  --publish=<group>    Publish a config group"
       echo "  --publish=<key>      Publish a specific config"
       echo "  --with-hooks         Also activate the git hooks of laravel-dev-tools"
       echo "  --fullstack          Force full-stack Makefile + CI stub (PHP + JS)"
-      echo "  --force, -f          Overwrite existing files (creates backups)"
+      echo "  --force, -f          Overwrite existing files (copies them in .dev-tools-backup/ first)"
       echo "  --silent, -s         Suppress output (errors only)"
       echo "  --help, -h           Show this help"
       echo ""
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       echo "  Groups (--publish=<group>)"
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "  setup      makefile, editorconfig, baseline, phpstan, gitignore, composer-scripts (the normal setup)"
       echo "  quality    phpstan, phpstan-baseline, rector, insights"
       echo "  style      pint, markdownlint, markdownlintignore"
       echo "  testing    phpunit"
@@ -86,6 +88,10 @@ for arg in "$@"; do
       echo "  markdownlint      → config/dev-tools/.markdownlint.json (+ .markdownlint.json at the root, thin)"
       echo "  markdownlintignore → config/dev-tools/.markdownlintignore (+ .markdownlintignore at the root, a copy)"
       echo "  phpunit           → config/dev-tools/phpunit.xml (+ phpunit.xml at the root, a copy)"
+      echo "  makefile          → Makefile (the one for PHP and JS with js-dev-tools or --fullstack)"
+      echo "  editorconfig      → .editorconfig"
+      echo "  composer-scripts  → the Composer scripts of the package, in composer.json"
+      echo "  gitignore         → the block of the dev-tools, in .gitignore"
       echo "  hooks             → core.hooksPath"
       echo "  gitlab-ci         → .gitlab-ci.yml"
       echo "  governance        → SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md"
@@ -125,48 +131,6 @@ fi
 # Result Tracking
 # ================
 
-declare -a CREATED_FILES=()
-declare -a SKIPPED_FILES=()
-declare -a BACKED_UP_FILES=()
-declare -a PUBLISHED_FILES=()
-
-track_created()   { CREATED_FILES+=("$1"); }
-track_skipped()   { SKIPPED_FILES+=("$1"); }
-track_backed_up() { BACKED_UP_FILES+=("$1"); }
-track_published() { PUBLISHED_FILES+=("$1"); }
-
-# File Helpers
-# ================
-
-# Copy file for standard setup (skips if exists unless force/CI)
-setup_file() {
-  local source="$1"
-  local target="$2"
-  local name="$3"
-
-  if [[ "$CI_MODE" == "true" ]] || [[ "$FORCE_OVERWRITE" == "true" ]]; then
-    if [[ -f "$target" ]] && [[ ! -L "$target" ]] && [[ "$CI_MODE" != "true" ]]; then
-      if backup_file "$target" 2>/dev/null; then
-        track_backed_up "$name"
-      fi
-    fi
-    rm -f "$target" 2>/dev/null || true
-    mkdir -p "$(dirname "$target")"
-    if cp "$source" "$target" 2>/dev/null; then
-      track_created "$name"
-    fi
-  else
-    if [[ -f "$target" ]] || [[ -L "$target" ]]; then
-      track_skipped "$name"
-    else
-      mkdir -p "$(dirname "$target")"
-      if cp "$source" "$target" 2>/dev/null; then
-        track_created "$name"
-      fi
-    fi
-  fi
-}
-
 # Publication
 # ================
 # The work is done by scripts/publish.php (ConfigStubPublisher): the same code as `php artisan dev-tools:publish`, so the
@@ -179,39 +143,17 @@ run_publish() {
   [[ "$FORCE_OVERWRITE" == "true" ]] && args+=(--force)
   [[ "$FORCE_FULLSTACK" == "true" ]] && args+=(--fullstack)
 
-  php "${SCRIPT_DIR}/publish.php" "${args[@]}"
+  if [[ "$SILENT_MODE" == "true" ]]; then
+    php "${SCRIPT_DIR}/publish.php" "${args[@]}" > /dev/null
+  else
+    php "${SCRIPT_DIR}/publish.php" "${args[@]}"
+  fi
 }
 
 do_publish() {
   log_header "Publishing Dev Tools Configs"
 
   run_publish "$PUBLISH_TARGET" || exit 1
-}
-
-# Gitignore Updater
-# ================
-
-update_gitignore() {
-  local gitignore="${PROJECT_ROOT}/.gitignore"
-  [[ ! -f "$gitignore" ]] && return 0
-
-  local changed=false
-
-  # A project that already has the block, with this title or with the one of the older versions, is left as it is.
-  if ! grep -qF -e "# Dev Tools temporary files" -e "# Dev Tools - Generated temporary files" "$gitignore" 2>/dev/null; then
-    cat >> "$gitignore" << 'EOF'
-
-# Dev Tools temporary files
-# ----------------
-.*.tmp.*
-.dev-tools-backup/
-EOF
-    changed=true
-  fi
-
-  if [[ "$changed" == "true" ]]; then
-    log_success "Updated .gitignore with dev-tools patterns"
-  fi
 }
 
 # Main Setup
@@ -245,26 +187,12 @@ setup_package() {
       run_publish hooks
     fi
 
-    update_gitignore
+    run_publish gitignore
 
     echo ""
     echo -e "${MAGENTA}┌────────────────────────────────────────┐${NC}"
     echo -e "${MAGENTA}│${NC}         ${GREEN}Publish Complete${NC}              ${MAGENTA}│${NC}"
     echo -e "${MAGENTA}├────────────────────────────────────────┤${NC}"
-
-    for f in "${PUBLISHED_FILES[@]}"; do
-      echo -e "${MAGENTA}│${NC} ${GREEN}✓${NC} ${f}"
-    done
-
-    if [[ ${#SKIPPED_FILES[@]} -gt 0 ]]; then
-      echo -e "${MAGENTA}│${NC} ${YELLOW}○ Already exist (skipped):${NC} ${SKIPPED_FILES[*]}"
-      echo -e "${MAGENTA}│${NC}   ${YELLOW}→ Use --force to overwrite${NC}"
-    fi
-
-    if [[ ${#BACKED_UP_FILES[@]} -gt 0 ]]; then
-      echo -e "${MAGENTA}│${NC} ${CYAN}↩ Backed up:${NC} ${BACKED_UP_FILES[*]}"
-      echo -e "${MAGENTA}│${NC}   ${CYAN}→ ${BACKUP_DIR}${NC}"
-    fi
 
     echo -e "${MAGENTA}├────────────────────────────────────────┤${NC}"
     echo -e "${MAGENTA}│${NC} ${CYAN}Edit configs in:${NC} config/dev-tools/"
@@ -277,23 +205,10 @@ setup_package() {
   # Normal Setup
   # ================
 
-  # Makefile (full-stack if @zairakai/js-dev-tools is installed or --fullstack forced)
-  if [[ "$FORCE_FULLSTACK" == "true" ]] || [[ -d "${PROJECT_ROOT}/node_modules/@zairakai/js-dev-tools" ]]; then
-    setup_file "${VENDOR_PATH}/stubs/Makefile.fullstack" "${PROJECT_ROOT}/Makefile" "Makefile"
-  else
-    setup_file "${VENDOR_PATH}/stubs/Makefile" "${PROJECT_ROOT}/Makefile" "Makefile"
-  fi
-
-  # .editorconfig (always copied - needed by IDEs)
-  setup_file "${VENDOR_PATH}/.editorconfig" "${PROJECT_ROOT}/.editorconfig" ".editorconfig"
-
-  # PHPStan baseline (created empty if missing - ensures phpstan configs can include it), then phpstan.neon adapted to the
-  # type of the project
-  run_publish baseline
-  run_publish phpstan
-
-  # Update .gitignore
-  update_gitignore
+  # What every project has: the Makefile (full-stack if @zairakai/js-dev-tools is installed or --fullstack is given),
+  # .editorconfig, the baseline and phpstan.neon adapted to the type of the project, the block of .gitignore and the
+  # Composer scripts. The work is done by the group "setup" of ConfigStubPublisher.
+  run_publish setup
 
   # Git Hooks (only if --with-hooks is explicitly requested)
   # ================
@@ -308,45 +223,20 @@ setup_package() {
     fi
   fi
 
-  # Composer Scripts merge
-  # ================
-
-  local force_flag=""
-  [[ "$FORCE_OVERWRITE" == "true" ]] && force_flag="--force"
-  php "${VENDOR_PATH}/scripts/merge-composer-scripts.php" \
-    "${PROJECT_ROOT}" "${VENDOR_PATH}" ${force_flag} 2>/dev/null || true
-
   # Summary
   # ================
 
   local project_type
   project_type="$(detect_project_type)"
 
-  if [[ "$SILENT_MODE" == "true" ]]; then
-    if [[ ${#CREATED_FILES[@]} -eq 0 ]] && \
-      [[ ${#BACKED_UP_FILES[@]} -eq 0 ]] && \
-      [[ $hooks_installed -eq 0 ]]; then
-      exit 0
-    fi
+  if [[ "$SILENT_MODE" == "true" ]] && [[ $hooks_installed -eq 0 ]]; then
+    exit 0
   fi
 
   echo ""
   echo -e "${MAGENTA}┌────────────────────────────────────────┐${NC}"
   echo -e "${MAGENTA}│${NC}            ${GREEN}Setup Complete${NC}             ${MAGENTA}│${NC}"
   echo -e "${MAGENTA}├────────────────────────────────────────┤${NC}"
-
-  if [[ ${#CREATED_FILES[@]} -gt 0 ]]; then
-    echo -e "${MAGENTA}│${NC} ${GREEN}✓ Created:${NC} ${CREATED_FILES[*]}"
-  fi
-
-  if [[ ${#SKIPPED_FILES[@]} -gt 0 ]] && [[ "$SILENT_MODE" != "true" ]]; then
-    echo -e "${MAGENTA}│${NC} ${YELLOW}○ Skipped:${NC} ${SKIPPED_FILES[*]}"
-  fi
-
-  if [[ ${#BACKED_UP_FILES[@]} -gt 0 ]]; then
-    echo -e "${MAGENTA}│${NC} ${CYAN}↩ Backed:${NC}  ${BACKED_UP_FILES[*]}"
-    echo -e "${MAGENTA}│${NC}   ${CYAN}→ ${BACKUP_DIR}${NC}"
-  fi
 
   if [[ $hooks_installed -gt 0 ]]; then
     echo -e "${MAGENTA}│${NC} ${GREEN}✓ Hooks:${NC}   laravel-dev-tools (core.hooksPath)"

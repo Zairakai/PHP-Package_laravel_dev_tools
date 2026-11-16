@@ -24,10 +24,11 @@ final class SetupCheckerTest extends TestCase
 
         mkdir($this->project . '/src', 0755, true);
         file_put_contents($this->project . '/composer.json', '{"name": "acme/sample"}');
+        file_put_contents($this->project . '/.gitignore', "vendor/\n");
 
         $silent = new SilentPublishOutput();
 
-        foreach (['quality', 'style', 'testing'] as $group) {
+        foreach (['setup', 'quality', 'style', 'testing'] as $group) {
             new ConfigStubPublisher($silent)->publishGroup($group, $this->vendor, $this->project, false);
         }
     }
@@ -35,6 +36,21 @@ final class SetupCheckerTest extends TestCase
     protected function tearDown(): void
     {
         exec('rm -rf ' . escapeshellarg($this->project));
+    }
+
+    #[Test]
+    public function a_composer_script_that_the_project_lacks_is_named(): void
+    {
+        $file     = $this->project . '/composer.json';
+        $composer = json_decode((string) file_get_contents($file), true);
+
+        unset($composer['scripts']['quality']);
+        file_put_contents($file, json_encode($composer));
+
+        $result = $this->resultOf('composer.json');
+
+        $this->assertSame(SetupChecker::DIFFERENT, $result['state']);
+        $this->assertStringContainsString('only in the package: scripts.quality', $result['detail']);
     }
 
     #[Test]
@@ -62,6 +78,24 @@ final class SetupCheckerTest extends TestCase
         $states = array_unique(array_column(new SetupChecker()->check($this->vendor, $this->project), 'state'));
 
         $this->assertSame([SetupChecker::SAME], $states);
+    }
+
+    #[Test]
+    public function a_project_without_gitignore_is_not_asked_for_one(): void
+    {
+        PlainFile::delete($this->project . '/.gitignore');
+
+        $files = array_column(new SetupChecker()->check($this->vendor, $this->project), 'file');
+
+        $this->assertNotContains('.gitignore', $files);
+    }
+
+    #[Test]
+    public function a_project_without_the_block_of_gitignore_is_told(): void
+    {
+        file_put_contents($this->project . '/.gitignore', "vendor/\n");
+
+        $this->assertSame(SetupChecker::DIFFERENT, $this->stateOf('.gitignore'));
     }
 
     #[Test]
@@ -102,6 +136,16 @@ final class SetupCheckerTest extends TestCase
         new SetupChecker()->check($this->vendor, $this->project);
 
         $this->assertSame($before, $this->tree());
+    }
+
+    #[Test]
+    public function the_makefile_and_the_editorconfig_are_checked(): void
+    {
+        PlainFile::delete($this->project . '/Makefile');
+        file_put_contents($this->project . '/.editorconfig', "root = true\n");
+
+        $this->assertSame(SetupChecker::MISSING, $this->stateOf('Makefile'));
+        $this->assertSame(SetupChecker::DIFFERENT, $this->stateOf('.editorconfig'));
     }
 
     /**
