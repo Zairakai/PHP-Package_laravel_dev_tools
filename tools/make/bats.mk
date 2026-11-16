@@ -8,11 +8,7 @@ bats:: ## Run shell script tests (BATS)
 		echo "ℹ️  No BATS tests found - skipping"; \
 		exit 0; \
 	fi
-	@if ! command -v bats &>/dev/null; then \
-		echo "❌ BATS not installed - run: make install-bats"; \
-		exit 1; \
-	fi
-	@bats tests/bats/unit/*.bats tests/bats/integration/*.bats
+	@bash scripts/bats-run.sh
 
 .PHONY: bats-unit
 bats-unit:: ## Run BATS unit tests
