@@ -161,6 +161,8 @@ php artisan dev-tools:publish --publish=pint            # a single file: phpstan
 php artisan dev-tools:publish --fullstack               # Makefile for PHP and JS
 ```
 
+`make setup-check` tells which files of the setup are missing or differ from what the package publishes now (it writes nothing, and exits with 1 when a file is missing or different). A file that differs can be a change of the project or a file late on the package: the check shows the difference, you decide what to keep.
+
 The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.
 
 For a package without Artisan:
