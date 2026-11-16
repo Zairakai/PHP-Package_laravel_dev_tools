@@ -351,6 +351,7 @@ run_setup() {
   run_setup
 
   [ "$status" -eq 0 ]
-  run grep -P '^\t"scripts": \{' "${PROJECT}/composer.json"
+  # grep -P does not exist in the image of the CI (Alpine): a fixed string with a tab
+  run grep -F $'\t"scripts": {' "${PROJECT}/composer.json"
   [ "$status" -eq 0 ]
 }
