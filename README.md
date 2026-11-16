@@ -108,14 +108,14 @@ PHP Insights only reports: its sniffs are fixed by hand, following the [handbook
 
 ### PHPStan
 
-```neon
+```yaml
 includes:
-    - vendor/zairakai/laravel-dev-tools/config/library.neon
+  - vendor/zairakai/laravel-dev-tools/config/library.neon
 
 parameters:
-    paths:
-        - src
-        - tests
+  paths:
+    - src
+    - tests
 ```
 
 ### Rector
@@ -160,6 +160,8 @@ php artisan dev-tools:publish --publish=pint            # a single file: phpstan
                                                         # pint, markdownlint, markdownlintignore, phpunit, gitlab-ci
 php artisan dev-tools:publish --fullstack               # Makefile for PHP and JS
 ```
+
+The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.
 
 For a package without Artisan:
 

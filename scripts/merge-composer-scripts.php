@@ -36,7 +36,8 @@ if (! file_exists($stubScriptsPath)) {
 }
 
 /** Read composer.json */
-$composerJson = json_decode(file_get_contents($composerJsonPath), true);
+$originalContent = file_get_contents($composerJsonPath);
+$composerJson    = json_decode($originalContent, true);
 
 if (null === $composerJson) {
     echo "Error: Failed to parse composer.json\n";
@@ -88,13 +89,28 @@ foreach ($stubScripts as $scriptName => $scriptValue) {
 /* Update composer.json with merged scripts */
 $composerJson['scripts'] = $mergedScripts;
 
-/** Write back to composer.json with pretty print */
+/**
+ * Write back to composer.json with the indentation it already has.
+ * json_encode indents with 4 spaces, so the output is re-indented to the indent of the file (2 spaces by default).
+ */
+$indent = '  ';
+
+if (1 === preg_match('/^([ \t]+)"/m', $originalContent, $indentMatch)) {
+    $indent = $indentMatch[1];
+}
+
 $jsonContent = json_encode(
     $composerJson,
     JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
+);
+$jsonContent = preg_replace_callback(
+    '/^( +)/m',
+    static fn (array $match): string => str_repeat($indent, intdiv(strlen($match[1]), 4)),
+    $jsonContent,
 ) . "\n";
 
-if (false === file_put_contents($composerJsonPath, $jsonContent)) {
+/* Leave the file alone when nothing changes */
+if ($jsonContent !== $originalContent && false === file_put_contents($composerJsonPath, $jsonContent)) {
     echo "Error: Failed to write composer.json\n";
 
     exit(1);

@@ -23,11 +23,9 @@ Please **do not disclose vulnerabilities publicly** until they have been reviewe
 
 | Layer | Security Protection |
 | :--- | :--- |
-| **Static Analysis** | PHPStan Level Max compliance and Rector modernizations. |
-| **Execution** | Controlled shell execution via `config.sh` and `scripts/`. |
-| **Filesystem** | Non-destructive defaults for file generation and publishing. |
-| **Git Hooks** | Isolated quality enforcement in project scope (`.githooks`). |
-| **CI Pipeline** | Automated secret detection and ShellCheck validation. |
+| **Static Analysis** | PHPStan and Rector, run by the quality gate (`make quality`). |
+| **CI Pipeline** | Automated checks on every merge request. |
+| **TODO** | Complete this table with the protections of this project. |
 
 ---
 
