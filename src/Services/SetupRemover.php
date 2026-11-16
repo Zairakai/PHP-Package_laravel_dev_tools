@@ -10,7 +10,7 @@ use RuntimeException;
  * Removes the files of the setup from a project, and only the ones that are still what the package publishes.
  *
  * A file that the project changed is kept and named. The files of config/dev-tools/ that the project changed go only when
- * $customized is given. Everything that is removed is copied first in .dev-tools-backup/<date>/, under its path from the
+ * $customized is given. Everything that is removed is copied first in `.dev-tools-backup/<date>/`, under its path from the
  * root (the same folder as --force and setup-update): copying that folder at the root puts everything back.
  */
 final readonly class SetupRemover
