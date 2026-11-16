@@ -394,7 +394,7 @@ final class PublishCommandTest extends TestCase
 
             $output = Artisan::output();
             $this->assertStringContainsString(
-                'Makefile stub not found',
+                'Stub not found, skipping: Makefile',
                 $output,
                 'Should show error when Makefile stub is missing',
             );

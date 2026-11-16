@@ -34,7 +34,7 @@ install-packages: ## Install optional PHP tools interactively
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/install-packages.sh
 
 .PHONY: setup
-setup: ## Run the dev-tools setup wizard (Makefile, configs, CI stub)
+setup: ## Run the dev-tools setup (Makefile, .editorconfig, baseline, phpstan, Composer scripts, .gitignore block)
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-package.sh
 
 .PHONY: setup-check

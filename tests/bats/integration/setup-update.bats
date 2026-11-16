@@ -23,6 +23,7 @@ setup() {
   printf '{\n  "name": "acme/sample"\n}\n' > "${PROJECT}/composer.json"
   printf 'vendor/\n' > "${PROJECT}/.gitignore"
 
+  bash "${PACKAGE}/scripts/setup-package.sh" > /dev/null 2>&1
   bash "${PACKAGE}/scripts/setup-package.sh" --publish > /dev/null 2>&1
 }
 

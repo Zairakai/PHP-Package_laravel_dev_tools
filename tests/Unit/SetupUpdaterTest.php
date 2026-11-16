@@ -25,10 +25,11 @@ final class SetupUpdaterTest extends TestCase
 
         mkdir($this->project . '/src', 0755, true);
         file_put_contents($this->project . '/composer.json', '{"name": "acme/sample"}');
+        file_put_contents($this->project . '/.gitignore', "vendor/\n");
 
         $silent = new SilentPublishOutput();
 
-        foreach (['quality', 'style', 'testing'] as $group) {
+        foreach (['setup', 'quality', 'style', 'testing'] as $group) {
             new ConfigStubPublisher($silent)->publishGroup($group, $this->vendor, $this->project, false);
         }
     }
@@ -36,6 +37,23 @@ final class SetupUpdaterTest extends TestCase
     protected function tearDown(): void
     {
         exec('rm -rf ' . escapeshellarg($this->project));
+    }
+
+    #[Test]
+    public function it_adds_the_composer_scripts_and_the_gitignore_block_that_the_project_lacks(): void
+    {
+        $file     = $this->project . '/composer.json';
+        $composer = json_decode((string) file_get_contents($file), true);
+
+        unset($composer['scripts']['quality']);
+        file_put_contents($file, json_encode($composer, JSON_PRETTY_PRINT));
+        file_put_contents($this->project . '/.gitignore', "vendor/\n");
+
+        $done = new SetupUpdater()->update($this->vendor, $this->project);
+
+        $this->assertSame(['.gitignore', 'composer.json'], $done['replaced']);
+        $this->assertArrayHasKey('quality', json_decode((string) file_get_contents($file), true)['scripts']);
+        $this->assertStringContainsString('.dev-tools-backup/', (string) file_get_contents($this->project . '/.gitignore'));
     }
 
     #[Test]
@@ -64,6 +82,17 @@ final class SetupUpdaterTest extends TestCase
         $this->assertSame([], $done['created']);
         $this->assertSame([], $done['replaced']);
         $this->assertNull($done['backup']);
+    }
+
+    #[Test]
+    public function it_publishes_a_makefile_that_is_missing(): void
+    {
+        PlainFile::delete($this->project . '/Makefile');
+
+        $done = new SetupUpdater()->update($this->vendor, $this->project);
+
+        $this->assertSame(['Makefile'], $done['created']);
+        $this->assertFileExists($this->project . '/Makefile');
     }
 
     #[Test]
