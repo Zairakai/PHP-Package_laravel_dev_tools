@@ -150,19 +150,9 @@ run_setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "--publish=phpunit publishes the configuration of an application when the project has artisan" {
+@test "--publish=phpunit publishes the configuration of an application when the project has artisan and laravel/framework" {
   touch "${PROJECT}/artisan"
-
-  run_setup --publish=phpunit
-
-  [ "$status" -eq 0 ]
-  run cmp "${PROJECT}/phpunit.xml" "${PACKAGE}/config/phpunit-app.xml"
-  [ "$status" -eq 0 ]
-}
-
-@test "--publish=phpunit publishes the configuration of an application when the project has app/ and no src/" {
-  rmdir "${PROJECT}/src"
-  mkdir "${PROJECT}/app"
+  printf '{\n  "name": "acme/app",\n  "require": {"laravel/framework": "^12.0"}\n}\n' > "${PROJECT}/composer.json"
 
   run_setup --publish=phpunit
 

@@ -33,6 +33,10 @@ final class PintConfigWriter
         array $layers,
         string $target = 'config/dev-tools/pint.json',
     ): string {
+        if (! class_exists(Pint::class)) {
+            throw new RuntimeException('The Pint rules of php-dev-tools were not found - run: composer install');
+        }
+
         $pintFile = (string) new ReflectionClass(Pint::class)->getFileName();
         $config   = self::read(dirname($pintFile, 2) . '/config/pint.json');
 

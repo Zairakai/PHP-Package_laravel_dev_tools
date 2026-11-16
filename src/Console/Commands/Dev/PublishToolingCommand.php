@@ -214,53 +214,7 @@ final class PublishToolingCommand extends Command
         $this->components->info(sprintf('Publishing group/key: <fg=cyan>%s</>', $target));
         $this->newLine();
 
-        $availableGroups = $configStubPublisher->availableGroups();
-        $availableKeys   = $configStubPublisher->availableKeys();
-
-        if (
-            'gitlab-ci' === $target
-            && (
-                $fullstack
-                || file_exists($basePath . '/package.json')
-            )
-        ) {
-            $configStubPublisher->publishGitlabCiFullstack(
-                $vendorPath,
-                $basePath,
-                $force,
-            );
-        }
-        // Attempt to publish as group first, then as individual key
-        elseif (in_array(
-            $target,
-            $availableGroups,
-            true,
-        )) {
-            $configStubPublisher->publishGroup(
-                $target,
-                $vendorPath,
-                $basePath,
-                $force,
-            );
-        }
-        elseif (in_array(
-            $target,
-            $availableKeys,
-            true,
-        )) {
-            $configStubPublisher->publishByKey(
-                $target,
-                $vendorPath,
-                $basePath,
-                $force,
-            );
-        }
-        else {
-            $this->components->error(sprintf('Unknown publish target: "%s"', $target));
-            $this->newLine();
-            $this->line(sprintf('  <fg=yellow>Valid groups:</> %s', implode(', ', $availableGroups)));
-            $this->line(sprintf('  <fg=yellow>Valid keys:</>   %s', implode(', ', $availableKeys)));
-
+        if (! $configStubPublisher->publishTarget($target, $vendorPath, $basePath, $force, $fullstack)) {
             return self::FAILURE;
         }
 
