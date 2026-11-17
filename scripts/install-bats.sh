@@ -21,9 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=config.sh
 source "${SCRIPT_DIR}/config.sh"
 
-# ============
 # Configuration
-# ============
+# ================
 
 CI_MODE="${CI:-false}"
 TOOL_VERSIONS_FILE="${SCRIPT_DIR}/../.tool-versions"
@@ -32,9 +31,8 @@ TOOL_VERSIONS_FILE="${SCRIPT_DIR}/../.tool-versions"
 INSTALL_DIR="${HOME}/.local/share/bats"
 BIN_DIR="${HOME}/.local/bin"
 
-# ============
 # Functions
-# ============
+# ================
 
 # Get BATS version from .tool-versions or use default
 get_bats_version() {
@@ -236,9 +234,8 @@ install_bats() {
   fi
 }
 
-# ============
 # Main
-# ============
+# ================
 
 main() {
   local required_version
