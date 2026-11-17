@@ -169,6 +169,8 @@ The setup also gives each project the Makefile, `.editorconfig`, the Composer sc
 
 `make setup-update` publishes again the files that `make setup-check` reports (missing or different), and only those. A file of the project that it replaces is copied first in `.dev-tools-backup/`: nothing is merged, you put your own settings back from the copy. `DRY_RUN=true make setup-update` lists the files without writing.
 
+In a full-stack project (this package and `@zairakai/js-dev-tools` with `fullstack.mk`), `make setup-check`, `make setup-update` and `make uninstall` run this package's script first, then the JS package's: the JS files of the setup are checked, updated and removed the same way. The two checks run one after the other, so `make -k setup-check` reports both when the first one fails.
+
 The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.
 
 For a package without Artisan:
