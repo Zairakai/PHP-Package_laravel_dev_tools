@@ -202,3 +202,17 @@ uninstall() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"Unknown option: --nope"* ]]
 }
+
+@test "uninstall-package.sh keeps a symbolic link and what it points at" {
+  printf '# shared\n' > "${TEST_TEMP_DIR}/shared-editorconfig"
+  rm "${PROJECT}/.editorconfig"
+  ln -s "${TEST_TEMP_DIR}/shared-editorconfig" "${PROJECT}/.editorconfig"
+
+  uninstall --force
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keep: .editorconfig (symbolic link)"* ]]
+  [ -L "${PROJECT}/.editorconfig" ]
+  [ "$(cat "${TEST_TEMP_DIR}/shared-editorconfig")" = "# shared" ]
+}
+

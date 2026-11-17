@@ -30,6 +30,11 @@ final class RemovalRules
             return null;
         }
 
+        // A symbolic link is the project's: it stays, and no copy of it is kept
+        if (is_link($basePath . '/' . $file)) {
+            return 'symbolic link';
+        }
+
         $thin     = isset(ConfigCopies::THIN_FILES[$file]);
         $inConfig = str_starts_with($file, self::CONFIG_FOLDER);
 

@@ -117,7 +117,7 @@ uninstall_package() {
   fi
 
   # The files of config/dev-tools/ that the project changed, and the baseline: removing them loses what the project wrote
-  changed="$(grep -c '^keep: config/dev-tools/' <<< "$lines" || true)"
+  changed="$(grep -c '^keep: config/dev-tools/.*(customized)' <<< "$lines" || true)"
 
   if [[ "$DRY_RUN" == "true" ]]; then
     log_info "Dry run: nothing was removed"
