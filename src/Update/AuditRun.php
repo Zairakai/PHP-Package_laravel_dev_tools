@@ -6,7 +6,7 @@ namespace Zairakai\LaravelDevTools\Update;
 
 /**
  * Look for security advisories in the lock file. One issue per advisory, never twice, closed when the advisory is gone.
- * With AUTO_FIX=true, an advisory that is high, critical or of unknown severity starts an update of the dependencies.
+ * With AUTO_FIX=true, an advisory that is high or critical starts an update of the dependencies (an unknown severity counts as a medium one).
  */
 final readonly class AuditRun
 {

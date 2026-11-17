@@ -15,6 +15,8 @@ use RuntimeException;
  * - cascade: after the publication of this package, start the update of the projects that use it (CascadeRun).
  * - audit: look for security advisories, open one issue per advisory and, with AUTO_FIX=true, start an update to fix
  *   them (AuditRun).
+ * - audit-check: read the report of `composer audit --format=json` and fail on an advisory that the daily audit fixes at
+ *   once (high or critical): the same level as `audit`, for the blocking audit of every pipeline (AuditCheckRun).
  * - policy: in the repository dependency-policy, lift the entries of php.json whose condition is met (PolicyWatchRun).
  * - policy-check: fail when the change since a ref updates a package of the dependency policy (PolicyCheckRun).
  * - dependabot-sync: rewrite the ignore rules of .github/dependabot.yml from the dependency policy (DependabotRun).
@@ -58,6 +60,13 @@ final class Updater
         $shell   = new ProcessShell($this->directory);
         $project = new Project($shell, $this->directory);
         $policy  = new Policy($shell, new WebNetwork());
+
+        // The audit of a pipeline only reads the report of `composer audit`: it needs no token.
+        if ('audit-check' === $mode) {
+            new AuditCheckRun($shell)->run($argument);
+
+            return;
+        }
 
         // The check only reads: it runs anywhere, GitHub included.
         if ('policy-check' === $mode) {
@@ -122,7 +131,7 @@ final class Updater
             'audit'   => new AuditRun($shell, $project, $audit, $issues, $mergeRequests, $api, $network)->run(),
             'policy'  => new PolicyWatchRun($shell, $project, $signing, $network, $mergeRequests)->run(),
             default   => throw new RuntimeException(
-                'Usage: update-dependencies update | release | tag | cascade | audit | policy '
+                'Usage: update-dependencies update | release | tag | cascade | audit | audit-check <report> | policy '
                 . '| policy-check <ref> | dependabot-sync',
             ),
         };

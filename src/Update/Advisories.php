@@ -165,12 +165,11 @@ final class Advisories
     }
 
     /**
-     * Whether an advisory is fixed without waiting for the next weekly update. Composer does not always give a severity: unknown counts as urgent.
+     * Whether an advisory is fixed without waiting for the next weekly update. Composer does not always give a severity: unknown counts as a medium one, it is not.
      */
     public static function isUrgent(string $severity): bool
     {
         return in_array($severity, [
-            '',
             'high',
             'critical',
         ], true);

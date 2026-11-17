@@ -11,6 +11,11 @@ load '../helpers/test_helper'
 setup() {
   setup_test_env
   make_script_project
+
+  # The audit asks bin/update-dependencies for the level: it needs the bin of the package and an autoloader
+  cp -R "${PROJECT_ROOT}/bin" "${PROJECT}/bin"
+  rm -rf "${PROJECT}/vendor"
+  ln -s "${PROJECT_ROOT}/vendor" "${PROJECT}/vendor"
 }
 
 teardown() {
@@ -37,19 +42,37 @@ run_in_project() {
   [[ "$output" == *"No security vulnerabilities found"* ]]
 }
 
-@test "security-audit.sh fails and shows the report when composer finds advisories" {
-  require_command jq
-  fake_command composer 'echo "{\"advisories\": {\"acme/lib\": [{\"title\": \"bad\"}]}}"; exit 1'
+@test "security-audit.sh fails and names an advisory of the high level" {
+  fake_command composer 'echo "{\"advisories\": {\"acme/lib\": [{\"advisoryId\": \"PKSA-1\", \"packageName\": \"acme/lib\", \"title\": \"bad\", \"link\": \"https://example.test/1\", \"severity\": \"high\"}]}}"; exit 1'
 
   run_in_project security-audit.sh
 
   [ "$status" -eq 1 ]
-  [[ "$output" == *"Found 1 security advisories"* ]]
-  [[ "$output" == *"acme/lib"* ]]
+  [[ "$output" == *"Blocking: acme/lib"* ]]
+  [[ "$output" == *"high"* ]]
+}
+
+@test "security-audit.sh lists an advisory of an unknown severity as a medium one and does not fail" {
+  fake_command composer 'echo "{\"advisories\": {\"acme/lib\": [{\"advisoryId\": \"PKSA-1\", \"packageName\": \"acme/lib\", \"title\": \"bad\", \"link\": \"\"}]}}"; exit 1'
+
+  run_in_project security-audit.sh
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Not blocking: acme/lib"* ]]
+  [[ "$output" == *"unknown"* ]]
+}
+
+@test "security-audit.sh lists an advisory below the high level and does not fail" {
+  fake_command composer 'echo "{\"advisories\": {\"acme/lib\": [{\"advisoryId\": \"PKSA-1\", \"packageName\": \"acme/lib\", \"title\": \"bad\", \"link\": \"\", \"severity\": \"medium\"}]}}"; exit 1'
+
+  run_in_project security-audit.sh
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Not blocking: acme/lib"* ]]
+  [[ "$output" == *"No security vulnerabilities found"* ]]
 }
 
 @test "security-audit.sh fails when composer audit could not run" {
-  require_command jq
   fake_command composer 'echo "Could not reach packagist" >&2; exit 100'
 
   run_in_project security-audit.sh
