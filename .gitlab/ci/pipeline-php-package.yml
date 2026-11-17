@@ -298,9 +298,11 @@ php:quality:outdated:
       - build/reports/outdated.json
     expire_in: 1 week
 
+# For information: it shows an advisory in the pipeline and does not block. The daily audit opens the issues and starts the fix.
 php:quality:security:
   <<: *job_php
   stage: quality
+  allow_failure: true
   rules:
     - if: $UPDATE_DEPENDENCIES == "true"
       when: never

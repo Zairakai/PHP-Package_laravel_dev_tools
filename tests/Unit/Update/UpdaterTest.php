@@ -56,6 +56,19 @@ final class UpdaterTest extends UpdateTestCase
     }
 
     #[Test]
+    public function it_reads_the_report_of_the_audit_check_without_a_token(): void
+    {
+        $this->env('GITLAB_TOKEN', '');
+        file_put_contents($this->directory . '/report.json', '{"error": "could not reach packagist"}');
+
+        // The mode is reached and reads the report: the missing token is not what stops it
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('composer audit could not run');
+
+        new Updater($this->directory)->run('audit-check', $this->directory . '/report.json');
+    }
+
+    #[Test]
     public function it_refuses_a_setting_that_composer_cannot_honor(): void
     {
         file_put_contents($this->directory . '/.dependency-update.json', '{"reject": ["a/a"]}');

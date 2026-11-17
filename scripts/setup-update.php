@@ -9,7 +9,7 @@ use Zairakai\LaravelDevTools\Services\SetupUpdater;
  *
  * Usage: php setup-update.php <project root> <vendor path of this package> [--dry-run]
  *
- * A file of the project that is replaced is copied in .dev-tools-backup/ first. Nothing is merged.
+ * A file of the project that is replaced is copied in .dev-tools-backup/ first. Nothing is merged. A symbolic link is kept.
  */
 
 $root   = $argv[1] ?? getcwd();
@@ -26,6 +26,10 @@ foreach ($done['created'] as $file) {
 
 foreach ($done['replaced'] as $file) {
     echo ($dryRun ? 'would replace: ' : 'replaced: ') . $file . "\n";
+}
+
+foreach ($done['kept'] as $file) {
+    echo 'keep: ' . $file . " (symbolic link)\n";
 }
 
 if (null !== $done['backup']) {

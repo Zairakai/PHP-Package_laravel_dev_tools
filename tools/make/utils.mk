@@ -25,8 +25,9 @@ composer-validate: ## Validate composer.json
 	@composer validate --strict
 
 ## —— 🧰 Utils ——
+# Double colon: in a full-stack project, the audit of js-dev-tools runs after this one
 .PHONY: security-audit
-security-audit: ## Run Composer security audit
+security-audit:: ## Run Composer security audit
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/security-audit.sh
 
 .PHONY: install-packages
@@ -37,15 +38,16 @@ install-packages: ## Install optional PHP tools interactively
 setup: ## Run the dev-tools setup
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-package.sh
 
+# Double colon: in a full-stack project, the targets of js-dev-tools run after these ones
 .PHONY: setup-check
-setup-check: ## Tell which files of the setup are missing or differ from the package (writes nothing)
+setup-check:: ## Tell which files of the setup are missing or differ from the package (writes nothing)
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-check.sh
 
 .PHONY: setup-update
-setup-update: ## Replace the files that setup-check reports
+setup-update:: ## Replace the files that setup-check reports
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/setup-update.sh
 
 .PHONY: uninstall
-uninstall: ## Remove the setup files (copy kept in .dev-tools-backup/)
+uninstall:: ## Remove the setup files (copy kept in .dev-tools-backup/)
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/uninstall-package.sh
 

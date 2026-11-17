@@ -79,7 +79,7 @@ final readonly class SetupRemover
     private function gitignore(string $basePath, bool $dryRun, ConfigBackup $backup): bool
     {
         $file = $basePath . '/.gitignore';
-        $text = is_file($file)
+        $text = is_file($file) && ! is_link($file)
             ? GitignoreBlock::removed((string) file_get_contents($file))
             : null;
 
@@ -152,6 +152,10 @@ final readonly class SetupRemover
     {
         $composer = $basePath . '/composer.json';
         $stub     = $vendorPath . '/stubs/composer-scripts.json';
+
+        if (is_link($composer)) {
+            return [];
+        }
 
         try {
             return $dryRun

@@ -16,33 +16,15 @@ ensure_dir "$(dirname "$AUDIT_REPORT")"
 log_step "Running composer audit..."
 
 # An abandoned package is not a vulnerability: composer would end with an error for it. The exit code is not enough alone
-# (it is also not 0 when the audit could not run): the report must be a JSON, and the advisories are counted in it.
+# (it is also not 0 when the audit could not run): the report decides, and the level is the one of the daily audit
+# (deps:audit): an advisory that is high or critical blocks, the others (an unknown severity counts as a medium one) are
+# listed. The rule is in bin/update-dependencies (audit-check), in one place.
 audit_status=0
 composer audit --format=json --abandoned=ignore > "$AUDIT_REPORT" || audit_status=$?
 
-if ! command_exists jq; then
-  if [ "$audit_status" -eq 0 ]; then
-    log_success "No security vulnerabilities found"
-    exit 0
-  fi
-
-  log_error "composer audit failed (install jq to count the advisories)"
-  cat "$AUDIT_REPORT"
+if ! php "$(dirname "$SCRIPT_DIR")/bin/update-dependencies" audit-check "$AUDIT_REPORT"; then
+  log_error "Security audit failed (composer audit exit ${audit_status}): see the advisories above"
   exit 1
 fi
 
-if ! jq -e '.advisories' "$AUDIT_REPORT" > /dev/null 2>&1; then
-  log_error "composer audit could not run: its report has no list of advisories"
-  cat "$AUDIT_REPORT"
-  exit 1
-fi
-
-VULNERABILITIES=$(jq '.advisories | length' "$AUDIT_REPORT")
-
-if [ "$VULNERABILITIES" -gt 0 ]; then
-  log_warning "Found $VULNERABILITIES security advisories"
-  cat "$AUDIT_REPORT"
-  exit 1
-fi
-
-log_success "No security vulnerabilities found"
+log_success "No security vulnerabilities found at the high level or above"

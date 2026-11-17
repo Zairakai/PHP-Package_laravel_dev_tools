@@ -169,6 +169,8 @@ The setup also gives each project the Makefile, `.editorconfig`, the Composer sc
 
 `make setup-update` publishes again the files that `make setup-check` reports (missing or different), and only those. A file of the project that it replaces is copied first in `.dev-tools-backup/`: nothing is merged, you put your own settings back from the copy. `DRY_RUN=true make setup-update` lists the files without writing.
 
+In a full-stack project (this package and `@zairakai/js-dev-tools` with `fullstack.mk`), `make setup-check`, `make setup-update` and `make uninstall` run this package's script first, then the JS package's: the JS files of the setup are checked, updated and removed the same way. The two checks run one after the other, so `make -k setup-check` reports both when the first one fails.
+
 The governance files (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) are published only with `--publish=governance`. They are a base to complete: in `SECURITY.md`, the service desk, the security scope and the protection table hold a `TODO`.
 
 For a package without Artisan:
@@ -208,7 +210,8 @@ Change `file` for the other templates:
 `vendor/bin/update-dependencies` keeps the requirements of a package up to date. The CI template runs it from the jobs `deps:update`, `deps:audit`, `deps:release`, `deps:tag` and `deps:cascade`:
 
 - `update`: `composer update -W`, `composer bump`, `composer normalize`, then a signed commit on a branch and a merge request into `develop`, merged when its pipeline succeeds.
-- `audit`: looks for security advisories in the lock file, one issue per advisory (an alert through ntfy when `NTFY_URL` is set), closed when the advisory is gone. With the group variable `AUTO_FIX=true`, an advisory that is high, critical or of unknown severity starts an update.
+- `audit`: looks for security advisories in the lock file, one issue per advisory (an alert through ntfy when `NTFY_URL` is set), closed when the advisory is gone. With the group variable `AUTO_FIX=true`, an advisory that is high or critical starts an update (an unknown severity counts as a medium one).
+- `audit-check <report>`: reads the report of `composer audit --format=json` and fails on an advisory of that same level (high or critical; an unknown severity counts as a medium one, it does not block). `make security-audit` and the job `php:quality:security` use it on every pipeline, so the audit shown in the pipeline and the daily audit that fixes have one level, set in one place. The job is for information: it does not block the pipeline (`allow_failure`). In a full-stack project, the JS audit runs after this one with the same level.
 - `release`: brings `develop` into `main` after an update.
 - `tag`: tags `main` (signed) only when a published range (`require`) changed.
 - `cascade`: after the publication on Packagist, starts the update of the projects that use the package.

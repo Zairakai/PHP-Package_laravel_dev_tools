@@ -85,6 +85,25 @@ final class SetupUpdaterTest extends TestCase
     }
 
     #[Test]
+    public function it_leaves_a_symbolic_link_alone_and_reports_it(): void
+    {
+        $shared = $this->project . '/shared-insights.php';
+        $link   = $this->project . '/config/dev-tools/phpinsights.php';
+
+        file_put_contents($shared, '<?php // shared');
+        PlainFile::delete($link);
+        symlink($shared, $link);
+
+        $done = new SetupUpdater()->update($this->vendor, $this->project);
+
+        $this->assertSame(['config/dev-tools/phpinsights.php'], $done['kept']);
+        $this->assertSame([], $done['replaced']);
+        $this->assertTrue(is_link($link));
+        $this->assertSame('<?php // shared', file_get_contents($shared));
+        $this->assertNull($done['backup']);
+    }
+
+    #[Test]
     public function it_publishes_a_makefile_that_is_missing(): void
     {
         PlainFile::delete($this->project . '/Makefile');

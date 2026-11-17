@@ -333,11 +333,11 @@ final class PlannerTest extends TestCase
     }
 
     #[Test]
-    public function fixes_without_waiting_only_the_serious_or_unknown_severities(): void
+    public function fixes_without_waiting_only_the_serious_severities_and_an_unknown_one_counts_as_medium(): void
     {
         $this->assertTrue(Advisories::isUrgent('critical'));
         $this->assertTrue(Advisories::isUrgent('high'));
-        $this->assertTrue(Advisories::isUrgent(''));
+        $this->assertFalse(Advisories::isUrgent(''));
         $this->assertFalse(Advisories::isUrgent('medium'));
         $this->assertFalse(Advisories::isUrgent('low'));
     }
