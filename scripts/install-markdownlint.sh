@@ -21,16 +21,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=config.sh
 source "${SCRIPT_DIR}/config.sh"
 
-# ============
 # Configuration
-# ============
+# ================
 
 CI_MODE="${CI:-false}"
 TOOL_VERSIONS_FILE="${SCRIPT_DIR}/../.tool-versions"
 
-# ============
 # Functions
-# ============
+# ================
 
 # Check if npm is available
 check_npm() {
@@ -174,9 +172,8 @@ install_markdownlint() {
   fi
 }
 
-# ============
 # Main
-# ============
+# ================
 
 main() {
   echo ""

@@ -102,3 +102,17 @@ check_the_setup() {
   [ "$output" = "1" ]
   [ ! -d "${PROJECT}/.dev-tools-backup" ]
 }
+
+@test "setup-update.sh leaves a symbolic link alone and names it" {
+  printf '<?php // shared\n' > "${TEST_TEMP_DIR}/shared-insights.php"
+  rm "${PROJECT}/config/dev-tools/phpinsights.php"
+  ln -s "${TEST_TEMP_DIR}/shared-insights.php" "${PROJECT}/config/dev-tools/phpinsights.php"
+
+  update_the_setup
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keep: config/dev-tools/phpinsights.php (symbolic link)"* ]]
+  [ -L "${PROJECT}/config/dev-tools/phpinsights.php" ]
+  [ "$(cat "${TEST_TEMP_DIR}/shared-insights.php")" = "<?php // shared" ]
+}
+

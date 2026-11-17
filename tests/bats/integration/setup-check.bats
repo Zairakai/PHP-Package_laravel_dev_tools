@@ -71,3 +71,13 @@ check_the_setup() {
   [ ! -e "${PROJECT}/config/dev-tools/rector.php" ]
   [ ! -d "${PROJECT}/.dev-tools-backup" ]
 }
+
+@test "the targets of the setup and of the audit are double-colon, so a full-stack project runs both packages" {
+  local target
+
+  for target in security-audit setup-check setup-update uninstall; do
+    run grep -c "^${target}:: " "${PROJECT_ROOT}/tools/make/utils.mk"
+    [ "$output" = "1" ]
+  done
+}
+

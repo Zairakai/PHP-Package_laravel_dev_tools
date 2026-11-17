@@ -7,6 +7,7 @@ namespace Zairakai\LaravelDevTools\Tests\Unit;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Zairakai\LaravelDevTools\Services\ConfigStubPublisher;
+use Zairakai\LaravelDevTools\Services\PlainFile;
 use Zairakai\LaravelDevTools\Services\SetupChecker;
 use Zairakai\LaravelDevTools\Services\SetupRemover;
 use Zairakai\LaravelDevTools\Services\SilentPublishOutput;
@@ -127,6 +128,23 @@ final class SetupRemoverTest extends TestCase
         $after = json_decode((string) file_get_contents($file), true);
 
         $this->assertSame(['quality' => 'my own gate'], $after['scripts']);
+    }
+
+    #[Test]
+    public function it_keeps_a_symbolic_link_and_what_it_points_at(): void
+    {
+        $shared = $this->project . '/shared-editorconfig';
+        $link   = $this->project . '/.editorconfig';
+
+        file_put_contents($shared, "root = true\n");
+        PlainFile::delete($link);
+        symlink($shared, $link);
+
+        $done = $this->remove();
+
+        $this->assertTrue(is_link($link));
+        $this->assertSame("root = true\n", file_get_contents($shared));
+        $this->assertContains(['file' => '.editorconfig', 'reason' => 'symbolic link'], $done['kept']);
     }
 
     #[Test]

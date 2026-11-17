@@ -21,16 +21,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=config.sh
 source "${SCRIPT_DIR}/config.sh"
 
-# ============
 # Configuration
-# ============
+# ================
 
 CI_MODE="${CI:-false}"
 TOOL_VERSIONS_FILE="${SCRIPT_DIR}/../.tool-versions"
 
-# ============
 # Functions
-# ============
+# ================
 
 # Get ShellCheck version from .tool-versions or use default
 get_shellcheck_version() {
@@ -206,9 +204,8 @@ install_shellcheck() {
   fi
 }
 
-# ============
 # Main
-# ============
+# ================
 
 main() {
   local required_version

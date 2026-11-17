@@ -8,14 +8,14 @@ namespace Zairakai\LaravelDevTools\Services;
  * Publishes again the files that SetupChecker reports as missing or different, and only those.
  *
  * A file of the project that is replaced is copied first in .dev-tools-backup/ (ConfigBackup, the folder that --force
- * uses). No merge: the project puts its own settings back from the copy.
+ * uses). No merge: the project puts its own settings back from the copy. A symbolic link is left alone.
  */
 final readonly class SetupUpdater
 {
     public function __construct(private SetupChecker $checker = new SetupChecker()) {}
 
     /**
-     * @return array{created: list<string>, replaced: list<string>, backup: ?string}
+     * @return array{created: list<string>, replaced: list<string>, kept: list<string>, backup: ?string}
      */
     public function update(string $vendorPath, string $basePath, bool $dryRun = false): array
     {
@@ -24,7 +24,7 @@ final readonly class SetupUpdater
             $basePath,
             function (string $generated, array $results) use ($basePath, $dryRun): array {
                 $backup = new ConfigBackup($basePath);
-                $done   = ['created' => [], 'replaced' => [], 'backup' => null];
+                $done   = ['created' => [], 'replaced' => [], 'kept' => [], 'backup' => null];
 
                 foreach ($results as $result) {
                     if (SetupChecker::SAME === $result['state']) {
@@ -32,6 +32,14 @@ final readonly class SetupUpdater
                     }
 
                     $target = $basePath . '/' . $result['file'];
+
+                    // A symbolic link is the project's: writing in it would write in what it points at, and no copy is kept
+                    if (is_link($target)) {
+                        $done['kept'][] = $result['file'];
+
+                        continue;
+                    }
+
                     $key    = SetupChecker::MISSING === $result['state']
                         ? 'created'
                         : 'replaced';
