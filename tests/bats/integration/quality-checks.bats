@@ -46,7 +46,7 @@ teardown() {
 # ================
 
 @test "setup-package.sh handles file installation" {
-  run grep -qE "(cp |copy)" "${SCRIPT_DIR}/setup-package.sh"
+  run grep -qE "(--publish|--force)" "${SCRIPT_DIR}/setup-package.sh"
 
   [ "$status" -eq 0 ]
 }

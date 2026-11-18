@@ -39,7 +39,7 @@ for arg in "$@"; do
       echo ""
       echo "Removes the files installed by setup-package.sh that are still what the package publishes:"
       echo "  - Makefile, .editorconfig, pint.json, phpunit.xml, .markdownlintignore"
-      echo "  - the thin files phpstan.neon and .markdownlint.json (they point at config/dev-tools/)"
+      echo "  - the thin file .markdownlint.json (it points at config/dev-tools/)"
       echo "  - config/dev-tools/ (the files that the project changed only after confirmation)"
       echo "  - the Composer scripts of the package in composer.json (a script that was changed stays)"
       echo "  - the block of the dev-tools in .gitignore"

@@ -50,7 +50,7 @@ final class ConfigStubPublisherTest extends TestCase
     }
 
     #[Test]
-    public function a_forced_publication_keeps_a_copy_of_the_generated_pint_file_and_of_its_copy_at_the_root(): void
+    public function a_forced_publication_keeps_a_copy_of_the_generated_pint_file(): void
     {
         File::makeDirectory(
             $this->basePath . '/config/dev-tools',
@@ -59,7 +59,6 @@ final class ConfigStubPublisherTest extends TestCase
             true,
         );
         File::put($this->basePath . '/config/dev-tools/pint.json', '{"mine": 1}');
-        File::put($this->basePath . '/pint.json', '{"root": 1}');
 
         $this->configStubPublisher->publishPint(
             $this->vendorPath,
@@ -73,44 +72,38 @@ final class ConfigStubPublisherTest extends TestCase
                 '',
             ])[0]),
         );
-        $this->assertSame(
-            '{"root": 1}',
-            File::get((glob($this->basePath . '/.dev-tools-backup/*/pint.json') ?: [
-                '',
-            ])[0]),
-        );
     }
 
     #[Test]
     public function a_forced_publication_keeps_a_copy_of_the_thin_file_of_the_root_that_it_writes_over(): void
     {
-        File::put($this->basePath . '/phpstan.neon', "includes:\n  - vendor/old.neon\n");
+        File::put($this->basePath . '/.markdownlint.json', '{"extends": "./vendor/old.json"}');
 
-        $this->configStubPublisher->publishPhpstan(
+        $this->configStubPublisher->publishMarkdownlint(
             $this->vendorPath,
             $this->basePath,
             true,
         );
 
-        $copies = glob($this->basePath . '/.dev-tools-backup/*/phpstan.neon') ?: [];
+        $copies = glob($this->basePath . '/.dev-tools-backup/*/.markdownlint.json') ?: [];
 
         $this->assertCount(1, $copies);
-        $this->assertStringContainsString('vendor/old.neon', File::get($copies[0]));
-        $this->assertStringContainsString('config/dev-tools/phpstan.neon', File::get($this->basePath . '/phpstan.neon'));
+        $this->assertStringContainsString('vendor/old.json', File::get($copies[0]));
+        $this->assertStringContainsString('./config/dev-tools/.markdownlint.json', File::get($this->basePath . '/.markdownlint.json'));
     }
 
     #[Test]
     public function a_publication_without_force_keeps_no_copy(): void
     {
-        File::put($this->basePath . '/phpstan.neon', "includes:\n  - vendor/old.neon\n");
+        File::put($this->basePath . '/.markdownlint.json', '{"extends": "./vendor/old.json"}');
 
-        $this->configStubPublisher->publishPhpstan(
+        $this->configStubPublisher->publishMarkdownlint(
             $this->vendorPath,
             $this->basePath,
             false,
         );
 
-        $this->assertStringContainsString('vendor/old.neon', File::get($this->basePath . '/phpstan.neon'));
+        $this->assertStringContainsString('vendor/old.json', File::get($this->basePath . '/.markdownlint.json'));
         $this->assertSame([], glob($this->basePath . '/.dev-tools-backup/*') ?: []);
     }
 
@@ -349,7 +342,8 @@ final class ConfigStubPublisherTest extends TestCase
         );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/phpstan.neon');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/phpstan.neon');
+        $this->assertFileDoesNotExist($this->basePath . '/phpstan.neon', 'no extension of an editor reads it');
     }
 
     #[Test]
@@ -380,7 +374,7 @@ final class ConfigStubPublisherTest extends TestCase
         );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/pint.json');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
     }
 
     #[Test]
@@ -661,20 +655,22 @@ variables:
         $this->assertTrue($result);
 
         foreach ([
-            '/phpstan.neon',
             '/config/dev-tools/phpstan.neon',
             '/config/dev-tools/rector.php',
             '/config/dev-tools/phpinsights.php',
             '/config/dev-tools/baseline.neon',
             '/config/dev-tools/pint.json',
-            '/pint.json',
             '/config/dev-tools/.markdownlint.json',
             '/.markdownlint.json',
             '/config/dev-tools/phpunit.xml',
-            '/phpunit.xml',
+            '/.markdownlintignore',
         ] as $file) {
             $this->assertFileExists($this->basePath . $file, "Missing: {$file}");
         }
+
+        $this->assertFileDoesNotExist($this->basePath . '/phpunit.xml');
+        $this->assertFileDoesNotExist($this->basePath . '/pint.json');
+        $this->assertFileDoesNotExist($this->basePath . '/config/dev-tools/.markdownlintignore');
 
         File::deleteDirectory($this->basePath . '/.githooks');
     }
@@ -712,7 +708,6 @@ variables:
         $this->assertTrue($result);
 
         foreach ([
-            '/phpstan.neon',
             '/config/dev-tools/phpstan.neon',
             '/config/dev-tools/rector.php',
             '/config/dev-tools/phpinsights.php',
@@ -733,7 +728,8 @@ variables:
         );
 
         $this->assertTrue($result);
-        $this->assertFileExists($this->basePath . '/pint.json');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
+        $this->assertFileDoesNotExist($this->basePath . '/pint.json', 'no copy at the root');
         $this->assertFileExists($this->basePath . '/.markdownlint.json');
     }
 
@@ -902,7 +898,7 @@ variables:
     }
 
     #[Test]
-    public function publish_pint_generates_the_complete_file_from_the_rules_of_php_dev_tools_and_copies_it(): void
+    public function publish_pint_generates_the_complete_file_from_the_rules_of_php_dev_tools_and_only_in_config_dev_tools(): void
     {
         $result = $this->configStubPublisher->publishPint($this->vendorPath, $this->basePath);
 
@@ -918,10 +914,7 @@ variables:
             $config['finder']['exclude'],
             'the exclusions of Laravel are added',
         );
-        $this->assertSame(
-            File::get($this->basePath . '/config/dev-tools/pint.json'),
-            File::get($this->basePath . '/pint.json'),
-        );
+        $this->assertFileDoesNotExist($this->basePath . '/pint.json', 'no copy at the root');
     }
 
     #[Test]
@@ -944,11 +937,10 @@ variables:
             true,
         );
         $this->assertStringNotContainsString('stale', File::get($this->basePath . '/config/dev-tools/pint.json'));
-        $this->assertStringNotContainsString('stale', File::get($this->basePath . '/pint.json'));
     }
 
     #[Test]
-    public function publish_pint_keeps_the_file_of_the_project_and_copies_it_at_the_root(): void
+    public function publish_pint_keeps_the_file_of_the_project(): void
     {
         File::makeDirectory(
             $this->basePath . '/config/dev-tools',
@@ -968,11 +960,7 @@ variables:
             File::get($this->basePath . '/config/dev-tools/pint.json'),
             'the changes of the project are kept',
         );
-        $this->assertSame(
-            File::get($this->basePath . '/config/dev-tools/pint.json'),
-            File::get($this->basePath . '/pint.json'),
-            'the root holds a copy',
-        );
+        $this->assertFileDoesNotExist($this->basePath . '/pint.json');
     }
 
     #[Test]
@@ -989,7 +977,7 @@ variables:
     }
 
     #[Test]
-    public function the_phpunit_file_of_config_dev_tools_goes_up_two_folders_and_the_copy_of_the_root_does_not(): void
+    public function the_phpunit_file_is_in_config_dev_tools_only_and_goes_up_two_folders(): void
     {
         $this->configStubPublisher->publishPhpunit(
             $this->vendorPath,
@@ -998,7 +986,7 @@ variables:
         );
 
         $this->assertStringContainsString('bootstrap="../../vendor/autoload.php"', File::get($this->basePath . '/config/dev-tools/phpunit.xml'));
-        $this->assertStringContainsString('bootstrap="vendor/autoload.php"', File::get($this->basePath . '/phpunit.xml'));
+        $this->assertFileDoesNotExist($this->basePath . '/phpunit.xml', 'no editor runs the tests, a copy would be a second file');
     }
 
     #[Test]
@@ -1011,7 +999,7 @@ variables:
             true,
         );
 
-        $this->assertStringContainsString('config/dev-tools/phpstan.neon', File::get($this->basePath . '/phpstan.neon'));
+        $this->assertFileDoesNotExist($this->basePath . '/phpstan.neon', 'no editor reads it');
         $this->assertStringContainsString('./config/dev-tools/.markdownlint.json', File::get($this->basePath . '/.markdownlint.json'));
         $this->assertFileDoesNotExist($this->basePath . '/rector.php', 'no editor reads it');
         $this->assertFileDoesNotExist($this->basePath . '/phpinsights.php', 'no editor reads it');

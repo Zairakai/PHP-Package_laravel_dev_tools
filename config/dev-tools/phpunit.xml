@@ -1,44 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-  bootstrap="vendor/autoload.php"
+  xsi:noNamespaceSchemaLocation="../../vendor/phpunit/phpunit/phpunit.xsd"
+  bootstrap="../../vendor/autoload.php"
   colors="true"
-  cacheDirectory="build/cache"
+  cacheDirectory="../../build/cache"
   displayDetailsOnTestsThatTriggerWarnings="true"
   failOnWarning="false"
   failOnRisky="true">
   <testsuites>
     <testsuite name="Unit">
-      <directory>tests/Unit</directory>
+      <directory>../../tests/Unit</directory>
     </testsuite>
 
     <testsuite name="Feature">
-      <directory>tests/Feature</directory>
+      <directory>../../tests/Feature</directory>
     </testsuite>
   </testsuites>
 
   <source>
     <include>
-      <directory>src</directory>
+      <directory>../../src</directory>
     </include>
 
     <exclude>
-      <directory>src/stubs</directory>
+      <directory>../../src/stubs</directory>
     </exclude>
   </source>
 
   <coverage>
     <report>
-      <clover outputFile="build/logs/clover.xml"/>
-      <cobertura outputFile="build/logs/cobertura.xml"/>
-      <html outputDirectory="build/coverage"/>
+      <clover outputFile="../../build/logs/clover.xml"/>
+      <cobertura outputFile="../../build/logs/cobertura.xml"/>
+      <html outputDirectory="../../build/coverage"/>
       <text outputFile="php://stdout" showUncoveredFiles="false"/>
     </report>
   </coverage>
 
   <logging>
-    <junit outputFile="build/logs/junit.xml"/>
+    <junit outputFile="../../build/logs/junit.xml"/>
   </logging>
 
   <php>

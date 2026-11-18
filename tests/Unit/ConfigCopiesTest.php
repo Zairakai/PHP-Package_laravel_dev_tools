@@ -53,28 +53,6 @@ final class ConfigCopiesTest extends TestCase
     }
 
     #[Test]
-    public function it_calls_the_callback_only_for_a_copy_that_exists_and_differs(): void
-    {
-        $this->publishEverything();
-
-        file_put_contents($this->root . '/pint.json', 'stale');
-
-        $seen = [];
-
-        ConfigCopies::sync(
-            $this->root,
-            [],
-            static function (string $file) use (&$seen): void {
-                $seen[] = basename($file);
-            },
-        );
-
-        self::assertSame([
-            'pint.json',
-        ], $seen, 'the copies that already agree are not saved');
-    }
-
-    #[Test]
     public function it_converts_every_kind_of_path_of_the_phpunit_schema(): void
     {
         $xml = <<<'XML_WRAP'
@@ -162,7 +140,6 @@ final class ConfigCopiesTest extends TestCase
             self::assertStringContainsString($left, $config, 'not a path of the project');
         }
 
-        self::assertSame($xml, ConfigCopies::phpunitForTheRoot($config));
     }
 
     #[Test]
@@ -175,11 +152,10 @@ final class ConfigCopiesTest extends TestCase
 
     #[Test]
     #[DataProvider('phpunitFilesOfThePackage')]
-    public function it_gives_back_the_phpunit_file_of_the_package_from_the_one_of_config_dev_tools(string $file): void
+    public function it_goes_up_two_folders_in_every_phpunit_file_of_the_package(string $file): void
     {
         $xml = (string) file_get_contents(dirname(__DIR__, 2) . '/' . $file);
 
-        self::assertSame($xml, ConfigCopies::phpunitForTheRoot(ConfigCopies::phpunitForConfig($xml)));
         self::assertStringContainsString('../../', ConfigCopies::phpunitForConfig($xml));
     }
 
@@ -209,7 +185,6 @@ final class ConfigCopiesTest extends TestCase
             $config,
             'a stream is not a path of the project',
         );
-        self::assertSame($xml, ConfigCopies::phpunitForTheRoot($config));
     }
 
     #[Test]
@@ -243,22 +218,43 @@ final class ConfigCopiesTest extends TestCase
     }
 
     #[Test]
-    public function it_tells_a_copy_that_differs_from_the_file_of_config_dev_tools(): void
+    public function it_tells_a_file_of_config_dev_tools_that_is_missing(): void
     {
         $this->publishEverything();
 
-        file_put_contents($this->root . '/pint.json', '{"preset": "psr12"}');
+        File::delete($this->root . '/config/dev-tools/.markdownlint.json');
 
         self::assertSame(
             [
-                'pint.json at the root differs from config/dev-tools/pint.json',
+                'config/dev-tools/.markdownlint.json is missing',
             ],
             ConfigCopies::problems($this->root),
         );
     }
 
     #[Test]
-    public function it_tells_a_copy_that_is_missing_at_the_root(): void
+    public function it_tells_a_file_of_the_root_that_no_editor_reads(): void
+    {
+        $this->publishEverything();
+
+        file_put_contents($this->root . '/rector.php', '<?php return [];');
+        file_put_contents($this->root . '/phpinsights.php', '<?php return [];');
+        file_put_contents($this->root . '/phpunit.xml', '<phpunit/>');
+        file_put_contents($this->root . '/phpstan.neon', "includes:\n  - baseline.neon\n");
+
+        self::assertSame(
+            [
+                'rector.php at the root is not read: move its changes to config/dev-tools/rector.php and remove it',
+                'phpinsights.php at the root is not read: move its changes to config/dev-tools/phpinsights.php and remove it',
+                'phpunit.xml at the root is not read: move its changes to config/dev-tools/phpunit.xml and remove it',
+                'phpstan.neon at the root is not read: move its changes to config/dev-tools/phpstan.neon and remove it',
+            ],
+            ConfigCopies::problems($this->root),
+        );
+    }
+
+    #[Test]
+    public function it_tells_a_file_that_is_missing_at_the_root(): void
     {
         $this->publishEverything();
 
@@ -273,32 +269,15 @@ final class ConfigCopiesTest extends TestCase
     }
 
     #[Test]
-    public function it_tells_a_file_of_config_dev_tools_that_is_missing(): void
+    public function it_tells_a_pint_file_at_the_root_where_no_tool_reads_it(): void
     {
         $this->publishEverything();
 
-        File::delete($this->root . '/config/dev-tools/phpunit.xml');
+        file_put_contents($this->root . '/pint.json', '{"preset": "psr12"}');
 
         self::assertSame(
             [
-                'config/dev-tools/phpunit.xml is missing',
-            ],
-            ConfigCopies::problems($this->root),
-        );
-    }
-
-    #[Test]
-    public function it_tells_a_file_of_the_root_that_no_editor_reads(): void
-    {
-        $this->publishEverything();
-
-        file_put_contents($this->root . '/rector.php', '<?php return [];');
-        file_put_contents($this->root . '/phpinsights.php', '<?php return [];');
-
-        self::assertSame(
-            [
-                'rector.php at the root is not read: move its changes to config/dev-tools/rector.php and remove it',
-                'phpinsights.php at the root is not read: move its changes to config/dev-tools/phpinsights.php and remove it',
+                'pint.json at the root is not read: move its changes to config/dev-tools/pint.json and remove it',
             ],
             ConfigCopies::problems($this->root),
         );
@@ -309,12 +288,10 @@ final class ConfigCopiesTest extends TestCase
     {
         $this->publishEverything();
 
-        file_put_contents($this->root . '/phpstan.neon', "includes:\n  - vendor/zairakai/laravel-dev-tools/config/library.neon\n");
         file_put_contents($this->root . '/.markdownlint.json', '{"extends": "./vendor/zairakai/laravel-dev-tools/config/.markdownlint.json"}');
 
         self::assertSame(
             [
-                'phpstan.neon at the root does not point at config/dev-tools/phpstan.neon',
                 '.markdownlint.json at the root does not point at ./config/dev-tools/.markdownlint.json',
             ],
             ConfigCopies::problems($this->root),
@@ -322,28 +299,18 @@ final class ConfigCopiesTest extends TestCase
     }
 
     #[Test]
-    public function it_writes_again_the_copies_of_the_root_from_config_dev_tools(): void
+    public function it_tells_an_ignore_file_in_config_dev_tools_that_the_tool_does_not_read(): void
     {
         $this->publishEverything();
 
-        file_put_contents($this->root . '/pint.json', 'stale');
-        file_put_contents($this->root . '/.markdownlintignore', 'stale');
+        file_put_contents($this->root . '/config/dev-tools/.markdownlintignore', "vendor/\n");
 
-        self::assertSame([
-            'pint.json',
-        ], ConfigCopies::sync($this->root, [
-            'pint.json',
-        ]));
-        self::assertSame('{"preset": "laravel"}', file_get_contents($this->root . '/pint.json'));
         self::assertSame(
-            'stale',
-            file_get_contents($this->root . '/.markdownlintignore'),
-            'only the names given',
+            [
+                'config/dev-tools/.markdownlintignore is not read: the file is the one of the root, remove it',
+            ],
+            ConfigCopies::problems($this->root),
         );
-
-        ConfigCopies::sync($this->root);
-
-        self::assertSame([], ConfigCopies::problems($this->root));
     }
 
     private function publishEverything(): void
@@ -353,14 +320,10 @@ final class ConfigCopiesTest extends TestCase
 
         file_put_contents($published . '/pint.json', '{"preset": "laravel"}');
         file_put_contents($published . '/phpunit.xml', $xml);
-        file_put_contents($published . '/.markdownlintignore', "vendor/\n");
         file_put_contents($published . '/phpstan.neon', "includes:\n  - baseline.neon\n");
         file_put_contents($published . '/.markdownlint.json', '{}');
 
-        file_put_contents($this->root . '/pint.json', '{"preset": "laravel"}');
-        file_put_contents($this->root . '/phpunit.xml', ConfigCopies::phpunitForTheRoot($xml));
         file_put_contents($this->root . '/.markdownlintignore', "vendor/\n");
-        file_put_contents($this->root . '/phpstan.neon', "includes:\n  - config/dev-tools/phpstan.neon\n");
         file_put_contents($this->root . '/.markdownlint.json', '{"extends": "./config/dev-tools/.markdownlint.json"}');
     }
 }

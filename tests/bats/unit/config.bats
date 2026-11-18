@@ -243,7 +243,7 @@ teardown() {
   [ "$output" = "vendor/zairakai/laravel-dev-tools/stubs/githooks" ]
 }
 
-@test "PINT_CONFIG is the pint.json of config/dev-tools, which the root copies" {
+@test "PINT_CONFIG is the pint.json of config/dev-tools, and only there" {
   run bash -c "source '${SCRIPT_DIR}/config.sh' >/dev/null 2>&1; echo \"\$PINT_CONFIG\""
 
   [ "$status" -eq 0 ]

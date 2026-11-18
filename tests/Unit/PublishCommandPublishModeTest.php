@@ -105,7 +105,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/phpstan.neon');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/phpstan.neon');
     }
 
     #[Test]
@@ -134,7 +134,7 @@ final class PublishCommandPublishModeTest extends TestCase
         ]);
 
         $this->assertEquals(0, $exitCode);
-        $this->assertFileExists($this->basePath . '/pint.json');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
     }
 
     #[Test]
@@ -164,7 +164,7 @@ final class PublishCommandPublishModeTest extends TestCase
 
         $this->assertEquals(0, $exitCode);
 
-        $this->assertFileExists($this->basePath . '/phpstan.neon');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/phpstan.neon');
         $this->assertFileExists($this->basePath . '/config/dev-tools/rector.php');
         $this->assertFileExists($this->basePath . '/config/dev-tools/phpinsights.php');
         $this->assertFileExists($this->basePath . '/config/dev-tools/baseline.neon');
@@ -184,7 +184,7 @@ final class PublishCommandPublishModeTest extends TestCase
 
         $this->assertEquals(0, $exitCode);
 
-        $this->assertFileExists($this->basePath . '/pint.json');
+        $this->assertFileExists($this->basePath . '/config/dev-tools/pint.json');
         $this->assertFileExists($this->basePath . '/.markdownlint.json');
     }
 
@@ -251,11 +251,10 @@ final class PublishCommandPublishModeTest extends TestCase
         $this->assertEquals(0, $exitCode);
 
         $expectedFiles = [
-            '/phpstan.neon',
             '/config/dev-tools/rector.php',
             '/config/dev-tools/phpinsights.php',
             '/config/dev-tools/baseline.neon',
-            '/pint.json',
+            '/config/dev-tools/pint.json',
             '/.markdownlint.json',
             '/config/dev-tools/phpunit.xml',
         ];
