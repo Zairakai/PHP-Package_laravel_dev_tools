@@ -58,7 +58,7 @@ final class SetupRemoverTest extends TestCase
 
         $this->assertNotNull($done['backup']);
 
-        foreach (['Makefile', '.editorconfig', 'pint.json', 'phpstan.neon', 'composer.json', '.gitignore', 'config/dev-tools/rector.php'] as $file) {
+        foreach (['Makefile', '.editorconfig', 'config/dev-tools/pint.json', 'config/dev-tools/phpstan.neon', 'composer.json', '.gitignore', 'config/dev-tools/rector.php'] as $file) {
             $this->assertFileExists($done['backup'] . '/' . $file, $file);
         }
 
@@ -167,13 +167,12 @@ final class SetupRemoverTest extends TestCase
     #[Test]
     public function it_removes_a_thin_file_that_points_at_config_dev_tools_and_keeps_another_one(): void
     {
-        file_put_contents($this->project . '/phpstan.neon', "includes:\n  - my/own.neon\n");
+        file_put_contents($this->project . '/.markdownlint.json', '{"extends": "./my/own.json"}');
 
         $done = $this->remove();
 
-        $this->assertFileExists($this->project . '/phpstan.neon');
-        $this->assertContains(['file' => 'phpstan.neon', 'reason' => 'customized'], $done['kept']);
-        $this->assertFileDoesNotExist($this->project . '/.markdownlint.json');
+        $this->assertFileExists($this->project . '/.markdownlint.json');
+        $this->assertContains(['file' => '.markdownlint.json', 'reason' => 'customized'], $done['kept']);
     }
 
     #[Test]
@@ -181,7 +180,7 @@ final class SetupRemoverTest extends TestCase
     {
         $done = $this->remove();
 
-        foreach (['Makefile', '.editorconfig', 'pint.json', 'phpunit.xml', '.markdownlintignore', 'phpstan.neon', '.markdownlint.json'] as $file) {
+        foreach (['Makefile', '.editorconfig', 'config/dev-tools/pint.json', 'config/dev-tools/phpunit.xml', '.markdownlintignore', 'config/dev-tools/phpstan.neon', '.markdownlint.json'] as $file) {
             $this->assertFileDoesNotExist($this->project . '/' . $file, $file);
             $this->assertContains($file, $done['removed']);
         }

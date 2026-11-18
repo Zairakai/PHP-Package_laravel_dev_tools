@@ -1,14 +1,14 @@
-# PHPStan configuration of this package: the thin file that the editor and the CI read.
-# The rules are in config/phpstan.neon, which extends the ones of php-dev-tools.
+# PHPStan configuration of this package: the one that the commands and the CI read.
+# The rules are in config/package.neon, which extends the ones of php-dev-tools.
 
 includes:
-  - config/package.neon
+  - ../package.neon
 
 parameters:
   paths:
-    - src
+    - ../../src
 
-  tmpDir: build/phpstan
+  tmpDir: ../../build/phpstan
 
   # Strict rules of php-dev-tools that the code of this package does not follow yet. TEMPORARY: reduce this list.
   ignoreErrors:
@@ -18,5 +18,3 @@ parameters:
       identifier: booleanNot.exprNotBoolean
     -
       identifier: arrayFilter.strict
-    -
-      identifier: plus.leftNonNumeric

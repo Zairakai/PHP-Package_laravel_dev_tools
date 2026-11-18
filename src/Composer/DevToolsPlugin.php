@@ -19,6 +19,7 @@ use Zairakai\LaravelDevTools\Services\GitlabCiSynchronizer;
  *   - Ensure the plugin itself is declared in config.allow-plugins
  *   - Ensure the setup-dev-tools script exists in composer.json scripts
  *   - Ensure @setup-dev-tools is registered in post-update-cmd
+ *   - After an update, tell which files of the setup are late (information only)
  *
  * Only runs in dev mode (composer install/update without --no-dev).
  */
@@ -92,6 +93,10 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
 
         $this->ensureScriptsConfigured();
         $this->synchronizeGitlabCi($event);
+
+        if (self::POST_UPDATE_EVENT === $event->getName()) {
+            $this->reportSetupCheck();
+        }
     }
 
     /**
@@ -270,6 +275,57 @@ final class DevToolsPlugin implements EventSubscriberInterface, PluginInterface
         }
 
         return $json;
+    }
+
+    /**
+     * Tell, after an update, which files of the setup are missing or differ from what the package publishes now.
+     *
+     * Information only: nothing is written and a failure of the check never fails the update (a file that differs can be
+     * a change of the project on purpose). `make setup-update` publishes again what is late.
+     */
+    private function reportSetupCheck(): void
+    {
+        $vendorDir = $this->composer?->getConfig()->get('vendor-dir');
+
+        if (
+            ! is_string($vendorDir)
+            || ! $this->io instanceof IOInterface
+        ) {
+            return;
+        }
+
+        $package = dirname(__DIR__, 2);
+        $lines   = [];
+        $code    = 0;
+
+        exec(
+            implode(' ', [
+                escapeshellarg(PHP_BINARY),
+                escapeshellarg($package . '/scripts/setup-check.php'),
+                escapeshellarg(dirname($vendorDir)),
+                escapeshellarg($package),
+                '2>&1',
+            ]),
+            $lines,
+            $code,
+        );
+
+        // 1 is "something is late"; any other code is a failure of the check itself, which is not shown as a result
+        if (1 !== $code) {
+            return;
+        }
+
+        $this->io->writeError(
+            '<warning>laravel-dev-tools: files of the setup that are missing or differ from the package:</warning>',
+        );
+
+        foreach ($lines as $line) {
+            $this->io->writeError('  - ' . $line);
+        }
+
+        $this->io->writeError(
+            'Run `make setup-update` to publish them again (the old file is kept in .dev-tools-backup/).',
+        );
     }
 
     // Private - GitLab CI synchronization

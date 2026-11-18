@@ -6,7 +6,7 @@ quality:: markdownlint shellcheck rector pint phpstan insights config-check ## R
 	@echo "✅ All quality checks passed"
 
 .PHONY: config-check
-config-check:: ## Check that the files of the root agree with config/dev-tools (SYNC=true writes the copies again)
+config-check:: ## Check that the files of the root agree with config/dev-tools
 	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/check-config-copies.sh
 
 .PHONY: quality-fast

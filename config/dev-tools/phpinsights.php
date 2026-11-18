@@ -21,7 +21,7 @@ use SlevomatCodingStandard\Sniffs\Functions\UnusedParameterSniff;
  * ================
  * The Laravel configuration of this package, which extends the one of php-dev-tools.
  */
-$baseConfig = require __DIR__ . '/config/phpinsights.php';
+$baseConfig = require dirname(__DIR__) . '/phpinsights.php';
 
 // The stubs are files for the projects, not code of this package.
 $baseConfig['exclude'] = [...($baseConfig['exclude'] ?? []), 'stubs'];

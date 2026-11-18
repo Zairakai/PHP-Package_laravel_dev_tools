@@ -30,16 +30,18 @@ The root of the project holds only what an editor or an extension reads, because
 
 | File of `config/dev-tools/` | What it does | At the root |
 | :--- | :--- | :--- |
-| `phpstan.neon` | `includes` `config/library.neon` (packages) or `config/app.neon` (applications), and the baseline. | `phpstan.neon`: thin, it includes the one of `config/dev-tools/`. |
+| `phpstan.neon` | `includes` `config/library.neon` (packages) or `config/app.neon` (applications), and the baseline. | None: no extension of an editor reads it, `make phpstan` does. |
 | `.markdownlint.json` | Extends `config/.markdownlint.json`, which extends the one of `php-dev-tools`. | `.markdownlint.json`: thin, it extends the one of `config/dev-tools/`. |
 | `rector.php` | Calls `RectorBaseConfig::configure()`. | None: no extension of an editor reads it, `make rector` does. |
 | `phpinsights.php` | Starts from `config/phpinsights.php`, then adds the overrides of the project. | None, as for Rector. |
-| `pint.json` | The complete file, which the project edits. Pint cannot extend a file: it is generated once from the rules of `php-dev-tools` and the Laravel layer of this package. | `pint.json`: a **copy**. |
-| `phpunit.xml` | The configuration of PHPUnit. PHPUnit cannot extend a file, and reads its paths from the folder of the file: the one of `config/dev-tools/` goes up two folders (`../../src`). | `phpunit.xml`: a **copy**, with the paths of the root (`src`). |
-| `.markdownlintignore` | The one of `php-dev-tools`, copied (an ignore file cannot extend another). | `.markdownlintignore`: a **copy**. |
+| `pint.json` | The complete file, which the project edits. Pint cannot extend a file: it is generated once from the rules of `php-dev-tools` and the Laravel layer of this package. | None: the extension of an editor takes its path in its settings (`laravel-pint.configPath`). |
+| `phpunit.xml` | The configuration of PHPUnit. PHPUnit cannot extend a file, and reads its paths from the folder of the file: the one of `config/dev-tools/` goes up two folders (`../../src`). | None: no extension of an editor runs the tests, `make test` does. |
 | `baseline.neon` | The errors that PHPStan accepts. | None. |
+| `phpstan-local.neon` | A local override of PHPStan, read before `phpstan.neon` when it exists (`scripts/config.sh`). | None. |
+| `phpcs.xml` | Optional, and not published: `make spread-fix` uses `config/phpcs.xml` of this package (the ternary on several lines). A project that wants more rules writes this file, and starts it with `<rule ref="../../vendor/zairakai/laravel-dev-tools/config/phpcs.xml"/>`, otherwise it replaces the rule of the package instead of adding to it. | None: no extension of an editor reads it, `make spread-fix` does. |
+| (none) | `.markdownlintignore`: the one of `php-dev-tools`. An ignore file cannot extend another and the tool reads it from the root. | `.markdownlintignore`: **the only file**, at the root. |
 
-The scripts and the `make` targets read `config/dev-tools/`. A copy at the root must say the same as its file of `config/dev-tools/`: `make config-check` checks it (it is part of `make quality`), and `SYNC=true make config-check` writes the copies again.
+The scripts and the `make` targets read `config/dev-tools/`. `make config-check` checks that the thin file points there and that no file is where no tool reads it: a `phpstan.neon`, `phpunit.xml`, `pint.json` or `rector.php` at the root, a `.markdownlintignore` in `config/dev-tools/` (it is part of `make quality`).
 
 ## Requirements
 
@@ -64,7 +66,7 @@ php artisan dev-tools:publish --fullstack
 The plugin adds a `setup-dev-tools` script to `composer.json` and runs it after each `composer install` and `composer update` (`scripts/setup-package.sh`). It also synchronizes the `ref` tags of the GitLab CI includes with the installed version. The setup:
 
 - creates the `Makefile` (PHP only, or full-stack when `package.json` is found), which delegates to `vendor/zairakai/laravel-dev-tools/tools/make/core.mk`,
-- creates `.editorconfig`, `config/dev-tools/baseline.neon` (the PHPStan baseline) and the PHPStan configuration of the project (`config/dev-tools/phpstan.neon`, with the thin `phpstan.neon` of the root),
+- creates `.editorconfig`, `config/dev-tools/baseline.neon` (the PHPStan baseline) and the PHPStan configuration of the project (`config/dev-tools/phpstan.neon`),
 - merges the Composer scripts of the package (`composer cs`, `composer analyse`, `composer quality`, `composer spread:fix`...) into `composer.json`, without replacing the ones the project has.
 
 </details>
@@ -146,12 +148,27 @@ $baseConfig = require __DIR__ . '/vendor/zairakai/laravel-dev-tools/config/phpin
 return $baseConfig;
 ```
 
+The requirements of the package are 80 for the quality, 40 for the complexity, 75 for the architecture and 0 for the style. A run or a pipeline can change them from the environment, without touching a file:
+
+| Variable | Requirement | Default |
+| :--- | :--- | :--- |
+| `INSIGHTS_MIN_QUALITY` | `min-quality` | 80 |
+| `INSIGHTS_MIN_COMPLEXITY` | `min-complexity` | 40 |
+| `INSIGHTS_MIN_ARCHITECTURE` | `min-architecture` | 75 |
+| `INSIGHTS_MIN_STYLE` | `min-style` | 0 |
+
+```bash
+INSIGHTS_MIN_QUALITY=90 make insights
+```
+
+A value that is not a number is ignored. The file of the project runs after the base one and has the last word: `$baseConfig['requirements']['min-quality'] = 90;` replaces the variable too.
+
 </details>
 
 <details>
 <summary>Publishing the configuration</summary>
 
-`dev-tools:publish` writes the configuration of the project in `config/dev-tools/`, then the files that the editor reads at the root (thin files, or copies). A file is never overwritten unless `--force` is given, and a root file that the project already has is kept. `pint.json` is generated.
+`dev-tools:publish` writes the configuration of the project in `config/dev-tools/`, then the files that the editor or the tool reads at the root (the thin `.markdownlint.json` and `.markdownlintignore`). A file is never overwritten unless `--force` is given, and a root file that the project already has is kept. `pint.json` is generated.
 
 ```bash
 php artisan dev-tools:publish --publish                 # everything
@@ -162,6 +179,8 @@ php artisan dev-tools:publish --fullstack               # Makefile for PHP and J
 ```
 
 `make setup-check` tells which files of the setup are missing or differ from what the package publishes now (it writes nothing, and exits with 1 when a file is missing or different). A file that differs can be a change of the project or a file late on the package: the check shows the difference, you decide what to keep.
+
+The check also runs by itself after `composer update`, for information only (it never fails the update): the plugin lists the files that are late and says to run `make setup-update`.
 
 The setup also gives each project the Makefile, `.editorconfig`, the Composer scripts of the package and the block of the tools in `.gitignore` (the group `setup`: `--publish=setup`, or one key at a time: `makefile`, `editorconfig`, `composer-scripts`, `gitignore`). `make setup-check` and `make setup-update` cover them too. The CI file and the governance files are not checked: a project makes them its own when it publishes them.
 

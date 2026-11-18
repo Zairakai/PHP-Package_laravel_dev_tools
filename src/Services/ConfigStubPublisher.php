@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Zairakai\LaravelDevTools\Services;
 
-use RuntimeException;
 use Zairakai\LaravelDevTools\Contracts\PublishOutput;
 
 /**
@@ -22,8 +21,9 @@ use Zairakai\LaravelDevTools\Contracts\PublishOutput;
  *   - governance : CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md (opt-in, not in 'all')
  *   - all        : all groups above except gitlab-ci and governance
  *
- * Each public method corresponds to one publishable asset - intentional by design.
- * Splitting into sub-publishers would add indirection without benefit.
+ * The public methods are the entry points of the publication, one per publishable asset. The work is done by three
+ * classes: BaseFilesPublisher (Makefile, .editorconfig, .gitignore, Composer scripts), ToolConfigPublisher (the
+ * configuration of the tools) and PlatformFilesPublisher (GitLab CI and governance files).
  */
 final readonly class ConfigStubPublisher
 {
@@ -79,13 +79,17 @@ final readonly class ConfigStubPublisher
 
     private BaseFilesPublisher $base;
 
-    private StubWriter $writer;
+    private PlatformFilesPublisher $platform;
+
+    private ToolConfigPublisher $tools;
 
     public function __construct(
         private PublishOutput $output,
     ) {
-        $this->writer = new StubWriter($output);
-        $this->base   = new BaseFilesPublisher($this->writer, $output);
+        $writer         = new StubWriter($output);
+        $this->base     = new BaseFilesPublisher($writer, $output);
+        $this->tools    = new ToolConfigPublisher($output, $writer);
+        $this->platform = new PlatformFilesPublisher($output, $writer);
     }
 
     /**
@@ -116,19 +120,11 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Publish the PHPStan baseline stub.
-     * Never force-overwritten - it accumulates user-accepted errors.
+     * See ToolConfigPublisher::publishBaseline().
      */
     public function publishBaseline(string $vendorPath, string $basePath): bool
     {
-        return $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/baseline.neon',
-            targetFile: $basePath . '/config/dev-tools/baseline.neon',
-            // Baseline is NEVER overwritten even with --force - it contains accepted errors
-            force: false,
-            label: 'config/dev-tools/baseline.neon',
-        );
+        return $this->tools->publishBaseline($vendorPath, $basePath);
     }
 
     /**
@@ -175,109 +171,35 @@ final readonly class ConfigStubPublisher
     // ================
 
     /**
-     * Publish the Enlightn configuration stub.
-     * Not part of any group - installed automatically on first setup.
+     * See ToolConfigPublisher::publishEnlightn().
      */
-    public function publishEnlightn(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): void {
-        $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/enlightn.php',
-            targetFile: $basePath . '/config/enlightn.php',
-            force: $force,
-            label: 'config/enlightn.php',
-        );
+    public function publishEnlightn(string $vendorPath, string $basePath, bool $force): void
+    {
+        $this->tools->publishEnlightn($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish the GitLab CI pipeline stub (.gitlab-ci.yml) into the project root.
-     *
-     * The stub contains a minimal .gitlab-ci.yml that includes the centralized
-     * pipeline template from zairakai/laravel-dev-tools. The ref: placeholder
-     * (0.0.0) is replaced with the currently installed package version by
-     * GitlabCiSynchronizer on the next composer install/update.
-     *
-     * Not included in the 'all' group - the CI file sits at the project root,
-     * not in config/dev-tools/, and requires intentional opt-in.
+     * See PlatformFilesPublisher::publishGitlabCi().
      */
-    public function publishGitlabCi(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        return $this->publishGitlabCiStub(
-            $vendorPath . '/stubs/gitlab-ci.yml',
-            $basePath,
-            $force,
-        );
+    public function publishGitlabCi(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->platform->publishGitlabCi($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish the full-stack GitLab CI pipeline stub (.gitlab-ci.yml) into the project root.
-     *
-     * Includes both PHP and JS pipelines with unified stages.
+     * See PlatformFilesPublisher::publishGitlabCiFullstack().
      */
-    public function publishGitlabCiFullstack(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        return $this->publishGitlabCiStub(
-            $vendorPath . '/stubs/gitlab-ci.fullstack.yml',
-            $basePath,
-            $force,
-        );
+    public function publishGitlabCiFullstack(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->platform->publishGitlabCiFullstack($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish governance files (CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md) to project root.
-     *
-     * Replaces PACKAGE_GITLAB_ISSUES placeholder with a URL derived from composer.json name.
-     * Hash-protected: skips files modified by the user (use --force to overwrite).
-     * Not included in 'all' - requires explicit opt-in (--publish=governance).
+     * See PlatformFilesPublisher::publishGovernanceFiles().
      */
-    public function publishGovernanceFiles(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        $stubsDir = $vendorPath . '/stubs/governance';
-
-        if (! is_dir($stubsDir)) {
-            $this->output->error('Governance stubs directory not found: ' . $stubsDir);
-
-            return false;
-        }
-
-        $issuesUrl = $this->resolveIssuesUrl($basePath);
-
-        $files = [
-            'CONTRIBUTING.md'    => $basePath . '/CONTRIBUTING.md',
-            'CODE_OF_CONDUCT.md' => $basePath . '/CODE_OF_CONDUCT.md',
-            'SECURITY.md'        => $basePath . '/SECURITY.md',
-        ];
-
-        $results = [];
-
-        foreach ($files as $filename => $targetFile) {
-            $results[] = $this->publishGovernanceFile(
-                stubFile: $stubsDir . '/' . $filename,
-                targetFile: $targetFile,
-                label: $filename,
-                issuesUrl: $issuesUrl,
-                force: $force,
-                basePath: $basePath,
-            );
-        }
-
-        return ! in_array(
-            false,
-            $results,
-            true,
-        );
+    public function publishGovernanceFiles(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->platform->publishGovernanceFiles($vendorPath, $basePath, $force);
     }
 
     /**
@@ -330,214 +252,62 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * Publish the PHP Insights configuration of the project into config/dev-tools/. No file at the root: no extension of
-     * an editor reads it, the commands do.
-     * User is expected to customize this file - protected against force overwrite.
+     * See ToolConfigPublisher::publishInsights().
      */
-    public function publishInsights(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        return $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/phpinsights.php',
-            targetFile: $basePath . '/config/dev-tools/phpinsights.php',
-            force: $force,
-            label: 'config/dev-tools/phpinsights.php',
-        );
+    public function publishInsights(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->tools->publishInsights($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish the Markdownlint configuration of the project into config/dev-tools/, and the thin file of the root that
-     * extends it, where the extension of the editor reads it.
+     * See ToolConfigPublisher::publishMarkdownlint().
      */
-    public function publishMarkdownlint(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        $published = $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/.markdownlint.json',
-            targetFile: $basePath . '/config/dev-tools/.markdownlint.json',
-            force: $force,
-            label: 'config/dev-tools/.markdownlint.json',
-        );
-
-        $this->publishRootThin(
-            $vendorPath,
-            $basePath,
-            '.markdownlint.json',
-            $force,
-        );
-
-        return $published;
+    public function publishMarkdownlint(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->tools->publishMarkdownlint($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish the Markdownlint ignore file into config/dev-tools/, and its copy at the root: an ignore file cannot
-     * extend another file.
+     * See ToolConfigPublisher::publishMarkdownlintIgnore().
      */
-    public function publishMarkdownlintIgnore(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        $published = $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/.markdownlintignore',
-            targetFile: $basePath . '/config/dev-tools/.markdownlintignore',
-            force: $force,
-            label: 'config/dev-tools/.markdownlintignore',
-        );
-
-        $this->publishRootCopy(
-            $basePath,
-            '.markdownlintignore',
-            $force,
-        );
-
-        return $published;
+    public function publishMarkdownlintIgnore(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->tools->publishMarkdownlintIgnore($vendorPath, $basePath, $force);
     }
 
     // Individual publishers
     // ================
 
     /**
-     * Publish the PHPStan configuration of the project into config/dev-tools/, where it extends the one of this package,
-     * and the thin file of the root that includes it, where the editor reads it.
+     * See ToolConfigPublisher::publishPhpstan().
      */
-    public function publishPhpstan(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        $generated = (string) tempnam(sys_get_temp_dir(), 'phpstan');
-
-        file_put_contents($generated, $this->phpstanContents($vendorPath, $basePath));
-
-        $published = $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $generated,
-            targetFile: $basePath . '/config/dev-tools/phpstan.neon',
-            force: $force,
-            label: 'config/dev-tools/phpstan.neon',
-        );
-
-        PlainFile::delete($generated);
-
-        $this->publishRootThin(
-            $vendorPath,
-            $basePath,
-            'phpstan.neon',
-            $force,
-        );
-
-        return $published;
+    public function publishPhpstan(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->tools->publishPhpstan($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish the PHPUnit configuration into config/dev-tools/, and its copy at the root, where the editor reads it.
-     * Detects project type to choose between app and package config.
-     *
-     * PHPUnit reads the paths of its file from the folder of that file: the one of config/dev-tools/ goes up two folders,
-     * the copy of the root does not (ConfigCopies).
+     * See ToolConfigPublisher::publishPhpunit().
      */
-    public function publishPhpunit(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        // Use app config for Laravel applications, library config for packages
-        $stubFile = $this->isLaravelApp($basePath)
-            ? $vendorPath . '/config/phpunit-app.xml'
-            : $vendorPath . '/config/phpunit.xml';
-
-        $converted = (string) tempnam(sys_get_temp_dir(), 'phpunit');
-
-        file_put_contents($converted, ConfigCopies::phpunitForConfig((string) file_get_contents($stubFile)));
-
-        $published = $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $converted,
-            targetFile: $basePath . '/config/dev-tools/phpunit.xml',
-            force: $force,
-            label: 'config/dev-tools/phpunit.xml',
-        );
-
-        PlainFile::delete($converted);
-
-        $this->publishRootCopy(
-            $basePath,
-            'phpunit.xml',
-            $force,
-        );
-
-        return $published;
+    public function publishPhpunit(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->tools->publishPhpunit($vendorPath, $basePath, $force);
     }
 
     /**
-     * Generate the pint.json of config/dev-tools/, and its copy at the root, where the editor reads it.
-     *
-     * Pint cannot extend a file. The file of config/dev-tools/ is the complete one that the project edits: it is
-     * generated from the rules of php-dev-tools and the Laravel layer of this package, and written again over the
-     * changes of the project only with $force.
+     * See ToolConfigPublisher::publishPint().
      */
-    public function publishPint(
-        string $vendorPath,
-        string $basePath,
-        bool $force = false,
-    ): bool {
-        if (
-            is_file($basePath . '/config/dev-tools/pint.json')
-            && ! $force
-        ) {
-            $this->writer->skip('config/dev-tools/pint.json', 'already exists (use --force to generate it again)');
-        }
-        else {
-            $this->writer->saveBeforeOverwriting($basePath, $basePath . '/config/dev-tools/pint.json');
-
-            try {
-                PintConfigWriter::write($basePath, [
-                    $vendorPath . '/config/pint.json',
-                ]);
-            }
-            catch (RuntimeException $runtimeException) {
-                $this->output->error($runtimeException->getMessage());
-
-                return false;
-            }
-
-            $this->output->task('Generated: config/dev-tools/pint.json');
-        }
-
-        $this->publishRootCopy(
-            $basePath,
-            'pint.json',
-            $force,
-        );
-
-        return true;
+    public function publishPint(string $vendorPath, string $basePath, bool $force = false): bool
+    {
+        return $this->tools->publishPint($vendorPath, $basePath, $force);
     }
 
     /**
-     * Publish the Rector configuration of the project into config/dev-tools/. No file at the root: no extension of an
-     * editor reads it, the commands do.
-     * User is expected to customize this file - protected against force overwrite.
+     * See ToolConfigPublisher::publishRector().
      */
-    public function publishRector(
-        string $vendorPath,
-        string $basePath,
-        bool $force,
-    ): bool {
-        return $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/rector.php',
-            targetFile: $basePath . '/config/dev-tools/rector.php',
-            force: $force,
-            label: 'config/dev-tools/rector.php',
-        );
+    public function publishRector(string $vendorPath, string $basePath, bool $force): bool
+    {
+        return $this->tools->publishRector($vendorPath, $basePath, $force);
     }
 
     /**
@@ -588,290 +358,15 @@ final readonly class ConfigStubPublisher
     }
 
     /**
-     * The CI file with PHP and JS: asked for, or the project uses js-dev-tools.
+     * See PlatformFilesPublisher::wantsFullstack().
      */
     public function wantsFullstack(string $basePath, bool $asked = false): bool
     {
-        return $asked || is_dir($basePath . '/node_modules/@zairakai/js-dev-tools');
-    }
-
-    /**
-     * A Laravel application: an artisan file and laravel/framework in composer.json.
-     */
-    private function isLaravelApp(string $basePath): bool
-    {
-        return file_exists($basePath . '/artisan')
-            && file_exists($basePath . '/composer.json')
-            && str_contains((string) file_get_contents($basePath . '/composer.json'), '"laravel/framework"');
-    }
-
-    /**
-     * The name of the package: the "name" of composer.json, or an empty string.
-     */
-    private function packageName(string $basePath): string
-    {
-        $file     = $basePath . '/composer.json';
-        $composer = is_file($file)
-            ? json_decode((string) file_get_contents($file), true)
-            : null;
-        $name     = is_array($composer)
-            ? ($composer['name'] ?? '')
-            : '';
-
-        return is_string($name)
-            ? $name
-            : '';
-    }
-
-    /**
-     * The PHPStan file of the project: the stub (a package), or the one of an application with its own folders.
-     */
-    private function phpstanContents(string $vendorPath, string $basePath): string
-    {
-        $stub = (string) file_get_contents($vendorPath . '/stubs/phpstan.neon');
-
-        if (! $this->isLaravelApp($basePath)) {
-            return $stub;
-        }
-
-        $paths = ['../../app'];
-
-        foreach (['database', 'routes'] as $folder) {
-            if (is_dir($basePath . '/' . $folder)) {
-                $paths[] = '../../' . $folder;
-            }
-        }
-
-        return str_replace(
-            [
-                'library.neon',
-                "    - ../../src\n    - ../../tests\n",
-            ],
-            [
-                'app.neon',
-                implode('', array_map(static fn (string $path): string => '    - ' . $path . "\n", $paths)),
-            ],
-            $stub,
-        );
-    }
-
-    /**
-     * The .gitlab-ci.yml of the project: the stub, with the name of the package and the cache key of composer.json.
-     */
-    private function publishGitlabCiStub(string $stubFile, string $basePath, bool $force): bool
-    {
-        if (! file_exists($stubFile)) {
-            $this->output->warn('Stub not found, skipping: .gitlab-ci.yml');
-
-            return false;
-        }
-
-        $content = (string) file_get_contents($stubFile);
-        $package = $this->packageName($basePath);
-
-        if ('' !== $package) {
-            $content = str_replace(
-                [
-                    'PACKAGIST_PACKAGE: "vendor/my-package"',
-                    'CACHE_KEY: "my-package"',
-                ],
-                [
-                    'PACKAGIST_PACKAGE: "' . $package . '"',
-                    'CACHE_KEY: "' . $this->shortName($package) . '"',
-                ],
-                $content,
-            );
-        }
-
-        $generated = (string) tempnam(sys_get_temp_dir(), 'gitlabci');
-
-        file_put_contents($generated, $content);
-
-        $published = $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $generated,
-            targetFile: $basePath . '/.gitlab-ci.yml',
-            force: $force,
-            label: '.gitlab-ci.yml',
-        );
-
-        PlainFile::delete($generated);
-
-        return $published;
-    }
-
-    /**
-     * Publish a single governance file with placeholder replacement.
-     *
-     * Logic (mirrors js-dev-tools publish_governance_file):
-     *  - Process stub: replace PACKAGE_GITLAB_ISSUES placeholder
-     *  - If target exists and no force: compare processed hash with target hash
-     *      → same hash: refresh (user hasn't modified, re-copy)
-     *      → different hash: skip (user has modified, protect)
-     *  - If target exists and force: overwrite unconditionally
-     *  - If target missing: copy
-     */
-    private function publishGovernanceFile(
-        string $stubFile,
-        string $targetFile,
-        string $label,
-        string $issuesUrl,
-        bool $force,
-        string $basePath,
-    ): bool {
-        if (! file_exists($stubFile)) {
-            $this->output->warn('Stub not found, skipping: ' . $label);
-
-            return false;
-        }
-
-        // Replace placeholder in a temporary buffer for hash comparison
-        $processed = str_replace(
-            'PACKAGE_GITLAB_ISSUES',
-            $issuesUrl,
-            (string) file_get_contents($stubFile),
-        );
-        $tempFile  = sys_get_temp_dir() . '/ldt_governance_' . md5($label);
-        file_put_contents($tempFile, $processed);
-
-        $this->writer->ensureDirectory(dirname($targetFile));
-
-        try {
-            // Target does not exist yet - just copy
-            if (! file_exists($targetFile)) {
-                copy($tempFile, $targetFile);
-                $this->output->task('Copied: ' . $label);
-
-                return true;
-            }
-
-            // Target exists, no force - compare processed content with target
-            if (! $force) {
-                $srcHash = hash_file('sha256', $tempFile);
-                $tgtHash = hash_file('sha256', $targetFile);
-
-                if ($srcHash === $tgtHash) {
-                    // Identical - silently refresh
-                    copy($tempFile, $targetFile);
-                    $this->output->task('Refreshed: ' . $label);
-
-                    return true;
-                }
-
-                // User has modified the file - protect it
-                $this->writer->skip(
-                    $label,
-                    'contains user modifications (use --force to overwrite)',
-                    'yellow',
-                );
-
-                return false;
-            }
-
-            // Force - overwrite unconditionally, after a copy of the file
-            $this->writer->saveBeforeOverwriting($basePath, $targetFile);
-            copy($tempFile, $targetFile);
-            $this->output->task('Copied: ' . $label);
-
-            return true;
-        }
-        finally {
-            PlainFile::delete($tempFile);
-        }
-    }
-
-    /**
-     * The copy of a file of config/dev-tools/ at the root, for the editor. Written when the project has none, or with
-     * $force; left alone otherwise (ConfigCopies tells when it differs).
-     */
-    private function publishRootCopy(
-        string $basePath,
-        string $name,
-        bool $force,
-    ): void {
-        if (
-            file_exists($basePath . '/' . $name)
-            && ! $force
-        ) {
-            return;
-        }
-
-        $written = ConfigCopies::sync(
-            $basePath,
-            [
-                $name,
-            ],
-            fn (string $file): bool => $this->writer->saveBeforeOverwriting($basePath, $file),
-        );
-
-        if ([] !== $written) {
-            $this->output->task('Copied: ' . $name . ' (root)');
-        }
-    }
-
-    /**
-     * The thin file of the root, for the editor: it points at the one of config/dev-tools/.
-     */
-    private function publishRootThin(
-        string $vendorPath,
-        string $basePath,
-        string $name,
-        bool $force,
-    ): void {
-        $this->writer->publish(
-            basePath: $basePath,
-            stubFile: $vendorPath . '/stubs/root/' . $name,
-            targetFile: $basePath . '/' . $name,
-            force: $force,
-            label: $name . ' (root)',
-        );
+        return $this->platform->wantsFullstack($basePath, $asked);
     }
 
     // Core publishing logic
     // ================
-
-    /**
-     * Derive the GitLab issues URL from the project's composer.json name.
-     *
-     * Convention: zairakai/laravel-dev-tools → https://gitlab.com/zairakai/php-packages/laravel-dev-tools/-/issues
-     */
-    private function resolveIssuesUrl(string $basePath): string
-    {
-        $composerPath = $basePath . '/composer.json';
-
-        if (! file_exists($composerPath)) {
-            return 'TODO: add GitLab issues URL';
-        }
-
-        $composer = json_decode((string) file_get_contents($composerPath), true);
-        $raw      = is_array($composer)
-            ? ($composer['name'] ?? '')
-            : '';
-        $name     = is_string($raw)
-            ? $raw
-            : '';
-
-        if ('' === $name) {
-            return 'TODO: add GitLab issues URL';
-        }
-
-        // Strip vendor prefix: zairakai/laravel-dev-tools → laravel-dev-tools
-        $shortName = str_contains($name, '/')
-            ? substr($name, strpos($name, '/') + 1)
-            : $name;
-
-        return 'https://gitlab.com/zairakai/php-packages/' . $shortName . '/-/issues';
-    }
-
-    /**
-     * The name of a package without its vendor: zairakai/laravel-dev-tools gives laravel-dev-tools.
-     */
-    private function shortName(string $package): string
-    {
-        return str_contains($package, '/')
-            ? substr($package, (int) strpos($package, '/') + 1)
-            : $package;
-    }
 
     /**
      * Handle unknown publishable key.

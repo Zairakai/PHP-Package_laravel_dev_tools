@@ -14,8 +14,8 @@ use StanislasPoisson\DevTools\Pint;
  *
  * Pint cannot extend another file. The file of config/dev-tools/ is the complete one that the project edits: it is
  * generated once from the rules of stanislas-poisson/php-dev-tools, then from each layer given (the Laravel layer of
- * this package), a later layer replacing the rules of an earlier one and adding its exclusions. The editor reads the
- * pint.json of the root, which is a copy of it (ConfigCopies).
+ * this package), a later layer replacing the rules of an earlier one and adding its exclusions. The extension of an
+ * editor takes its path in its settings.
  */
 final class PintConfigWriter
 {

@@ -7,7 +7,7 @@ namespace Zairakai\LaravelDevTools\Services;
 /**
  * What differs between the root of a project and its config/dev-tools/, one line each.
  *
- * The files and what they must hold are the ones of ConfigCopies.
+ * The files and where they must be are the ones of ConfigCopies.
  */
 final class ConfigCopiesCheck
 {
@@ -25,37 +25,10 @@ final class ConfigCopiesCheck
         }
 
         return array_merge(
-            self::copies($root),
             self::thinFiles($root),
             self::strayFiles($root),
+            self::rootOnlyFiles($root),
         );
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function copies(string $root): array
-    {
-        return array_values(array_filter(array_map(
-            static fn (string $name): ?string => self::copyProblem($root, $name),
-            ConfigCopies::COPIES,
-        )));
-    }
-
-    private static function copyProblem(string $root, string $name): ?string
-    {
-        $published = $root . '/' . ConfigCopies::PUBLISHED . $name;
-        $copy      = $root . '/' . $name;
-
-        return match (true) {
-            ! is_file($published) => self::missing($name),
-            ! is_file($copy)      => self::missingAtTheRoot($name),
-            (string) file_get_contents($copy) !== ConfigCopies::expectedCopy(
-                $name,
-                (string) file_get_contents($published),
-            )                     => sprintf('%s at the root differs from %s%s', $name, ConfigCopies::PUBLISHED, $name),
-            default               => null,
-        };
     }
 
     private static function missing(string $name): string
@@ -66,6 +39,30 @@ final class ConfigCopiesCheck
     private static function missingAtTheRoot(string $name): string
     {
         return sprintf('%s is missing at the root, where the editor reads it', $name);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function rootOnlyFiles(string $root): array
+    {
+        $problems = [];
+
+        foreach (ConfigCopies::ONLY_AT_THE_ROOT as $name) {
+            if (! is_file($root . '/' . $name)) {
+                $problems[] = self::missingAtTheRoot($name);
+            }
+
+            if (is_file($root . '/' . ConfigCopies::PUBLISHED . $name)) {
+                $problems[] = sprintf(
+                    '%s%s is not read: the file is the one of the root, remove it',
+                    ConfigCopies::PUBLISHED,
+                    $name,
+                );
+            }
+        }
+
+        return $problems;
     }
 
     /**
