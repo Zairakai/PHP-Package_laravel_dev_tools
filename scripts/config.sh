@@ -123,7 +123,8 @@ export PHPMETRICS_BIN="${PHPMETRICS_BIN:-vendor/bin/phpmetrics}"
 # CONFIGURATION RESOLUTION
 # ================
 # The configuration of the project is the file of config/dev-tools/, which extends the one of this package. The files of
-# the root are for the editor: thin files that point at it, or copies of it (ConfigCopies).
+# the root are for the editor: thin files that point at it, Files that no editor reads stay in
+# config/dev-tools/ only (phpunit.xml, pint.json); the ignore file of markdownlint stays at the root only (ConfigCopies).
 # Cascade: 1. config/dev-tools/$filename       (the configuration of the project)
 #          2. PROJECT_ROOT/$filename           (a project that has not moved its file yet)
 #          3. config/$filename                 (legacy or intermediate)
@@ -163,8 +164,7 @@ PHPSTAN_BASELINE=$(resolve_config "baseline.neon")
 export PHPSTAN_BASELINE="${PHPSTAN_BASELINE:-config/dev-tools/baseline.neon}"
 
 # Pint cannot extend a file: config/dev-tools/pint.json is the complete one that the project edits (generated once from the
-# rules of stanislas-poisson/php-dev-tools and the Laravel layer of this package), and the pint.json of the root, which the
-# editor reads, is a copy of it. build_pint_config prints the path of the file to use. A project that has no
+# rules of stanislas-poisson/php-dev-tools and the Laravel layer of this package), and the extension of an editor takes its path in its settings. build_pint_config prints the path of the file to use. A project that has no
 # config/dev-tools/pint.json yet gets the root file generated as before; the scripts of Pint call it once they run where
 # PHP is (maybe_dockerize).
 export PINT_CONFIG="${PROJECT_ROOT}/config/dev-tools/pint.json"
@@ -196,8 +196,16 @@ export RECTOR_CONFIG="${RECTOR_CONFIG:-}"
 MARKDOWNLINT_CONFIG=$(resolve_config ".markdownlint.json" "vendor/zairakai/laravel-dev-tools/config/.markdownlint.json")
 export MARKDOWNLINT_CONFIG="${MARKDOWNLINT_CONFIG:-}"
 
-MARKDOWNLINT_IGNORE=$(resolve_config ".markdownlintignore" "vendor/stanislas-poisson/php-dev-tools/config/.markdownlintignore")
-export MARKDOWNLINT_IGNORE="${MARKDOWNLINT_IGNORE:-}"
+# The ignore file is the one of the root only (it cannot extend another file), or the one of php-dev-tools
+MARKDOWNLINT_IGNORE=""
+for _ignore_candidate in ".markdownlintignore" "vendor/stanislas-poisson/php-dev-tools/config/.markdownlintignore"; do
+  if [[ -f "${PROJECT_ROOT}/${_ignore_candidate}" ]]; then
+    MARKDOWNLINT_IGNORE="${PROJECT_ROOT}/${_ignore_candidate}"
+    break
+  fi
+done
+unset _ignore_candidate
+export MARKDOWNLINT_IGNORE
 
 # PHPInsights
 INSIGHTS_CONFIG=$(resolve_config "phpinsights.php" "vendor/zairakai/laravel-dev-tools/config/phpinsights.php")

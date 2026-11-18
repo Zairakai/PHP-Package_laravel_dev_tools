@@ -61,6 +61,16 @@ final class RepositoryStructureTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function phpunitBases(): iterable
+    {
+        yield 'package' => ['config/phpunit.xml', 'src'];
+
+        yield 'application' => ['config/phpunit-app.xml', 'app'];
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function rootFiles(): iterable
@@ -68,7 +78,7 @@ final class RepositoryStructureTest extends TestCase
         foreach ([
             'LICENSE', 'README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'composer.json',
             '.editorconfig', '.gitattributes', '.gitignore', '.gitlab-ci.yml', '.markdownlint.json',
-            '.markdownlintignore', 'phpunit.xml',
+            '.markdownlintignore',
         ] as $file) {
             yield $file => [
                 $file,
@@ -241,15 +251,27 @@ final class RepositoryStructureTest extends TestCase
     }
 
     #[Test]
-    public function it_holds_the_files_of_the_tools_at_the_root_for_the_editor(): void
+    public function it_holds_the_files_of_the_tools_of_this_package_in_config_dev_tools_only(): void
     {
         foreach ([
             'phpstan.neon',
             'rector.php',
             'phpinsights.php',
             'pint.json',
+            'phpunit.xml',
+            '.markdownlint.json',
         ] as $file) {
-            self::assertFileExists($this->root($file));
+            self::assertFileExists($this->root('config/dev-tools/' . $file));
+        }
+
+        foreach ([
+            'phpstan.neon',
+            'rector.php',
+            'phpinsights.php',
+            'pint.json',
+            'phpunit.xml',
+        ] as $file) {
+            self::assertFileDoesNotExist($this->root($file), $file . ': no extension of an editor reads it');
         }
     }
 
@@ -309,14 +331,32 @@ final class RepositoryStructureTest extends TestCase
     #[Test]
     public function it_holds_the_thin_files_of_the_root_in_stubs_root_and_points_them_at_config_dev_tools(): void
     {
-        self::assertStringContainsString(
-            'config/dev-tools/phpstan.neon',
-            (string) file_get_contents($this->root('stubs/root/phpstan.neon')),
-        );
+        self::assertFileDoesNotExist($this->root('stubs/root/phpstan.neon'), 'no editor reads it: config/dev-tools/ only');
         self::assertStringContainsString(
             './config/dev-tools/.markdownlint.json',
             (string) file_get_contents($this->root('stubs/root/.markdownlint.json')),
         );
+    }
+
+    #[Test]
+    #[DataProvider('phpunitBases')]
+    public function it_keeps_coverage_and_junit_in_each_phpunit_base(string $file, string $source): void
+    {
+        $xml = (string) file_get_contents($this->root($file));
+
+        foreach ([
+            '<clover outputFile="build/logs/clover.xml"/>',
+            '<cobertura outputFile="build/logs/cobertura.xml"/>',
+            '<html outputDirectory="build/coverage"/>',
+            '<text outputFile="php://stdout"',
+            '<junit outputFile="build/logs/junit.xml"/>',
+            'failOnRisky="true"',
+            'cacheDirectory="build/cache"',
+        ] as $element) {
+            self::assertStringContainsString($element, $xml, $file . ' loses ' . $element);
+        }
+
+        self::assertStringContainsString('<directory>' . $source . '</directory>', $xml, 'the code that the coverage measures');
     }
 
     #[Test]
@@ -361,7 +401,7 @@ final class RepositoryStructureTest extends TestCase
     }
 
     #[Test]
-    public function it_keeps_the_pint_file_of_the_root_equal_to_the_merge_of_the_bases(): void
+    public function it_keeps_the_pint_file_of_this_package_equal_to_the_merge_of_the_bases(): void
     {
         $read = fn (string $path): array => (array) json_decode(
             (string) file_get_contents($this->root($path)),
@@ -370,18 +410,18 @@ final class RepositoryStructureTest extends TestCase
             JSON_THROW_ON_ERROR,
         );
 
-        // Pint cannot extend a file and the editor reads only this one: it is the rules of php-dev-tools and the
-        // exclusions of Laravel, as scripts/pint-config.php merges them.
+        // Pint cannot extend a file: it is the rules of php-dev-tools and the exclusions of Laravel, as
+        // scripts/pint-config.php merges them.
         $merged = Pint::merge($read('vendor/stanislas-poisson/php-dev-tools/config/pint.json'), $read('config/pint.json'));
 
-        self::assertSame($merged, $read('pint.json'));
+        self::assertSame($merged, $read('config/dev-tools/pint.json'));
     }
 
     #[Test]
-    public function it_keeps_the_pint_stub_identical_to_the_file_of_the_root(): void
+    public function it_keeps_the_pint_stub_identical_to_the_file_of_this_package(): void
     {
         self::assertSame(
-            (string) file_get_contents($this->root('pint.json')),
+            (string) file_get_contents($this->root('config/dev-tools/pint.json')),
             (string) file_get_contents($this->root('stubs/pint.json')),
         );
     }
@@ -396,7 +436,7 @@ final class RepositoryStructureTest extends TestCase
 
         foreach ([
             '/.gitattributes', '/.gitignore', '/.gitlab-ci.yml', '/.markdownlint.json', '/SECURITY.md', '/assets', '/docs',
-            '/tests', '/phpstan.neon', '/phpinsights.php', '/rector.php', '/pint.json',
+            '/tests', '/config/dev-tools',
         ] as $entry) {
             self::assertStringContainsString($entry . ' export-ignore', $attributes);
         }
@@ -547,6 +587,15 @@ final class RepositoryStructureTest extends TestCase
         ] as $text) {
             self::assertStringContainsString($text, $gitignore);
         }
+    }
+
+    #[Test]
+    public function it_tells_what_is_late_after_an_update_without_failing(): void
+    {
+        $plugin = (string) file_get_contents($this->root('src/Composer/DevToolsPlugin.php'));
+
+        self::assertStringContainsString('scripts/setup-check.php', $plugin);
+        self::assertStringContainsString('POST_UPDATE_EVENT === $event->getName()', $plugin);
     }
 
     /**

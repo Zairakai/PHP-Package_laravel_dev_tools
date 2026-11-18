@@ -3,7 +3,12 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
   bootstrap="vendor/autoload.php"
-  colors="true">
+  colors="true"
+  cacheDirectory="build/cache"
+  displayDetailsOnTestsThatTriggerWarnings="true"
+  failOnWarning="false"
+  failOnRisky="true"
+>
   <testsuites>
     <testsuite name="Unit">
       <directory>tests/Unit</directory>
@@ -20,8 +25,28 @@
     </include>
   </source>
 
+  <coverage>
+    <report>
+      <clover outputFile="build/logs/clover.xml"/>
+      <cobertura outputFile="build/logs/cobertura.xml"/>
+      <html outputDirectory="build/coverage"/>
+      <text outputFile="php://stdout" showUncoveredFiles="false"/>
+    </report>
+  </coverage>
+
+  <logging>
+    <junit outputFile="build/logs/junit.xml"/>
+  </logging>
+
   <php>
     <env name="APP_ENV" value="testing"/>
+    <env name="APP_MAINTENANCE_DRIVER" value="file"/>
     <env name="BCRYPT_ROUNDS" value="4"/>
+    <env name="CACHE_STORE" value="array"/>
+    <env name="MAIL_MAILER" value="array"/>
+    <env name="PULSE_ENABLED" value="false"/>
+    <env name="QUEUE_CONNECTION" value="sync"/>
+    <env name="SESSION_DRIVER" value="array"/>
+    <env name="TELESCOPE_ENABLED" value="false"/>
   </php>
 </phpunit>

@@ -414,6 +414,22 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+@test "a phpcs.xml of the project that references the one of the package keeps its rule" {
+  [ -x "${PROJECT_ROOT}/vendor/bin/phpcbf" ] || skip "phpcbf is not installed"
+
+  mkdir -p "${TEST_TEMP_DIR}/config/dev-tools" "${TEST_TEMP_DIR}/vendor/zairakai/laravel-dev-tools/config" "${TEST_TEMP_DIR}/src"
+  cp "${PROJECT_ROOT}/config/phpcs.xml" "${TEST_TEMP_DIR}/vendor/zairakai/laravel-dev-tools/config/phpcs.xml"
+  printf '<?xml version="1.0"?>\n<ruleset name="project">\n  <rule ref="../../vendor/zairakai/laravel-dev-tools/config/phpcs.xml"/>\n</ruleset>\n' \
+    > "${TEST_TEMP_DIR}/config/dev-tools/phpcs.xml"
+  printf '<?php\n\n$a = $x ? 1 : 2;\n' > "${TEST_TEMP_DIR}/src/Sample.php"
+
+  cd "${TEST_TEMP_DIR}"
+  run "${PROJECT_ROOT}/vendor/bin/phpcbf" --standard=config/dev-tools/phpcs.xml src
+
+  run grep -c '^    ? 1$' "${TEST_TEMP_DIR}/src/Sample.php"
+  [ "$output" = "1" ]
+}
+
 # spread-fix.sh Tests
 # ================
 
