@@ -8,7 +8,7 @@ bats:: ## Run shell script tests (BATS)
 		echo "ℹ️  No BATS tests found - skipping"; \
 		exit 0; \
 	fi
-	@bash scripts/bats-run.sh
+	@bash $(LARAVEL_DIRECTORY_TOOLS_SCRIPTS_DIR)/bats-run.sh
 
 .PHONY: bats-unit
 bats-unit:: ## Run BATS unit tests
