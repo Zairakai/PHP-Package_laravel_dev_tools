@@ -2,7 +2,7 @@
 # This file includes shared targets from vendor/zairakai/laravel-dev-tools
 
 LARAVEL_DIRECTORY_TOOLS_PROJECT_ROOT := $(shell pwd)
-LARAVEL_DIRECTORY_TOOLS_PROJECT_NAME := "Laravel Project"
+LARAVEL_DIRECTORY_TOOLS_PROJECT_NAME := Laravel Project
 
 .DEFAULT_GOAL := help
 
