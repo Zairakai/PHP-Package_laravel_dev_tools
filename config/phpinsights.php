@@ -23,6 +23,14 @@ use StanislasPoisson\DevTools\Insights;
  * For numeric arrays (remove, add, exclude) always merge using spread operator.
  * Never use array_replace_recursive() - it replaces values by index.
  */
+// A requirement can be set from the environment, for a pipeline or a run, without touching a file: INSIGHTS_MIN_QUALITY,
+// INSIGHTS_MIN_COMPLEXITY, INSIGHTS_MIN_ARCHITECTURE and INSIGHTS_MIN_STYLE. getenv() and not env(): the helper of Laravel is
+// not there when a package runs PHPInsights. A value that is not a number is ignored. The file of the project runs after
+// this one and has the last word.
+$requirement = static fn (string $name, int $default): int => is_numeric(getenv($name))
+    ? (int) getenv($name)
+    : $default;
+
 return Insights::config([
     'preset' => 'laravel',
 
@@ -88,9 +96,9 @@ return Insights::config([
     ],
 
     'requirements' => [
-        'min-quality'      => 80,
-        'min-complexity'   => 40,
-        'min-architecture' => 75,
-        'min-style'        => 0,
+        'min-quality'      => $requirement('INSIGHTS_MIN_QUALITY', 80),
+        'min-complexity'   => $requirement('INSIGHTS_MIN_COMPLEXITY', 40),
+        'min-architecture' => $requirement('INSIGHTS_MIN_ARCHITECTURE', 75),
+        'min-style'        => $requirement('INSIGHTS_MIN_STYLE', 0),
     ],
 ]);
