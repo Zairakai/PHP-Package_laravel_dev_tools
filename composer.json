@@ -54,13 +54,13 @@
   },
   "require-dev": {
     "composer/composer": "^2.11.2",
-    "ergebnis/composer-normalize": "^2.57",
+    "ergebnis/composer-normalize": "^2.58",
     "illuminate/console": "^12.0 || ^13.0",
     "illuminate/database": "^12.0 || ^13.0",
     "illuminate/filesystem": "^12.0 || ^13.0",
     "illuminate/support": "^12.0 || ^13.0",
     "orchestra/testbench": "^10.0 || ^11.3",
-    "phpunit/phpunit": "^12.5.44"
+    "phpunit/phpunit": "^12.5.45"
   },
   "suggest": {
     "enlightn/enlightn": "Security and performance analysis (Laravel apps only)",
